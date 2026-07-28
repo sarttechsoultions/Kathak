@@ -5,22 +5,27 @@ import { ArrowRight } from "lucide-react";
 
 export default function GurukulBanner() {
   return (
-    <section id="gurukul" className="relative w-full bg-[#153325] text-white my-12 sm:my-16 lg:my-20 overflow-hidden shadow-xl">
-      <div className="w-full">
+    <section id="gurukul" className="relative w-full bg-[#153325] text-white mt-12 sm:mt-16 lg:mt-20 mb-0 overflow-hidden shadow-xl min-h-[290px]">
+      
+      {/* Left Image Section: Touches LEFT (left-0), TOP (top-0), and BOTTOM (bottom-0) 100% */}
+      <div className="lg:absolute lg:top-0 lg:left-0 lg:bottom-0 lg:w-[32%] xl:w-[28%] w-full h-[280px] lg:h-full flex items-stretch justify-start overflow-hidden z-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/gurukul.png"
+          alt="Private Gurukul Experience"
+          className="w-full h-full object-cover object-left"
+        />
+      </div>
 
+      {/* Main Content Grid Container */}
+      <div className="relative w-full max-w-[1536px] mx-auto z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch gap-0">
 
+          {/* Spacer Column reserved for Left Image */}
+          <div className="lg:col-span-4 xl:col-span-3 min-h-[240px] lg:min-h-[290px]" />
 
-          {/* Left Image Section: gurukul.png */}
-          <div className="lg:col-span-3 self-stretch">
-            <img
-              src="/gurukul.png"
-              alt="Private Gurukul Experience"
-              className="w-full h-full object-contain object-left"
-            />
-          </div>
           {/* Center Column: Text Content */}
-          <div className="lg:col-span-4 px-8 lg:px-10 space-y-3 py-6 lg:py-8 border-r border-dashed border-[#D4AF37]/40">
+          <div className="lg:col-span-4 px-6 lg:px-8 space-y-3 py-6 lg:py-8 border-r border-dashed border-[#D4AF37]/40 flex flex-col justify-center bg-[#153325]/80 lg:bg-transparent">
             <h3 className="font-playfair font-medium text-2xl sm:text-3xl lg:text-[32px] leading-[48px] tracking-[1px] text-[#D9BE7A]">
               Private Gurukul Experience
             </h3>
@@ -35,14 +40,15 @@ export default function GurukulBanner() {
           </div>
 
           {/* Right Column: 4 Circular Feature Badges + Book Button */}
-          <div className="lg:col-span-5 flex flex-col justify-center items-start gap-6 px-20">
+          <div className="lg:col-span-4 xl:col-span-5 flex flex-col justify-center items-start gap-6 px-6 lg:px-10 py-6 lg:py-8 bg-[#153325]">
 
-            {/* 4 Circular Feature Icons (No Hover Effects, using exact PNG icons) */}
-            <div className="flex items-start justify-center gap-6">
+            {/* 4 Circular Feature Icons */}
+            <div className="flex items-start justify-center gap-4 sm:gap-6 flex-wrap sm:flex-nowrap">
 
               {/* Badge 1 */}
               <div className="flex flex-col items-center text-center">
                 <div className="w-[62px] h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/icons/Personalized.png"
                     alt="Personalized Learning Plan"
@@ -103,7 +109,6 @@ export default function GurukulBanner() {
           </div>
 
         </div>
-
       </div>
     </section>
   );

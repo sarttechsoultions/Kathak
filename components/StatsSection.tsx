@@ -43,7 +43,7 @@ const statsData: StatItem[] = [
 
 export default function StatsSection() {
   return (
-    <section id="stats" className="relative w-full bg-white border-y border-[#E5E7EB] py-8 sm:py-10 my-0">
+    <section id="stats" className="relative w-full bg-white border-b border-[#E5E7EB] pt-4 sm:pt-6 pb-8 sm:pb-10 my-0">
       <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6 sm:gap-8 lg:gap-10 divide-y sm:divide-y-0 lg:divide-x lg:divide-dashed lg:divide-[#D4AF37]/40">
           {statsData.map((stat, idx) => (
