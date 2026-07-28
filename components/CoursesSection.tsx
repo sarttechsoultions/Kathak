@@ -167,7 +167,7 @@ export default function CoursesSection() {
 </p>
 
           {/* Level Filter Tabs */}
-          <div className="flex items-center justify-center gap-6 pt-6">
+          <div className="flex items-center justify-center gap-3 sm:gap-6 flex-wrap sm:flex-nowrap pt-6">
   <button className="px-8 py-3 rounded-full text-xs  font-sans font-bold bg-[#1F4A3A] text-[#ffffff] shadow-md cursor-pointer">
     Basic
   </button>
@@ -193,6 +193,19 @@ export default function CoursesSection() {
                   {course.categoryLabel}
                 </span>
               </div>
+
+              {/* Card Top Right Share Icon */}
+              <button
+                aria-label="Share course"
+                className="absolute top-3.5 right-4 z-30 w-8 h-8 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer drop-shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/icons/share.png"
+                  alt="Share"
+                  className="w-full h-full object-contain"
+                />
+              </button>
 
               {/* Card Main Body Content */}
          <div className="pt-14 px-6 sm:px-7 pb-6 flex-1 flex flex-col justify-between z-10 relative">

@@ -5,7 +5,7 @@ import { ArrowRight, Trophy, Users, Globe, Award } from "lucide-react";
 
 export default function AboutSection() {
   return (
-    <section id="about" className="relative bg-white  sm:py-20 lg:py-28 overflow-hidden text-stone-900">
+    <section id="about" className="relative bg-white py-12 sm:py-20 lg:py-28 overflow-hidden text-stone-900">
       {/* Right Background Image (image 14.png from Figma) */}
       <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none z-0 opacity-40 sm:opacity-50 lg:opacity-65 max-w-[280px] sm:max-w-[380px] lg:max-w-[460px] translate-x-4 sm:translate-x-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -20,7 +20,7 @@ export default function AboutSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
 
           {/* Left Column: Image Collage with Floating Badge on Right Edge */}
-          <div className="lg:col-span-6 relative pr-4 sm:pr-6 lg:pr-8">
+          <div className="lg:col-span-6 relative px-2 sm:px-6 lg:pr-8 lg:pl-0">
             <div className="grid grid-cols-12 gap-3 sm:gap-4 relative max-w-[620px] mx-auto lg:max-w-none">
 
               {/* Left Tall Portrait Image (Rectangle 40.png) */}
@@ -54,18 +54,18 @@ export default function AboutSection() {
                   <img
                     src="/about/Rectangle 42.png"
                     alt="Kathak Student Performing Mudra"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-cover object-top sm:object-center transition-transform duration-700 group-hover:scale-105"
                   />
                 </div>
               </div>
 
-              {/* Floating Circular Badge on Right Edge with Gold Ring */}
-              <div className="absolute top-[52%] -right-5 sm:-right-7 lg:-right-9 -translate-y-1/2 z-30">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#0A4A40] border-[3.5px] border-[#D4AF37] shadow-2xl flex flex-col items-center justify-center text-center p-2 transform hover:scale-105 transition-transform duration-300">
-                  <span className="font-playfair font-bold text-2xl sm:text-3xl lg:text-4xl text-white leading-none tracking-tight">
+              {/* Floating Circular Badge on Right Edge Center with Gold Ring */}
+              <div className="absolute top-[48%] sm:top-[52%] right-[-6px] sm:-right-7 lg:-right-9 -translate-y-1/2 z-30">
+                <div className="w-22 h-22 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#0A4A40] border-[3px] sm:border-[3.5px] border-[#D4AF37] shadow-2xl flex flex-col items-center justify-center text-center p-1.5 sm:p-2 transform hover:scale-105 transition-transform duration-300">
+                  <span className="font-playfair font-bold text-xl sm:text-3xl lg:text-4xl text-white leading-none tracking-tight">
                     10+
                   </span>
-                  <span className="font-playfair text-[10px] sm:text-xs lg:text-sm text-stone-100 leading-tight font-medium mt-1">
+                  <span className="font-playfair text-[9.5px] sm:text-xs lg:text-sm text-stone-100 leading-tight font-medium mt-0.5 sm:mt-1">
                     Years of <br /> Excellence
                   </span>
                 </div>

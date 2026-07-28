@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Play, Share2 } from "lucide-react";
+import React from "react";
+import { ArrowRight, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 
 interface HeroSectionProps {
   videoSrc?: string;
 }
 
 export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionProps) {
-  const [isPlaying, setIsPlaying] = useState(true);
-
   return (
     <section id="home" className="relative w-full min-h-[680px] lg:min-h-[740px] h-[calc(100vh-90px)] max-h-[820px] flex items-center overflow-hidden bg-black text-white">
       {/* Background Video Layer */}
@@ -19,7 +17,7 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
           loop
           muted
           playsInline
-          className="w-full h-full object-cover scale-105 filter brightness-90"
+          className="w-full h-full object-cover object-center scale-105 filter brightness-90"
         >
           <source src={videoSrc} type="video/mp4" />
           Your browser does not support the video tag.
@@ -30,39 +28,39 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 z-10" />
       </div>
 
-      {/* Main Hero Container */}
-      <div className="relative z-20 w-full max-w-[1536px] mx-auto px-6 sm:px-10 lg:px-16 py-12 flex flex-col justify-center h-full">
+      {/* Main Hero Container: Subtle upward shift on Mobile (-translate-y-5) for light clearance */}
+      <div className="relative z-20 w-full max-w-[1536px] mx-auto px-6 sm:px-10 lg:px-16 py-8 sm:py-12 flex flex-col justify-center h-full">
         
-        <div className="max-w-2xl space-y-6">
+        <div className="max-w-2xl space-y-5 sm:space-y-6 mx-auto sm:mx-0 text-center sm:text-left flex flex-col items-center sm:items-start -translate-y-5 sm:translate-y-0">
           {/* Subheader Badge Tagline */}
-          <div className="inline-block">
-          <span className="font-poppins text-sm md:text-lg lg:text-[24px] font-bold uppercase tracking-[0.2em] lg:tracking-[8px] leading-[20px] text-[#fffff]">
-  Jaipur Gharana Tradition
-</span>
+          <div className="inline-block text-center sm:text-left">
+            <span className="font-poppins text-xs sm:text-sm md:text-lg lg:text-[24px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[8px] leading-[20px] text-white">
+              Jaipur Gharana Tradition
+            </span>
           </div>
 
           {/* Main Headline in Playfair Display */}
-          <h1 className="font-playfair font-medium text-[42px] md:text-[64px] xl:text-[96px] leading-[1.08] xl:leading-[104px] tracking-normal">
-  <span className="text-white">
-    Step Into The
-  </span>
-  <br />
-  <span className="whitespace-nowrap text-[#F6D099]">
-    Rhythm of Kathak
-  </span>
-</h1>
+          <h1 className="font-playfair font-medium text-[36px] sm:text-[42px] md:text-[64px] xl:text-[96px] leading-[1.1] xl:leading-[104px] tracking-normal text-center sm:text-left">
+            <span className="text-white">
+              Step Into The
+            </span>
+            <br />
+            <span className="sm:whitespace-nowrap text-[#F6D099]">
+              Rhythm of Kathak
+            </span>
+          </h1>
 
           {/* Description Subtitle in Playfair Display */}
-          <p className="font-playfair text-base sm:text-lg lg:text-xl text-stone-200 font-normal leading-relaxed max-w-xl opacity-95">
+          <p className="font-playfair text-sm sm:text-base lg:text-xl text-stone-200 font-normal leading-relaxed max-w-xl opacity-95 text-center sm:text-left mx-auto sm:mx-0">
             Discover the grace, discipline and storytelling that make Kathak a timeless classical art.
           </p>
 
           {/* CTA Action Buttons */}
-          <div className="flex flex-wrap items-center gap-4 pt-4">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 sm:pt-4 mx-auto sm:mx-0">
             {/* Primary Action Button */}
             <a
               href="#one-to-one"
-              className="bg-[#D9383A] hover:bg-[#B91C1C] text-white px-7 py-3.5 rounded-full font-playfair font-semibold text-sm sm:text-base transition-all duration-300 shadow-lg shadow-red-900/40 flex items-center gap-2 group cursor-pointer"
+              className="bg-[#D9383A] hover:bg-[#B91C1C] text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-semibold text-xs sm:text-base transition-all duration-300 shadow-lg shadow-red-900/40 flex items-center gap-2 group cursor-pointer"
             >
               <span>One-to-One</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -71,7 +69,7 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
             {/* Secondary Action Button */}
             <a
               href="#inquire"
-              className="border border-[#F6D099] hover:border-white bg-black/30 hover:bg-white/10 text-white px-7 py-3.5 rounded-full font-playfair font-medium text-sm sm:text-base transition-all backdrop-blur-sm cursor-pointer"
+              className="border border-[#F6D099] hover:border-white bg-black/30 hover:bg-white/10 text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-medium text-xs sm:text-base transition-all backdrop-blur-sm cursor-pointer"
             >
               Inquire Now
             </a>
@@ -80,67 +78,71 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
 
       </div>
 
-      {/* Floating Carousel Arrows */}
+      {/* Floating Carousel Arrows (Adjusted height slightly DOWN to top-[46%] on mobile, 50% on desktop) */}
       <button
         aria-label="Previous slide"
-        className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full border border-white/30 bg-black/40 hover:bg-black/70 text-white backdrop-blur-md flex items-center justify-center transition-all cursor-pointer hover:scale-110"
+        className="absolute top-[46%] sm:top-1/2 left-2 sm:left-4 lg:left-8 -translate-y-1/2 z-30 w-8 h-8 sm:w-11 sm:h-11 rounded-full border border-white/30 bg-black/60 hover:bg-black/80 text-white backdrop-blur-md flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
       >
-        <ChevronLeft className="w-6 h-6" />
+        <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6" />
       </button>
 
       <button
         aria-label="Next slide"
-        className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full border border-white/30 bg-black/40 hover:bg-black/70 text-white backdrop-blur-md flex items-center justify-center transition-all cursor-pointer hover:scale-110"
+        className="absolute top-[46%] sm:top-1/2 right-2 sm:right-4 lg:right-8 -translate-y-1/2 z-30 w-8 h-8 sm:w-11 sm:h-11 rounded-full border border-white/30 bg-black/60 hover:bg-black/80 text-white backdrop-blur-md flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg"
       >
-        <ChevronRight className="w-6 h-6" />
+        <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
       </button>
 
-      {/* Bottom Floating Action Controls */}
-      {/* Bottom Left Floating Phone Button */}
-      <div className="absolute bottom-6 left-6 lg:left-12 z-30">
+      {/* FIXED Floating Action Controls (Transparent BG, Uniform Sizing, Hover Micro-Animations, Shifted UP) */}
+
+      {/* Left Side Fixed Stack: Top (Phone Icon), Bottom (Instagram Icon) */}
+      <div className="fixed bottom-12 sm:bottom-8 left-3 sm:left-6 z-50 flex flex-col items-center gap-3">
+        {/* Top: Phone Call Icon */}
         <a
           href="tel:+919876543210"
           aria-label="Call Us"
-          className="w-11 h-11 rounded-full bg-black/60 hover:bg-[#D9383A] border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-lg p-2.5"
+          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/phone.png" alt="Phone" className="w-full h-full object-contain" />
+          <img src="/icons/phone.png" alt="Phone" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
+        </a>
+
+        {/* Bottom: Instagram Icon */}
+        <a
+          href="https://instagram.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Instagram Profile"
+          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/insta.png" alt="Instagram" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
         </a>
       </div>
 
-      {/* Bottom Right Actions */}
-      <div className="absolute bottom-6 right-6 lg:right-12 z-30 flex items-center gap-3">
-        {/* Watch Intro Button */}
-        <button
-          onClick={() => setIsPlaying(!isPlaying)}
-          className="flex items-center gap-2 bg-black/50 hover:bg-black/80 border border-white/20 px-4 py-2 rounded-full text-xs font-playfair font-medium text-white backdrop-blur-md transition-all cursor-pointer"
-        >
-          <div className="w-5 h-5 rounded-full bg-[#D9383A] flex items-center justify-center">
-            <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
-          </div>
-          <span>Watch Intro</span>
-        </button>
-
-        {/* WhatsApp Icon Button */}
+      {/* Right Side Fixed Stack: Top (WhatsApp Icon), Bottom (Chatbot Icon) */}
+      <div className="fixed bottom-12 sm:bottom-8 right-3 sm:right-6 z-50 flex flex-col items-center gap-3">
+        {/* Top: WhatsApp Icon */}
         <a
           href="https://wa.me/919876543210"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Chat on WhatsApp"
-          className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-md p-2"
+          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/whatsapp.png" alt="WhatsApp" className="w-full h-full object-contain" />
+          <img src="/icons/whatsapp.png" alt="WhatsApp" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
         </a>
 
-        {/* Share Button */}
+        {/* Bottom: Chatbot Icon */}
         <button
-          aria-label="Share page"
-          className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 shadow-md"
+          aria-label="Chatbot Support"
+          className="w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-[#C10F3A] hover:bg-[#A01830] text-white flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-110 hover:-translate-y-1 active:scale-95 shadow-xl hover:shadow-2xl p-3"
         >
-          <Share2 className="w-4 h-4" />
+          <Bot className="w-7 h-7 text-white" />
         </button>
       </div>
+
     </section>
   );
 }

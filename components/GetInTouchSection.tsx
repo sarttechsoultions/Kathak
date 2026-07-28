@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 
 export default function GetInTouchSection() {
   const [formData, setFormData] = useState({
@@ -34,18 +34,18 @@ export default function GetInTouchSection() {
             />
 
             {/* large Container: #6c867e with lower opacity & Corner Radius: 0 (rounded-none) */}
-            <div className="absolute bottom-0 right-0 bg-[#1F4A3A]/60 backdrop-blur-xs p-3.5 sm:p-4 rounded-none shadow-xl max-w-[391px]">
+            <div className="absolute bottom-0 right-0 bg-[#1F4A3A]/60 backdrop-blur-xs p-3.5 sm:p-4 rounded-none shadow-xl max-w-[85%] sm:max-w-[391px]">
               {/* Chota Container: #37523f with higher opacity & Corner Radius: 0 (rounded-none) */}
-             <div className="bg-[#1F4A3A]/60 pl-1 pt-0 pb-5 px-5 rounded-none text-white shadow-md border border-white/10">
+              <div className="bg-[#1F4A3A]/60 pl-1 pt-0 pb-5 px-5 rounded-none text-white shadow-md border border-white/10">
                 {/* Inter Medium 16px white */}
-             <span className="block font-inter text-[16px] font-medium leading-[19px] mb-3">
-  Have Any Questions?
-</span>
+                <span className="block font-inter text-[16px] font-medium leading-[19px] mb-3">
+                  Have Any Questions?
+                </span>
 
-<h3 className="font-inter text-[32px] font-semibold leading-[38px]">
-  We'd Love to Hear <br />
-  From You
-</h3>
+                <h3 className="font-inter text-[32px] font-semibold leading-[38px]">
+                  We'd Love to Hear <br />
+                  From You
+                </h3>
               </div>
             </div>
           </div>
@@ -68,17 +68,16 @@ export default function GetInTouchSection() {
               
               {/* 1. Full Name */}
               <div>
-             <input
-  type="text"
-  required
-  placeholder="Full Name"
-  value={formData.fullName}
-  onChange={(e) =>
-    setFormData({ ...formData, fullName: e.target.value })
-  }
-  className="w-full h-[60px] rounded-xl bg-white px-7 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none
-  "
-/>
+                <input
+                  type="text"
+                  required
+                  placeholder="Full Name"
+                  value={formData.fullName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullName: e.target.value })
+                  }
+                  className="w-full h-[60px] rounded-xl bg-white px-7 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none"
+                />
               </div>
 
               {/* 2. Email / Phone Number */}
@@ -93,13 +92,13 @@ export default function GetInTouchSection() {
                 />
               </div>
 
-              {/* 3. Class Mode Dropdown */}
-              <div>
+              {/* 3. Class Mode Dropdown (Arrow shifted LEFT using ChevronDown) */}
+              <div className="relative">
                 <select
                   required
                   value={formData.classMode}
                   onChange={(e) => setFormData({ ...formData, classMode: e.target.value })}
-                  className="w-full h-[60px] rounded-xl bg-white px-7 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer"
+                  className="w-full h-[60px] rounded-xl bg-white pl-7 pr-14 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer appearance-none"
                 >
                   <option value="" disabled>
                     Class Mode
@@ -108,15 +107,16 @@ export default function GetInTouchSection() {
                   <option value="Offline">Offline</option>
                   <option value="Other">Other</option>
                 </select>
+                <ChevronDown className="w-5 h-5 text-black absolute right-7 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
-              {/* 4. Subject Dropdown */}
-              <div>
+              {/* 4. Subject Dropdown (Arrow shifted LEFT using ChevronDown) */}
+              <div className="relative">
                 <select
                   required
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full h-[60px] rounded-xl bg-white px-7 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer"
+                  className="w-full h-[60px] rounded-xl bg-white pl-7 pr-14 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer appearance-none truncate"
                 >
                   <option value="" disabled>
                     Subject
@@ -142,6 +142,7 @@ export default function GetInTouchSection() {
                   <option value="Competition Judging">Competition Judging</option>
                   <option value="Other">Other</option>
                 </select>
+                <ChevronDown className="w-5 h-5 text-black absolute right-7 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
 
               {/* 5. Your Message Textarea */}
@@ -157,30 +158,13 @@ export default function GetInTouchSection() {
 
               {/* 6. Send Button */}
               <div className="pt-2">
-              <button
-  type="submit"
-  className="
-    w-full
-    h-[60px]
-    rounded-xl
-    bg-[#C10F3A]
-    text-white
-    font-['Plus_Jakarta_Sans']
-    text-[24px]
-    font-semibold
-    leading-[24px]
-    flex
-    items-center
-    justify-center
-    gap-2
-    transition-colors
-    hover:bg-[#A01830]
-    cursor-pointer
-  "
->
-  <span>Send</span>
-  <ArrowRight className="w-6 h-6" />
-</button>
+                <button
+                  type="submit"
+                  className="w-full h-[60px] rounded-xl bg-[#C10F3A] text-white font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-[24px] flex items-center justify-center gap-2 transition-colors hover:bg-[#A01830] cursor-pointer"
+                >
+                  <span>Send</span>
+                  <ArrowRight className="w-6 h-6" />
+                </button>
               </div>
 
             </form>

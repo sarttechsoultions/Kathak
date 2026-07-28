@@ -49,16 +49,16 @@ export default function StatsSection() {
           {statsData.map((stat, idx) => (
             <div
               key={idx}
-              className={`flex items-center justify-center gap-3.5 px-2 text-center mx-auto ${
+              className={`flex items-center justify-center gap-3.5 px-2 text-center mx-auto pb-3 border-b border-[#687280]/40 w-full ${
                 idx !== 0 ? "pt-4 sm:pt-0 lg:pl-6" : ""
               }`}
             >
-              {/* Icon - Centered alongside text */}
+              {/* Icon - Shifted slightly UP */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={stat.iconSrc}
                 alt={stat.label}
-                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 -mt-2"
               />
 
               {/* Text Column - Centered Number and Label */}
@@ -66,7 +66,7 @@ export default function StatsSection() {
                 <span className="font-sans font-bold text-2xl sm:text-[24px] text-[#1F4A3A] tracking-[1px] leading-[32px] text-center w-full">
                   {stat.number}
                 </span>
-                <span className="font-sans font-semibold text-[11px] sm:text-xs text-[#687280] tracking-[0.5px] leading-[15px] uppercase whitespace-nowrap text-center w-full">
+                <span className="font-sans font-semibold text-[11px] sm:text-xs text-[#687280] tracking-[0.5px] leading-[15px] uppercase sm:whitespace-nowrap text-center w-full">
                   {stat.label}
                 </span>
               </div>

@@ -26,24 +26,24 @@ interface NavbarProps {
 
 export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState("IN");
+  const [selectedCountry, setSelectedCountry] = useState("India (IN)");
   const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs transition-all">
-      <div className="w-full max-w-[1536px] mx-auto h-[90px] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-[100] w-full bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs transition-all">
+      <div className="w-full max-w-[1536px] mx-auto h-[60px] sm:h-[90px] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
         
-        {/* Brand Logo - Pushed further to Left */}
+        {/* Brand Logo */}
         <Link href="/" className="flex items-center shrink-0 group py-1 -ml-1 sm:ml-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoSrc}
             alt="Kathak by Harshita Logo"
-            className="h-14 sm:h-16 max-h-[64px] w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+            className="h-11 sm:h-16 max-h-[64px] w-auto object-contain transition-transform duration-300 group-hover:scale-105"
           />
         </Link>
 
-        {/* Center Navigation Links (Using Playfair Display Font) */}
+        {/* Center Navigation Links */}
         <nav className="hidden xl:flex items-center gap-6 lg:gap-7 xl:gap-8">
           {navItems.map((item) => (
             <Link
@@ -63,51 +63,71 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
           ))}
         </nav>
 
-        {/* Right Action Controls - Pushed further to Right */}
+        {/* Right Action Controls: Country / Language Selector Pill + Login Button */}
         <div className="hidden sm:flex items-center gap-4 -mr-1 sm:mr-0">
-          {/* Currency Dropdown */}
+          
+          {/* Country / Language Selection Pill Dropdown */}
           <div className="relative">
             <button
               onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
-              className="flex items-center gap-1.5 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 px-3.5 py-1.5 rounded-full text-xs font-medium text-stone-700 transition-colors cursor-pointer"
-              title="Select Currency"
+              className="flex items-center gap-2 bg-white hover:bg-stone-50 border border-stone-200/90 px-3.5 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium text-stone-800 transition-colors cursor-pointer shadow-2xs"
+              title="Select Language / Country"
             >
-              <span className="text-sm">🇮🇳</span>
-              <span className="font-semibold tracking-wide text-stone-800">
-                {selectedCurrency}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/india-flag.svg"
+                alt="India Flag"
+                className="w-5 h-3.5 object-cover rounded-[2px] shadow-2xs shrink-0"
+              />
+              <span className="font-sans font-medium text-stone-800">
+                India (IN)
               </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${currencyDropdownOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-stone-600 transition-transform duration-200 ${currencyDropdownOpen ? "rotate-180" : ""}`} />
             </button>
 
             {currencyDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-28 bg-white rounded-xl shadow-lg border border-stone-100 py-1.5 z-50 text-xs font-playfair animate-in fade-in slide-in-from-top-2">
-                {["INR", "USD", "GBP"].map((curr) => (
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-stone-100 py-2 z-50 text-xs font-sans animate-in fade-in slide-in-from-top-2">
+                {[
+                  { label: "India (IN)", flagSrc: "/icons/india-flag.svg" },
+                  { label: "USA (US)", flagEmoji: "🇺🇸" },
+                  { label: "UK (GB)", flagEmoji: "🇬🇧" },
+                  { label: "Canada (CA)", flagEmoji: "🇨🇦" },
+                ].map((country) => (
                   <button
-                    key={curr}
+                    key={country.label}
                     onClick={() => {
-                      setSelectedCurrency(curr);
+                      setSelectedCountry(country.label);
                       setCurrencyDropdownOpen(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-stone-50 flex items-center justify-between font-medium text-stone-800 cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-stone-50 flex items-center justify-between font-medium text-stone-800 cursor-pointer"
                   >
-                    <span>{curr === "INR" ? "🇮🇳 INR" : curr === "USD" ? "🇺🇸 USD" : "🇬🇧 GBP"}</span>
-                    {selectedCurrency === curr && <span className="text-[#D9383A]">✓</span>}
+                    <span className="flex items-center gap-2">
+                      {country.flagSrc ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={country.flagSrc} alt={country.label} className="w-4 h-3 object-cover rounded-[2px]" />
+                      ) : (
+                        <span>{country.flagEmoji}</span>
+                      )}
+                      <span>{country.label}</span>
+                    </span>
+                    {selectedCountry === country.label && <span className="text-[#C10F3A]">✓</span>}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Login Button */}
-          <Link
-            href="/login"
-            className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-7 py-2 rounded-full font-playfair font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] inline-flex items-center justify-center"
+          {/* Login Button - Does not redirect anywhere */}
+          <button
+            type="button"
+            onClick={(e) => e.preventDefault()}
+            className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-7 py-2 rounded-full font-playfair font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] inline-flex items-center justify-center cursor-pointer"
           >
             Login
-          </Link>
+          </button>
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Toggle Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="xl:hidden p-2 rounded-lg text-stone-700 hover:bg-stone-100 transition-colors"
@@ -117,9 +137,9 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
         </button>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-white border-b border-stone-200 px-6 py-4 shadow-lg animate-in slide-in-from-top-3">
+        <div className="xl:hidden bg-white border-b border-stone-200 px-6 py-4 shadow-xl animate-in slide-in-from-top-3 relative z-[100]">
           <nav className="flex flex-col gap-3">
             {navItems.map((item) => (
               <Link
@@ -137,18 +157,60 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
             ))}
           </nav>
           
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-stone-200">
-            <div className="flex items-center gap-2 bg-stone-50 px-3 py-1.5 rounded-full border border-stone-200 text-xs font-medium">
-              <span>🇮🇳</span>
-              <span>{selectedCurrency}</span>
+          <div className="space-y-3 mt-4 pt-4 border-t border-stone-200">
+            <div className="flex items-center justify-between gap-2">
+              {/* Mobile Country/Language Selector Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+                  className="flex items-center gap-2 bg-white hover:bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-full text-xs font-medium text-stone-800"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/icons/india-flag.svg"
+                    alt="India Flag"
+                    className="w-4 h-3 object-cover rounded-[2px] shrink-0"
+                  />
+                  <span className="font-sans font-medium">India (IN)</span>
+                  <ChevronDown className="w-3 h-3 text-stone-600" />
+                </button>
+              </div>
+
+              {/* Login Button - Does not redirect anywhere */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setMobileMenuOpen(false);
+                }}
+                className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-6 py-1.5 rounded-full font-playfair font-semibold text-xs transition-all cursor-pointer"
+              >
+                Login
+              </button>
             </div>
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="bg-[#D9383A] text-white px-6 py-2 rounded-full font-playfair font-semibold text-sm"
-            >
-              Login
-            </Link>
+
+            {/* Mobile Social Media Icons */}
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-stone-500 font-medium">Follow Us:</span>
+              <div className="flex items-center gap-3">
+                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="p-1 rounded-full hover:scale-110 transition-transform">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/linkedin.png" alt="LinkedIn" className="w-5.5 h-5.5 object-contain" />
+                </a>
+                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-1 rounded-full hover:scale-110 transition-transform">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/insta.png" alt="Instagram" className="w-5.5 h-5.5 object-contain" />
+                </a>
+                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-1 rounded-full hover:scale-110 transition-transform">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/facebook.png" alt="Facebook" className="w-5.5 h-5.5 object-contain" />
+                </a>
+                <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="p-1 rounded-full hover:scale-110 transition-transform">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/youtube.png" alt="YouTube" className="w-5.5 h-5.5 object-contain" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
