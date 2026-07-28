@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --font-playfair: var(--font-playfair), 'Playfair Display', serif;
+  --font-sans: var(--font-jakarta), 'Plus Jakarta Sans', sans-serif;
+  --font-serif: var(--font-playfair), 'Playfair Display', serif;
+  --color-brand-red: #D9383A;
+  --color-brand-darkred: #B91C1C;
+  --color-brand-gold: #D4AF37;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #1c1917;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-jakarta), sans-serif;
+}
+
+.font-playfair {
+  font-family: var(--font-playfair), 'Playfair Display', serif;
+}
