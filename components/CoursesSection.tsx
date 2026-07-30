@@ -244,12 +244,18 @@ export default function CoursesSection() {
 
   {/* Action Buttons at Bottom */}
   <div className="flex items-center gap-2 pt-4">
-    <button className="bg-[#C81E3D] hover:bg-[#A01830] text-white px-3 py-1.5 rounded-full font-inter font-medium text-sm transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95">
+    <a
+      href="#contact"
+      className="bg-[#C81E3D] hover:bg-[#A01830] text-white px-3 py-1.5 rounded-full font-inter font-medium text-sm transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 inline-block"
+    >
       Enquire Now
-    </button>
-    <button className="bg-[#C81E3D] hover:bg-[#A01830] text-white px-3 py-1.5 rounded-full font-inter font-medium text-sm transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95">
+    </a>
+    <a
+      href="/student/enroll"
+      className="bg-[#C81E3D] hover:bg-[#A01830] text-white px-3 py-1.5 rounded-full font-inter font-medium text-sm transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 inline-block"
+    >
       Enroll now
-    </button>
+    </a>
   </div>
 
 </div>

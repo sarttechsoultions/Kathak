@@ -59,6 +59,12 @@ export const ENDPOINTS = {
   ADMIN_DASHBOARD: `${API_BASE_URL}/admin/dashboard`,
   ADMIN_STUDENTS: `${API_BASE_URL}/admin/students`,
   ADMIN_TEACHERS: `${API_BASE_URL}/admin/teachers`,
+  ADMIN_BATCHES: `${API_BASE_URL}/admin/batches`,
+  ADMIN_ATTENDANCE: `${API_BASE_URL}/admin/attendance`,
+  ADMIN_FINANCE: `${API_BASE_URL}/admin/finance`,
+  ADMIN_CERTIFICATES: `${API_BASE_URL}/admin/certificates`,
+  ADMIN_EXAMS: `${API_BASE_URL}/admin/exams`,
+  STUDENT_ENROLL: `${API_BASE_URL}/student/enroll`,
   INQUIRIES: `${API_BASE_URL}/inquiries`,
   COURSES: `${API_BASE_URL}/courses`,
 };
