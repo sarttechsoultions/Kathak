@@ -70,7 +70,7 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   usePublish(tracksToPublish);
 
   const remoteUsers = useRemoteUsers();
-  const teacher = remoteUsers.find((u) => u.uid === 1);
+  const hostUser = remoteUsers.find((u) => u.uid === 1) || remoteUsers.find((u) => u.uid === 999999) || remoteUsers[0];
 
   useEffect(() => {
     const socket = getSocket();
@@ -92,8 +92,8 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
         <div className="relative h-[70vh] overflow-hidden rounded-3xl bg-black">
-          {teacher ? (
-            <RemoteUser user={teacher} playVideo playAudio className="h-full w-full object-cover" />
+          {hostUser ? (
+            <RemoteUser user={hostUser} playVideo playAudio className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-stone-400">Waiting for the teacher to start the camera…</div>
           )}

@@ -17,9 +17,44 @@ const CLASSES_ENDPOINT = "/admin/classes";
 const dateTime = (value: string) => new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default function ClassManagementView() {
-  const [classes, setClasses] = useState<LiveClass[]>([]); const [batches, setBatches] = useState<Batch[]>([]); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [openedClass, setOpenedClass] = useState<LiveClass | null>(null);
+  const [classes, setClasses] = useState<LiveClass[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [openedClass, setOpenedClass] = useState<LiveClass | null>(null);
   const [form, setForm] = useState({ batchId: "", title: "", teacherName: "", scheduledStart: "", scheduledEnd: "" });
-  const load = async () => { setLoading(true); try { const [classData, batchData] = await Promise.all([apiRequest(CLASSES_ENDPOINT), apiRequest(ENDPOINTS.ADMIN_BATCHES)]); setClasses(classData.data?.classes ?? []); const active = (batchData.data?.batches ?? []).filter((batch: Batch) => batch.status === "Active"); setBatches(active); setForm((value) => { const batch = active.find((item: Batch) => item.id === value.batchId) || active[0]; return { ...value, batchId: batch?.id || "", teacherName: batch?.teacher || "" }; }); } finally { setLoading(false); } };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      let classData: any = { data: { classes: [] } };
+      let batchData: any = { data: { batches: [] } };
+
+      try {
+        classData = await apiRequest(CLASSES_ENDPOINT);
+      } catch (err) {
+        console.warn("Fetch classes error:", err);
+      }
+
+      try {
+        batchData = await apiRequest(ENDPOINTS.ADMIN_BATCHES);
+      } catch (err) {
+        console.warn("Fetch batches warning (Teacher role):", err);
+      }
+
+      setClasses(classData.data?.classes ?? []);
+      const active = (batchData.data?.batches ?? []).filter((batch: Batch) => batch.status === "Active");
+      setBatches(active);
+      if (active.length > 0) {
+        setForm((value) => {
+          const batch = active.find((item: Batch) => item.id === value.batchId) || active[0];
+          return { ...value, batchId: batch?.id || "", teacherName: batch?.teacher || "" };
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => { load().catch(() => setLoading(false)); }, []);
   const createClass = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); try { await apiRequest(CLASSES_ENDPOINT, { method: "POST", body: JSON.stringify({ ...form, scheduledStart: new Date(form.scheduledStart).toISOString(), scheduledEnd: new Date(form.scheduledEnd).toISOString() }) }); setForm((value) => ({ ...value, title: "", scheduledStart: "", scheduledEnd: "" })); await load(); } finally { setSaving(false); } };
   const setStatus = async (id: string, status: "LIVE" | "COMPLETED") => { await apiRequest(`${CLASSES_ENDPOINT}/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }); await load(); };
@@ -141,7 +176,7 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
 
   const remoteUsers = useRemoteUsers();
   const teacher = remoteUsers.find((u) => u.uid === 1);
-  const students = remoteUsers.filter((u) => u.uid !== 1);
+  const students = remoteUsers.filter((u) => u.uid !== 1 && u.uid !== 999999);
 
   // Filter out generic strings (Student/User) & Admin/Teacher names to isolate actual joined students
   const uniqueStudentParticipants = Array.from(

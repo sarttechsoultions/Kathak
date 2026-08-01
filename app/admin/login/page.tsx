@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { getDefaultAccessibleRoute } from "@/lib/permissions";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -17,8 +18,15 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("kathak_admin_token");
-    if (token) {
-      router.replace("/admin/dashboard");
+    const savedUserStr = localStorage.getItem("kathak_session_user");
+    if (token && savedUserStr) {
+      try {
+        const user = JSON.parse(savedUserStr);
+        const destination = getDefaultAccessibleRoute(user) || "/admin/class-management";
+        router.replace(destination);
+      } catch {
+        router.replace("/admin/dashboard");
+      }
     }
   }, [router]);
 
@@ -34,15 +42,17 @@ export default function AdminLoginPage() {
 
       if (res.data?.token) {
         localStorage.setItem("kathak_admin_token", res.data.token);
+        let destination = "/admin/dashboard";
         if (res.data.user) {
           localStorage.setItem("kathak_session_user", JSON.stringify(res.data.user));
+          destination = getDefaultAccessibleRoute(res.data.user) || "/admin/class-management";
         }
         localStorage.setItem(
           "kathak_admin_token_expiry",
           (Date.now() + 7 * 24 * 60 * 60 * 1000).toString()
         );
         document.cookie = `kathak_admin_token=${res.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        router.push("/admin/dashboard");
+        router.push(destination);
       } else {
         alert(res.message || "Login failed. Invalid response from server.");
       }

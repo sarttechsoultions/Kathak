@@ -18,8 +18,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (pathname === "/admin/login") {
       const existingToken = localStorage.getItem("kathak_admin_token");
-      if (existingToken) {
-        router.replace("/admin/dashboard");
+      const savedUserStr = localStorage.getItem("kathak_session_user");
+      if (existingToken && savedUserStr) {
+        try {
+          const user = JSON.parse(savedUserStr);
+          const destination = getDefaultAccessibleRoute(user) || "/admin/class-management";
+          router.replace(destination);
+        } catch {
+          router.replace("/admin/dashboard");
+        }
       } else {
         setIsAuthenticated(true);
       }
@@ -49,6 +56,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     if (currentUser && canAccessRoute(currentUser, pathname)) {
       setIsAuthenticated(true);
+    } else if (currentUser && !canAccessRoute(currentUser, pathname)) {
+      const destination = getDefaultAccessibleRoute(currentUser);
+      router.replace(destination || "/admin/login");
     }
 
     // 2. Validate session directly against PostgreSQL Database via GET /api/v1/auth/me API
