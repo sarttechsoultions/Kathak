@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User, Lock, LogIn, Eye, EyeOff } from "lucide-react";
 
+import { apiRequest, ENDPOINTS } from "@/lib/api";
+
 // Font stacks matching Figma spec — same as Enroll page
 const fontJakarta = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const fontInter = { fontFamily: "'Inter', sans-serif" };
@@ -24,17 +26,29 @@ export default function StudentLoginPage() {
     setIsSubmitting(true);
 
     try {
-      // TODO: replace with actual auth API call
-      // const res = await fetch("/api/student/login", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, password, rememberMe }),
-      // });
-      // if (!res.ok) throw new Error("Invalid credentials");
+      const res = await apiRequest(ENDPOINTS.AUTH_LOGIN, {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
 
-      router.push("/student/dashboard");
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      if (res.data?.token) {
+        localStorage.setItem("kathak_token", res.data.token);
+        if (res.data.user) {
+          localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
+        }
+        router.push("/student/dashboard");
+      } else {
+        setError("Invalid email or password. Please check your credentials or complete enrollment first.");
+      }
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : "Invalid credentials. Only registered students who have completed enrollment can log in.";
+
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -155,11 +169,11 @@ export default function StudentLoginPage() {
             {!isSubmitting && <LogIn className="w-4 h-4" />}
           </button>
 
-          {/* Contact Academy Link */}
+          {/* Enroll Now Link */}
           <p className="text-center text-xs text-stone-500">
             Don&apos;t have an account?{" "}
             <Link href="/student/enroll" className="text-[#C10F3A] font-semibold hover:underline">
-              Contact Academy
+              Enroll Now 
             </Link>
           </p>
         </form>

@@ -6,6 +6,7 @@ import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
 import { Loader2 } from "lucide-react";
 import { AuthSessionUser, canAccessRoute, getDefaultAccessibleRoute } from "@/lib/permissions";
+import { apiRequest, ENDPOINTS } from "@/lib/api";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,57 +14,82 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  // 1. Persistent Session & Token Expiration Check
+  // 1. Direct API Authentication Check via GET /api/v1/auth/me
   useEffect(() => {
     if (pathname === "/admin/login") {
-      setIsAuthenticated(true);
+      const existingToken = localStorage.getItem("kathak_admin_token");
+      if (existingToken) {
+        router.replace("/admin/dashboard");
+      } else {
+        setIsAuthenticated(true);
+      }
       return;
     }
 
     const token = localStorage.getItem("kathak_admin_token");
-    const tokenExpiry = localStorage.getItem("kathak_admin_token_expiry");
     const savedUser = localStorage.getItem("kathak_session_user");
 
-    // Check if token exists and is valid
-    if (token) {
-      if (tokenExpiry && Date.now() > Number(tokenExpiry)) {
-        // Expired -> Clean and redirect to login
-        localStorage.removeItem("kathak_admin_token");
-        localStorage.removeItem("kathak_admin_token_expiry");
-        localStorage.removeItem("kathak_session_user");
-        document.cookie = "kathak_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        setIsAuthenticated(false);
-        router.replace("/admin/login");
-      } else {
-        try {
-          const user = savedUser ? (JSON.parse(savedUser) as AuthSessionUser) : null;
-          if (!canAccessRoute(user, pathname)) {
-            const destination = getDefaultAccessibleRoute(user);
-            if (destination) {
-              router.replace(destination);
-              setIsAuthenticated(true);
-              return;
-            }
-            localStorage.removeItem("kathak_admin_token");
-            localStorage.removeItem("kathak_admin_token_expiry");
-            localStorage.removeItem("kathak_session_user");
-            document.cookie = "kathak_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            router.replace("/admin/login");
-            setIsAuthenticated(false);
-            return;
-          }
-          setIsAuthenticated(true);
-        } catch {
-          localStorage.removeItem("kathak_session_user");
-          router.replace("/admin/login");
-          setIsAuthenticated(false);
-        }
-      }
-    } else {
-      // No token -> Block access & redirect to login
+    if (!token) {
       setIsAuthenticated(false);
       router.replace("/admin/login");
+      return;
     }
+
+    let isMounted = true;
+
+    // 1. Instant optimistic check using saved user session if available
+    let currentUser: AuthSessionUser | null = null;
+    if (savedUser) {
+      try {
+        currentUser = JSON.parse(savedUser) as AuthSessionUser;
+      } catch {
+        currentUser = null;
+      }
+    }
+
+    if (currentUser && canAccessRoute(currentUser, pathname)) {
+      setIsAuthenticated(true);
+    }
+
+    // 2. Validate session directly against PostgreSQL Database via GET /api/v1/auth/me API
+    async function verifyAuthWithApi() {
+      try {
+        const res = await apiRequest(ENDPOINTS.AUTH_ME);
+        const user = res.data?.user as AuthSessionUser;
+
+        if (user && isMounted) {
+          localStorage.setItem("kathak_session_user", JSON.stringify(user));
+          if (canAccessRoute(user, pathname)) {
+            setIsAuthenticated(true);
+          } else {
+            const destination = getDefaultAccessibleRoute(user);
+            router.replace(destination || "/admin/login");
+          }
+        }
+      } catch (err: any) {
+        console.warn("API Auth check:", err.message);
+        // Only kick out if explicitly Unauthorized (401 / 403) from API
+        if (err.message?.includes("401") || err.message?.includes("403") || err.message?.includes("Unauthorized") || err.message?.includes("expired")) {
+          localStorage.removeItem("kathak_admin_token");
+          localStorage.removeItem("kathak_admin_token_expiry");
+          localStorage.removeItem("kathak_session_user");
+          document.cookie = "kathak_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          if (isMounted) {
+            setIsAuthenticated(false);
+            router.replace("/admin/login");
+          }
+        } else if (!currentUser) {
+          // If no local session user exists and API fails, allow access for ADMIN token
+          setIsAuthenticated(true);
+        }
+      }
+    }
+
+    verifyAuthWithApi();
+
+    return () => {
+      isMounted = false;
+    };
   }, [pathname, router]);
 
   // 2. Direct Step-by-Step Back Button Handling

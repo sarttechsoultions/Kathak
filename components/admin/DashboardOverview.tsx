@@ -77,7 +77,7 @@ export default function DashboardOverview() {
         {isLoading && (
           <div className="flex items-center gap-2 text-xs font-semibold text-stone-400 bg-stone-100 px-3 py-1.5 rounded-full">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#9E0C25]" />
-            <span>Syncing Live DB Data...</span>
+            <span>Updating Dashboard...</span>
           </div>
         )}
       </div>

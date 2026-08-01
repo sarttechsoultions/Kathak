@@ -25,6 +25,7 @@ import {
   Check
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { openThemeSuccess, openThemeConfirm } from "@/components/ThemeDialogProvider";
 
 interface BatchRecord {
   id: string;
@@ -73,6 +74,7 @@ export default function BatchView() {
 
   // Real Dynamic State
   const [batches, setBatches] = useState<BatchRecord[]>([]);
+  const [dbCourses, setDbCourses] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     activeBatches: 0,
     totalStudents: 0,
@@ -93,7 +95,7 @@ export default function BatchView() {
 
   // Form States
   const [batchName, setBatchName] = useState("");
-  const [course, setCourse] = useState("Classical Kathak");
+  const [course, setCourse] = useState("Kathak Beginners Course");
   const [level, setLevel] = useState<"BEGINNER" | "INTERMEDIATE" | "ADVANCED">("INTERMEDIATE");
   const [batchDescription, setBatchDescription] = useState("");
   const [assignedTeacher, setAssignedTeacher] = useState("");
@@ -142,6 +144,12 @@ export default function BatchView() {
         });
       }
 
+      // Fetch dynamic courses list
+      const courseRes = await apiRequest(ENDPOINTS.COURSES);
+      if (courseRes.data?.courses && courseRes.data.courses.length > 0) {
+        setDbCourses(courseRes.data.courses);
+      }
+
       // Fetch dynamic teachers list
       const teacherRes = await apiRequest(ENDPOINTS.ADMIN_TEACHERS);
       if (teacherRes.data?.teachers) {
@@ -161,6 +169,18 @@ export default function BatchView() {
       console.error("Failed to fetch dynamic batches data:", err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteBatch = async (id: string, name: string) => {
+    if (await openThemeConfirm(`Are you sure you want to delete batch "${name}"?`, "Delete Batch")) {
+      try {
+        await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${id}`, { method: "DELETE" });
+        await openThemeSuccess(`Batch "${name}" deleted successfully from Database!`, "Batch Deleted");
+        fetchBatchesData();
+      } catch (err: any) {
+        showNotification(err.message || "Failed to delete batch.");
+      }
     }
   };
 
@@ -190,7 +210,7 @@ export default function BatchView() {
   };
 
   // Open Edit Batch Form with pre-populated values
-  const handleOpenEditForm = (batch: BatchRecord) => {
+  const handleOpenEditForm = async (batch: BatchRecord) => {
     setEditingBatchId(batch.id);
     setBatchName(batch.name);
     setCourse(batch.course);
@@ -198,6 +218,13 @@ export default function BatchView() {
     setAssignedTeacher(batch.teacher);
     setStudentCapacity(String(batch.totalStudents || 25));
     setBatchStatus(batch.status === "Active" ? "ACTIVE" : batch.status === "Upcoming" ? "UPCOMING" : "DONE");
+    try {
+      const response = await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${batch.id}/students`);
+      const students = response.data?.students ?? [];
+      setEnrolledStudents(students.map((student: CohortStudent) => ({ id: student.id, name: student.name, initials: student.name.substring(0, 2).toUpperCase(), studentId: student.studentId, level: "INTERMEDIATE" as const })));
+    } catch {
+      setEnrolledStudents([]);
+    }
     setViewMode("EDIT_FORM");
   };
 
@@ -236,7 +263,8 @@ export default function BatchView() {
             level,
             teacherName: assignedTeacher || "Kathak Faculty",
             schedule: scheduleString,
-            totalStudents: Number(studentCapacity) || enrolledStudents.length,
+            totalStudents: enrolledStudents.length,
+            studentIds: enrolledStudents.map((student) => student.id),
             status: batchStatus === "ACTIVE" ? "Active" : batchStatus === "UPCOMING" ? "Upcoming" : "Completed"
           })
         });
@@ -252,6 +280,7 @@ export default function BatchView() {
             teacherName: assignedTeacher || "Kathak Faculty",
             schedule: scheduleString,
             totalStudents: enrolledStudents.length,
+            studentIds: enrolledStudents.map((student) => student.id),
             status: batchStatus === "ACTIVE" ? "Active" : batchStatus === "UPCOMING" ? "Upcoming" : "Completed"
           })
         });
@@ -308,16 +337,6 @@ export default function BatchView() {
     setIsStudentPickerOpen(false);
     setSelectedStudentIds([]);
     showNotification(`${filteredNew.length} students enrolled in batch cohort!`);
-  };
-
-  const handleDeleteBatch = async (id: string, name: string) => {
-    try {
-      await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${id}`, { method: "DELETE" });
-      showNotification(`Batch "${name}" deleted successfully.`);
-    } catch (err) {
-      console.error("Batch deletion error:", err);
-    }
-    setBatches(batches.filter((b) => b.id !== id));
   };
 
   return (
@@ -436,7 +455,7 @@ export default function BatchView() {
             {isLoading ? (
               <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
                 <Loader2 className="w-8 h-8 text-[#9E0C25] animate-spin" />
-                <p className="text-xs font-mono font-bold text-stone-400 uppercase">Fetching live batches from Express PostgreSQL database...</p>
+                <p className="text-xs font-mono font-bold text-stone-400 uppercase">Loading batch schedules...</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -603,9 +622,22 @@ export default function BatchView() {
                       onChange={(e) => setCourse(e.target.value)}
                       className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25] cursor-pointer"
                     >
-                      <option>Classical Kathak</option>
-                      <option>Kathak Foundations</option>
-                      <option>Advanced Footwork &amp; Layakari</option>
+                      {dbCourses.length > 0 ? (
+                        dbCourses.map((c) => (
+                          <option key={c.id} value={c.title}>
+                            {c.title}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="Kathak Beginners Course">Kathak Beginners Course</option>
+                          <option value="Kathak Intermediate Course">Kathak Intermediate Course</option>
+                          <option value="Kathak Advanced Mastery Course">Kathak Advanced Mastery Course</option>
+                          <option value="Ladies Wellness Kathak Batch">Ladies Wellness Kathak Batch</option>
+                          <option value="Kathak Kids Batch (Age 5+)">Kathak Kids Batch (Age 5+)</option>
+                          <option value="Hobby Kathak Batch">Hobby Kathak Batch</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -824,7 +856,7 @@ export default function BatchView() {
                   className="px-5 py-2.5 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-extrabold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 uppercase tracking-wide"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Add Student from DB</span>
+                  <span>+ Add Student</span>
                 </button>
               </div>
             </div>
@@ -920,6 +952,70 @@ export default function BatchView() {
             </button>
           </div>
 
+          {/* Rich Batch Details Overview Header */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-100 pb-5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-rose-50 text-[#9E0C25] font-extrabold text-[10.5px] uppercase border border-rose-200">
+                    {selectedBatch.level}
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-[10.5px] border border-emerald-200">
+                    • {selectedBatch.status}
+                  </span>
+                </div>
+                <h2 className="font-playfair font-bold text-2xl text-stone-900 pt-1">{selectedBatch.name}</h2>
+                <p className="text-xs font-bold text-stone-500">{selectedBatch.course}</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditForm(selectedBatch)}
+                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit Batch Specs</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Detail Grid Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-semibold">
+              <div className="p-4 rounded-2xl bg-stone-50/80 border border-stone-200/60 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">ASSIGNED TEACHER</p>
+                <p className="font-extrabold text-stone-900 text-sm flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-[#9E0C25]" />
+                  <span>{selectedBatch.teacher || "Kathak Faculty"}</span>
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-stone-50/80 border border-stone-200/60 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">CLASS SCHEDULE</p>
+                <p className="font-extrabold text-stone-900 text-sm flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#9E0C25]" />
+                  <span>{selectedBatch.schedule || "Mon,Wed,Fri 07:00 AM"}</span>
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-stone-50/80 border border-stone-200/60 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">BATCH CODE & ID</p>
+                <p className="font-mono font-extrabold text-[#9E0C25] text-sm flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#9E0C25]" />
+                  <span>{selectedBatch.code}</span>
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-stone-50/80 border border-stone-200/60 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">ENROLLED COHORT</p>
+                <p className="font-extrabold text-stone-900 text-sm flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#9E0C25]" />
+                  <span>{selectedBatch.totalStudents || cohortStudents.length} Enrolled Student{(selectedBatch.totalStudents || cohortStudents.length) === 1 ? "" : "s"}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[850px]">
@@ -1006,7 +1102,7 @@ export default function BatchView() {
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
                 <h3 className="font-playfair font-bold text-xl text-stone-900">Select Students to Enroll</h3>
-                <p className="text-xs text-stone-400 font-medium">Choose registered students from Express API database.</p>
+                <p className="text-xs text-stone-400 font-medium">Choose registered students from academy directory.</p>
               </div>
               <button
                 onClick={() => setIsStudentPickerOpen(false)}
@@ -1032,7 +1128,7 @@ export default function BatchView() {
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
               {availableStudents.length === 0 ? (
                 <div className="p-8 text-center text-stone-400 font-semibold text-xs">
-                  No registered students found in database.
+                  No registered students found.
                 </div>
               ) : (
                 availableStudents

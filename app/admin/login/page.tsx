@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,13 @@ export default function AdminLoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    const token = localStorage.getItem("kathak_admin_token");
+    if (token) {
+      router.replace("/admin/dashboard");
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -27,10 +34,21 @@ export default function AdminLoginPage() {
 
       if (res.data?.token) {
         localStorage.setItem("kathak_admin_token", res.data.token);
+        if (res.data.user) {
+          localStorage.setItem("kathak_session_user", JSON.stringify(res.data.user));
+        }
+        localStorage.setItem(
+          "kathak_admin_token_expiry",
+          (Date.now() + 7 * 24 * 60 * 60 * 1000).toString()
+        );
+        document.cookie = `kathak_admin_token=${res.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+        router.push("/admin/dashboard");
+      } else {
+        alert(res.message || "Login failed. Invalid response from server.");
       }
-      router.push("/admin/dashboard");
-    } catch (err) {
-      router.push("/admin/dashboard");
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      alert(err.message || "Login failed. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }

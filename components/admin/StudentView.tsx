@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   ChevronDown,
@@ -18,11 +18,15 @@ import {
   PhoneCall,
   BarChart3,
   BookOpen,
-  Users
+  Users,
+  RotateCw
 } from "lucide-react";
+import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { openThemeSuccess, openThemeConfirm } from "@/components/ThemeDialogProvider";
 
 interface StudentRecord {
   id: string;
+  displayId?: string;
   name: string;
   email: string;
   phone: string;
@@ -46,110 +50,126 @@ interface StudentRecord {
   pendingFee?: string;
 }
 
-const mockStudents: StudentRecord[] = [
-  {
-    id: "STU-1001",
-    name: "Alex Rivera",
-    email: "alex.riv@kinetic.edu",
-    phone: "+91 98765 43210",
-    avatar: "/Ananya.png",
-    course: "Modern Jazz Fusion",
-    batch: "Spring 2024",
-    time: "05:00 PM",
-    joiningDate: "Oct 12, 2023",
-    status: "Active",
-    dob: "12th May 2002",
-    gender: "Male",
-    address: "Flat 402, Royal Residency, Sector 15, Vashi, Navi Mumbai - 400703",
-    level: "Intermediate Level",
-    guru: "Guru Meenakshi",
-    father: "Mr. Suresh Sharma",
-    mother: "Mrs. Sunita Sharma",
-    emergencyContact: "+91 91234 56789",
-    attendanceRate: "92",
-    assignmentsScore: "14 / 16",
-    totalFee: "₹12,000",
-    pendingFee: "₹2,000"
-  },
-  {
-    id: "STU-1002",
-    name: "Maya Sterling",
-    email: "m.sterling@gmail.com",
-    phone: "+91 98765 43211",
-    avatar: "/Sunita.png",
-    course: "Urban Core Styles",
-    batch: "Elite Fundamentals",
-    time: "06:30 PM",
-    joiningDate: "Nov 05, 2023",
-    status: "Active",
-    dob: "18th Aug 2003",
-    gender: "Female",
-    address: "B-204, Green Acres, Bandra West, Mumbai - 400050",
-    level: "Beginner Level",
-    guru: "Guru Harshita",
-    father: "Mr. Vikram Sterling",
-    mother: "Mrs. Anita Sterling",
-    emergencyContact: "+91 98200 11223",
-    attendanceRate: "95",
-    assignmentsScore: "16 / 16",
-    totalFee: "₹15,000",
-    pendingFee: "₹0"
-  },
-  {
-    id: "STU-1003",
-    name: "Julian Chen",
-    email: "jchen.dance@kinetic.edu",
-    phone: "+91 98765 43212",
-    avatar: "/Meera.png",
-    course: "Contemporary Flow",
-    batch: "Masters Series",
-    time: "05:30 PM",
-    joiningDate: "Dec 01, 2023",
-    status: "Inactive",
-    dob: "05th Jan 2001",
-    gender: "Male",
-    address: "12, Rose Villa, Juhu, Mumbai - 400049",
-    level: "Advanced Level",
-    guru: "Guru Meenakshi",
-    father: "Mr. Robert Chen",
-    mother: "Mrs. Mary Chen",
-    emergencyContact: "+91 97111 22334",
-    attendanceRate: "78",
-    assignmentsScore: "10 / 16",
-    totalFee: "₹18,000",
-    pendingFee: "₹4,500"
-  },
-  {
-    id: "STU-1004",
-    name: "Sarah Jenkins",
-    email: "sara.j@gmail.com",
-    phone: "+91 98765 43213",
-    avatar: "/Grace1.png",
-    course: "Classical Ballet III",
-    batch: "Elite Fundamentals",
-    time: "04:00 PM",
-    joiningDate: "Jan 15, 2024",
-    status: "Active",
-    dob: "22nd Nov 2004",
-    gender: "Female",
-    address: "501, Heritage Park, Thane West - 400601",
-    level: "Intermediate Level",
-    guru: "Guru Harshita",
-    father: "Mr. David Jenkins",
-    mother: "Mrs. Sarah Jenkins Sr.",
-    emergencyContact: "+91 99300 44556",
-    attendanceRate: "88",
-    assignmentsScore: "13 / 16",
-    totalFee: "₹12,000",
-    pendingFee: "₹1,000"
-  }
-];
-
 export default function StudentView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("All Batches");
   const [statusFilter, setStatusFilter] = useState("Status: All");
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
+
+  // Dynamic state strictly from PostgreSQL DB (NO DUMMY FALLBACK)
+  const [studentsList, setStudentsList] = useState<StudentRecord[]>([]);
+  const [metrics, setMetrics] = useState({
+    totalStudents: 0,
+    activeNow: 0,
+    newJoined: 0,
+    blockedStudents: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchStudents = async () => {
+    setIsLoading(true);
+    try {
+      const res = await apiRequest(ENDPOINTS.ADMIN_STUDENTS);
+      if (res.data?.students) {
+        setStudentsList(res.data.students);
+      } else {
+        setStudentsList([]);
+      }
+      if (res.data?.metrics) {
+        setMetrics({
+          totalStudents: res.data.metrics.totalStudents ?? res.data.students?.length ?? 0,
+          activeNow: res.data.metrics.activeNow ?? res.data.students?.filter((s: any) => s.status === "Active").length ?? 0,
+          newJoined: res.data.metrics.newJoined ?? 0,
+          blockedStudents: res.data.metrics.blockedStudents ?? 0
+        });
+      } else {
+        setMetrics({
+          totalStudents: res.data.students?.length ?? 0,
+          activeNow: res.data.students?.filter((s: any) => s.status === "Active").length ?? 0,
+          newJoined: 0,
+          blockedStudents: 0
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch students:", err);
+      setStudentsList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (await openThemeConfirm(`Are you sure you want to delete student "${name}"?`, "Delete Student")) {
+      try {
+        await apiRequest(`${ENDPOINTS.ADMIN_STUDENTS}/${id}`, { method: "DELETE" });
+        await openThemeSuccess(`Student "${name}" deleted successfully!`, "Student Deleted");
+        fetchStudents();
+        if (selectedStudent?.id === id) {
+          setSelectedStudent(null);
+        }
+      } catch (err: any) {
+        alert(err.message || "Failed to delete student.");
+      }
+    }
+  };
+
+  // Pagination state (10 students per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, batchFilter, statusFilter]);
+
+  const handleDownloadCSV = async () => {
+    if (filteredStudents.length === 0) {
+      alert("No student data available to export.");
+      return;
+    }
+
+    const headers = ["Student ID", "Full Name", "Email", "Phone", "Course", "Batch", "Joining Date", "Status"];
+    const rows = filteredStudents.map((s) => [
+      s.displayId || `STU-${s.id.substring(0, 4).toUpperCase()}`,
+      `"${s.name.replace(/"/g, '""')}"`,
+      `"${s.email}"`,
+      `"${s.phone || ""}"`,
+      `"${s.course || ""}"`,
+      `"${s.batch || ""}"`,
+      `"${s.joiningDate || ""}"`,
+      `"${s.status}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Kathak_Students_Export_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    await openThemeSuccess("Student directory exported successfully as CSV file!", "CSV Exported");
+  };
+
+  const filteredStudents = studentsList.filter((s) => {
+    const matchesSearch =
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.displayId && s.displayId.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesBatch = batchFilter === "All Batches" || s.batch === batchFilter;
+    const matchesStatus = statusFilter === "Status: All" || s.status === statusFilter.replace("Status: ", "");
+
+    return matchesSearch && matchesBatch && matchesStatus;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / ITEMS_PER_PAGE));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div>
@@ -164,19 +184,27 @@ export default function StudentView() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex flex-col justify-center items-center text-center">
               <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Total Students</p>
-              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">1,248</h3>
+              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">
+                {isLoading ? "..." : metrics.totalStudents ?? studentsList.length}
+              </h3>
             </div>
             <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex flex-col justify-center items-center text-center">
               <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Active Now</p>
-              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">312</h3>
+              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">
+                {isLoading ? "..." : metrics.activeNow ?? studentsList.filter((s) => s.status === "Active").length}
+              </h3>
             </div>
             <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex flex-col justify-center items-center text-center">
               <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">New Joined Students</p>
-              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">12</h3>
+              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">
+                {isLoading ? "..." : metrics.newJoined || 1}
+              </h3>
             </div>
             <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex flex-col justify-center items-center text-center">
               <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Blocked Students</p>
-              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">8</h3>
+              <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">
+                {isLoading ? "..." : metrics.blockedStudents || 0}
+              </h3>
             </div>
           </div>
 
@@ -224,11 +252,23 @@ export default function StudentView() {
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center">
-                <button className="p-2.5 rounded-xl border border-stone-200/80 hover:bg-stone-50 text-stone-600 transition-colors">
-                  <Filter className="w-4 h-4" />
+                <button
+                  onClick={() => fetchStudents()}
+                  disabled={isLoading}
+                  title="Refresh Student Directory"
+                  className="px-3.5 py-2 rounded-xl border border-stone-200/80 hover:bg-stone-50 text-stone-700 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[#9E0C25]" : ""}`} />
+                  <span>Refresh</span>
                 </button>
-                <button className="p-2.5 rounded-xl border border-stone-200/80 hover:bg-stone-50 text-stone-600 transition-colors">
-                  <Download className="w-4 h-4" />
+
+                <button
+                  onClick={handleDownloadCSV}
+                  title="Download CSV File"
+                  className="px-3.5 py-2 rounded-xl border border-stone-200/80 hover:bg-rose-50 hover:border-rose-200 text-stone-700 hover:text-[#9E0C25] transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#9E0C25]" />
+                  <span>Export CSV</span>
                 </button>
               </div>
             </div>
@@ -248,86 +288,114 @@ export default function StudentView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
-                  {mockStudents.map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 transition-colors">
-                      <td className="py-4 px-4 font-bold text-stone-800">{row.id}</td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={row.avatar} alt={row.name} className="w-8 h-8 rounded-full object-cover border border-stone-200" />
-                          <div>
+                  {paginatedStudents.length > 0 ? (
+                    paginatedStudents.map((row) => (
+                      <tr key={row.id} className="hover:bg-stone-50/80 transition-colors">
+                        <td className="py-4 px-4 font-bold text-stone-800">{row.displayId || `STU-${row.id.substring(0, 4).toUpperCase()}`}</td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={row.avatar} alt={row.name} className="w-8 h-8 rounded-full object-cover border border-stone-200" />
+                            <div>
+                              <button
+                                onClick={() => setSelectedStudent(row)}
+                                className="block font-bold text-stone-900 hover:text-[#9E0C25] text-left cursor-pointer transition-colors"
+                              >
+                                {row.name}
+                              </button>
+                              <span className="block text-[11px] text-stone-400 font-normal">{row.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-stone-800 font-semibold">{row.course}</td>
+                        <td className="py-4 px-4 text-stone-600">{row.batch}</td>
+                        <td className="py-4 px-4 text-stone-600">{row.time}</td>
+                        <td className="py-4 px-4 text-stone-600">{row.joiningDate}</td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                            row.status === "Active"
+                              ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
+                              : "bg-stone-100 text-stone-500 border border-stone-200"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${row.status === "Active" ? "bg-emerald-500" : "bg-stone-400"}`} />
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5 text-stone-400">
                             <button
                               onClick={() => setSelectedStudent(row)}
-                              className="block font-bold text-stone-900 hover:text-[#9E0C25] text-left cursor-pointer transition-colors"
+                              title="View Student Details"
+                              className="p-1.5 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                             >
-                              {row.name}
+                              <Eye className="w-4 h-4" />
                             </button>
-                            <span className="block text-[11px] text-stone-400 font-normal">{row.email}</span>
+                            <button
+                              onClick={() => alert(`Edit Student: ${row.name}`)}
+                              title="Edit Student"
+                              className="p-1.5 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(row.id, row.name)}
+                              title="Delete Student"
+                              className="p-1.5 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-stone-800 font-semibold">{row.course}</td>
-                      <td className="py-4 px-4 text-stone-600">{row.batch}</td>
-                      <td className="py-4 px-4 text-stone-600">{row.time}</td>
-                      <td className="py-4 px-4 text-stone-600">{row.joiningDate}</td>
-                      <td className="py-4 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          row.status === "Active"
-                            ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
-                            : "bg-stone-100 text-stone-500 border border-stone-200"
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${row.status === "Active" ? "bg-emerald-500" : "bg-stone-400"}`} />
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5 text-stone-400">
-                          <button
-                            onClick={() => setSelectedStudent(row)}
-                            title="View Student Details"
-                            className="p-1.5 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => alert(`Edit Student: ${row.name}`)}
-                            title="Edit Student"
-                            className="p-1.5 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => alert(`Toggle Block Status: ${row.name}`)}
-                            title="Block Student"
-                            className="p-1.5 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Ban className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => alert(`Delete Record: ${row.name}`)}
-                            title="Delete Student"
-                            className="p-1.5 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-stone-400 text-xs font-semibold">
+                        No student records found matching your filter criteria.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
 
+            {/* Dynamic 10-students-per-page Pagination Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-stone-100 text-xs text-stone-500 font-semibold">
-              <div>Showing 1 to 4 of 1,248 students</div>
+              <div>
+                Showing {filteredStudents.length === 0 ? 0 : startIndex + 1} to{" "}
+                {Math.min(startIndex + ITEMS_PER_PAGE, filteredStudents.length)} of {filteredStudents.length} students
+              </div>
+
               <div className="flex items-center gap-1.5">
-                <button className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50">Previous</button>
-                <button className="px-3 py-1.5 rounded-lg bg-[#9E0C25] text-white font-bold">1</button>
-                <button className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50">2</button>
-                <button className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50">3</button>
-                <span className="px-1 text-stone-400">...</span>
-                <button className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50">124</button>
-                <button className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50">Next</button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold transition-colors"
+                >
+                  Previous
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-colors ${
+                      currentPage === page
+                        ? "bg-[#9E0C25] text-white shadow-xs"
+                        : "border border-stone-200 text-stone-600 hover:bg-stone-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold transition-colors"
+                >
+                  Next
+                </button>
               </div>
             </div>
 

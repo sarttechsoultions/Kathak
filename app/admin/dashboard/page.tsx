@@ -234,105 +234,14 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F8FAFC] font-sans flex text-stone-800">
-      
-      {/* ================= SIDEBAR (Width 274px / w-[274px]) ================= */}
-      <aside className="w-[274px] shrink-0 bg-white border-r border-stone-200/80 min-h-screen flex flex-col justify-between p-4 sticky top-0 h-screen overflow-y-auto">
-        
-        <div className="space-y-6">
-          {/* Logo Header */}
-          <div className="px-3 py-2 flex items-center justify-between">
-            <Link href="/">
-              <Image
-                src="/logo.png"
-                alt="Kathak by Harshita Logo"
-                width={160}
-                height={50}
-                className="h-12 w-auto object-contain"
-              />
-            </Link>
-          </div>
-
-          {/* Navigation Items List */}
-          <nav className="space-y-2">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.label;
-
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => handleTabClick(item.label)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-sans text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? "bg-[#9E0C25] text-white shadow-md"
-                      : "bg-[#EFEAEA] text-stone-700 hover:bg-stone-200/80 hover:text-stone-900"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-stone-600"}`} />
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer Info */}
-        <div className="pt-4 border-t border-stone-200 text-center">
-          <p className="text-[11px] font-semibold text-stone-400">
-            Kathak Management System v1.0
-          </p>
-        </div>
-
-      </aside>
-
-      {/* ================= MAIN CONTENT AREA ================= */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        
-        {/* Top Navbar */}
-        <header className="h-[72px] bg-white border-b border-stone-200/80 px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
-          
-          {/* Search Input Bar */}
-          <div className="relative w-full max-w-md">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search lessons, progress, or teachers..."
-              className="w-full h-10 pl-10 pr-4 rounded-full bg-stone-100/80 text-xs sm:text-sm font-medium text-stone-800 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9E0C25]/20 border border-stone-200/60 transition-all"
-            />
-          </div>
-
-          {/* Right Admin User Profile */}
-          <div className="flex items-center gap-5">
-            <button className="p-2 rounded-full hover:bg-stone-100 relative text-stone-600 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="w-2 h-2 rounded-full bg-[#9E0C25] absolute top-1.5 right-1.5" />
-            </button>
-
-            <div className="flex items-center gap-3 pl-3 border-l border-stone-200">
-              <div className="w-9 h-9 rounded-full bg-stone-800 text-white flex items-center justify-center font-bold text-sm">
-                A
-              </div>
-              <div className="hidden sm:block text-left">
-                <h4 className="text-xs font-bold text-stone-900 leading-tight">Admin User</h4>
-                <p className="text-[10px] font-semibold text-stone-500">Head of Faculty</p>
-              </div>
-            </div>
-          </div>
-
-        </header>
-
-        {/* Dynamic Main Body Based on Active Tab */}
-        <div className="p-6 sm:p-8 space-y-8 max-w-[1400px] mx-auto w-full">
-          
-          {/* ================= VIEW 1: DASHBOARD ================= */}
-          {activeTab === "Dashboard" && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              {/* Header Title Banner */}
-              <div className="space-y-1">
-                <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
-                  Dashboard Overview
-                </h1>
+    <>
+      {activeTab === "Dashboard" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          {/* Header Title Banner */}
+      <div className="space-y-1">
+        <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+          Dashboard Overview
+        </h1>
                 <p className="text-xs sm:text-sm font-medium text-stone-500">
                   Unified management console for institutional operations.
                 </p>
@@ -968,11 +877,6 @@ export default function AdminDashboardPage() {
 
             </div>
           )}
-
-        </div>
-
-      </main>
-
-    </div>
+    </>
   );
 }

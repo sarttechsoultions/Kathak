@@ -136,7 +136,7 @@ export default function AdminSidebar({ isMobileOpen = false, onCloseMobile }: Ad
       <div className="space-y-6">
         {/* Logo Header & Close Button on Mobile */}
         <div className="px-1 py-2 ml-10 flex items-center justify-between">
-          <Link href="/" onClick={handleNavClick}>
+          <Link href="/admin/dashboard" onClick={handleNavClick}>
             <Image
               src="/logo.png"
               alt="Kathak by Harshita Logo"
