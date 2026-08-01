@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -55,6 +55,51 @@ export default function StudentLayout({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [studentUser, setStudentUser] = useState<{ fullName?: string; name?: string; email?: string; studentId?: string; avatarUrl?: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const studentSaved = localStorage.getItem("kathak_student_user");
+    if (studentSaved) {
+      try {
+        const parsed = JSON.parse(studentSaved);
+        if (parsed && (parsed.role === "STUDENT" || !parsed.role)) {
+          setStudentUser(parsed);
+        }
+      } catch {}
+    } else {
+      const sessionSaved = localStorage.getItem("kathak_session_user");
+      if (sessionSaved) {
+        try {
+          const parsed = JSON.parse(sessionSaved);
+          if (parsed && parsed.role === "STUDENT") {
+            setStudentUser(parsed);
+          }
+        } catch {}
+      }
+    }
+
+    const studentToken = localStorage.getItem("kathak_student_token");
+    if (studentToken) {
+      import("@/lib/api").then(({ apiRequest, ENDPOINTS }) => {
+        apiRequest<{ data: { user?: any; profile?: any } }>(ENDPOINTS.AUTH_ME, {
+          headers: { Authorization: `Bearer ${studentToken}` }
+        })
+          .then((res) => {
+            const u = res.data?.user || res.data?.profile;
+            if (u) {
+              setStudentUser(u);
+              localStorage.setItem("kathak_student_user", JSON.stringify(u));
+            }
+          })
+          .catch(() => {});
+      });
+    }
+  }, []);
+
+  const displayName = studentUser?.fullName || studentUser?.name || "Student";
+  const studentIdDisplay = studentUser?.studentId ? `#${studentUser.studentId}` : studentUser?.email ? studentUser.email : "#DNC2025";
+  const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "ST";
 
   // If on login or enroll full-screen pages, render children directly without sidebar
   if (pathname === "/student/login" || pathname === "/student/enroll") {
@@ -62,6 +107,8 @@ export default function StudentLayout({
   }
 
   const handleLogout = () => {
+    localStorage.removeItem("kathak_student_user");
+    localStorage.removeItem("kathak_session_user");
     router.push("/student/login");
   };
 
@@ -83,7 +130,7 @@ export default function StudentLayout({
 
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#900C27] text-white font-bold flex items-center justify-center text-xs">
-            RS
+            {initials}
           </div>
         </div>
       </div>
@@ -185,26 +232,27 @@ export default function StudentLayout({
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <span className="font-semibold text-sm text-[#1B1B24] block leading-tight">
-                  Rahul Sharma
+                  {displayName}
                 </span>
                 <span className="text-[11px] text-stone-500 font-sans block">
-                  Student ID: #DNC2025
+                  Student ID: {studentIdDisplay}
                 </span>
               </div>
 
               {/* Student Avatar */}
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#900C27] to-amber-500 flex items-center justify-center font-bold text-white text-sm shadow-sm overflow-hidden shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/Ananya.png"
-                  alt="Rahul Sharma Avatar"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    // Fallback to initials if image missing
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-                <span className="fallback-initials">RS</span>
+                {studentUser?.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={studentUser.avatarUrl}
+                    alt={`${displayName} Avatar`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                ) : null}
+                <span>{initials}</span>
               </div>
             </div>
 

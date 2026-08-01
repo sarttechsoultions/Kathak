@@ -32,6 +32,7 @@ export default function StudentLoginPage() {
       });
 
       if (res.data?.token) {
+        localStorage.setItem("kathak_student_token", res.data.token);
         localStorage.setItem("kathak_token", res.data.token);
         if (res.data.user) {
           localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));

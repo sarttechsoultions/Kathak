@@ -26,7 +26,10 @@ export async function apiRequest<T = any>(
 
   // Automatically attach auth token from localStorage if in client browser environment
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token");
+    const isStudentRoute = window.location.pathname.startsWith("/student");
+    const token = isStudentRoute
+      ? (localStorage.getItem("kathak_student_token") || localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token"))
+      : (localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_student_token") || localStorage.getItem("kathak_token"));
     if (token) {
       defaultHeaders["Authorization"] = `Bearer ${token}`;
     }

@@ -10,7 +10,7 @@ import { getSocket } from "@/lib/socket";
 
 type Batch = { id: string; name: string; code: string; status: string; teacher: string };
 type LiveClass = { id: string; title: string; teacherName: string; scheduledStart: string; scheduledEnd: string; status: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED"; batchName: string; batchCode: string };
-type JoinInfo = { appId: string; channelName: string; token: string; uid: number };
+type JoinInfo = { appId: string; channelName: string; token: string; uid: number; role?: string };
 
 const CLASSES_ENDPOINT = "/admin/classes";
 
@@ -100,10 +100,28 @@ interface Participant {
 }
 
 function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveClass; joinInfo: JoinInfo; onBack: () => void }) {
+  const [currentUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("kathak_session_user");
+      if (savedUser) {
+        try {
+          return JSON.parse(savedUser);
+        } catch {}
+      }
+    }
+    return null;
+  });
+
+  const isTeacherRole = currentUser?.role === "TEACHER" || joinInfo?.role === "teacher" || joinInfo?.uid === 1;
+  const userDisplayName = currentUser?.fullName || (isTeacherRole ? liveClass.teacherName : "Super Admin");
+  const userRoleName = isTeacherRole ? "Teacher" : "Admin";
+
   const channelName = joinInfo?.channelName || "kathak-live";
   const appId = joinInfo?.appId || "testing";
+  const myUid = joinInfo?.uid || (isTeacherRole ? 1 : 999999);
+
   useJoin(
-    { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinInfo?.uid || 999999 },
+    { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: myUid },
     Boolean(joinInfo?.channelName && joinInfo?.appId)
   );
 
@@ -111,8 +129,8 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
   const [joinedParticipants, setJoinedParticipants] = useState<Participant[]>([]);
   const [spotlightUser, setSpotlightUser] = useState<any>(null);
 
-  const [micOn, setMicOn] = useState(false);
-  const [camOn, setCamOn] = useState(false);
+  const [micOn, setMicOn] = useState(isTeacherRole);
+  const [camOn, setCamOn] = useState(isTeacherRole);
 
   const { localMicrophoneTrack, error: micError } = useLocalMicrophoneTrack(micOn);
   const { localCameraTrack, error: camError } = useLocalCameraTrack(camOn);
@@ -139,7 +157,7 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
 
   useEffect(() => {
     const socket = getSocket();
-    socket.emit("liveclass:join", { roomName: joinInfo.channelName, userName: "Super Admin", userRole: "Admin" });
+    socket.emit("liveclass:join", { roomName: joinInfo.channelName, userName: userDisplayName, userRole: userRoleName });
 
     const onRoomUsers = (users: Participant[]) => {
       if (Array.isArray(users)) {
@@ -172,7 +190,7 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
       socket.off("liveclass:user-left", onUserLeft);
       socket.off("liveclass:raise-hand", onRaise);
     };
-  }, [joinInfo.channelName]);
+  }, [joinInfo.channelName, userDisplayName, userRoleName]);
 
   const remoteUsers = useRemoteUsers();
   const teacher = remoteUsers.find((u) => u.uid === 1);
@@ -216,6 +234,14 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
                 </button>
               </div>
             </>
+          ) : isTeacherRole && camOn && localCameraTrack ? (
+            <>
+              <LocalVideoTrack track={localCameraTrack} play className="h-full w-full object-cover" />
+              <div className="absolute top-4 left-4 rounded-lg bg-black/60 px-3 py-1 text-xs font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{userDisplayName} (Host Camera - Live)</span>
+              </div>
+            </>
           ) : teacher ? (
             <>
               <RemoteUser user={teacher} playVideo playAudio className="h-full w-full object-cover" />
@@ -244,12 +270,12 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
               {camOn ? <VideoIcon className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
             </button>
             <span className="text-[11px] font-bold text-stone-200 ml-1">
-              Admin Camera: {camOn ? "ON 🟢" : "OFF 🔴"}
+              {isTeacherRole ? "Teacher" : "Admin"} Camera: {camOn ? "ON 🟢" : "OFF 🔴"}
             </span>
           </div>
 
-          {/* Admin Self Camera PIP Preview when Camera is ON */}
-          {camOn && (
+          {/* Admin Self Camera PIP Preview when Admin Camera is ON */}
+          {!isTeacherRole && camOn && (
             <div className="absolute bottom-4 right-4 h-28 w-36 overflow-hidden rounded-2xl border-2 border-white/50 bg-stone-900 shadow-2xl z-20">
               {localCameraTrack ? (
                 <LocalVideoTrack track={localCameraTrack} play className="h-full w-full object-cover" />
@@ -257,7 +283,7 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
                 <div className="flex h-full items-center justify-center text-[10px] text-stone-400">Camera starting…</div>
               )}
               <div className="absolute bottom-1 left-1 bg-black/80 backdrop-blur-xs px-1.5 py-0.5 rounded text-[10px] font-extrabold text-white truncate max-w-[120px]">
-                Super Admin (You)
+                {userDisplayName} (You)
               </div>
             </div>
           )}
@@ -296,34 +322,13 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
           </div>
 
         {/* 3. Student Video Profile Thumbnail Cards BELOW Joined Profiles */}
-        {(uniqueStudentParticipants.length > 0 || students.length > 0) && (
+        {students.length > 0 && (
           <div className="flex gap-3 overflow-x-auto pb-1 pt-1">
-            {uniqueStudentParticipants.length > 0 ? (
-              uniqueStudentParticipants.map((p, idx) => {
-                const agoraUser = students[idx];
-                return (
-                  <div
-                    key={p.id || idx}
-                    onClick={() => agoraUser && setSpotlightUser(agoraUser)}
-                    className="relative h-28 w-36 shrink-0 overflow-hidden rounded-2xl border-2 border-stone-200 bg-stone-900 shadow-md cursor-pointer hover:border-emerald-400 transition-all group"
-                    title="Click to spotlight student camera"
-                  >
-                    {agoraUser ? (
-                      <RemoteUser user={agoraUser} playVideo playAudio className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-amber-400/90 text-xs font-bold bg-stone-900">
-                        Camera off
-                      </div>
-                    )}
-                    <div className="absolute bottom-1.5 left-1.5 bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white truncate max-w-[125px] flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{p.userName}</span>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              students.map((s) => (
+            {students.map((s, idx) => {
+              const displayName =
+                uniqueStudentParticipants[idx]?.userName ||
+                `Student #${s.uid}`;
+              return (
                 <div
                   key={s.uid}
                   onClick={() => setSpotlightUser(s)}
@@ -333,11 +338,11 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
                   <RemoteUser user={s} playVideo playAudio className="h-full w-full object-cover" />
                   <div className="absolute bottom-1.5 left-1.5 bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white truncate max-w-[125px] flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Student #{s.uid}</span>
+                    <span>{displayName}</span>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
         )}
       </div>

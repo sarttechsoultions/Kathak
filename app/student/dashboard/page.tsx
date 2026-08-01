@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Video,
@@ -23,13 +23,47 @@ import {
 } from "lucide-react";
 
 export default function StudentDashboardPage() {
+  const [studentUser, setStudentUser] = useState<{ fullName?: string; name?: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("kathak_student_user");
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u && (u.role === "STUDENT" || !u.role)) {
+          setStudentUser(u);
+        }
+      } catch {}
+    }
+
+    const studentToken = localStorage.getItem("kathak_student_token");
+    if (studentToken) {
+      import("@/lib/api").then(({ apiRequest, ENDPOINTS }) => {
+        apiRequest<{ data: { user?: any; profile?: any } }>(ENDPOINTS.AUTH_ME, {
+          headers: { Authorization: `Bearer ${studentToken}` }
+        })
+          .then((res) => {
+            const u = res.data?.user || res.data?.profile;
+            if (u) {
+              setStudentUser(u);
+              localStorage.setItem("kathak_student_user", JSON.stringify(u));
+            }
+          })
+          .catch(() => {});
+      });
+    }
+  }, []);
+
+  const studentFirstName = (studentUser?.fullName || studentUser?.name || "Student").split(" ")[0];
+
   return (
     <div className="space-y-8 font-sans pb-12">
       
       {/* 1. GREETING HEADER (Exact Figma Specs: Inter Bold 32px #1B1B24) */}
       <div className="space-y-1">
         <h1 className="text-[32px] font-bold text-[#1B1B24] leading-[40px] tracking-[-0.32px]">
-          Good Morning, Rahul! 👋
+          Good Morning, {studentFirstName}! 👋
         </h1>
         <p className="text-base font-normal text-[#464555] leading-[24px]">
           Keep learning, keep growing. Your next class is in 6 hours.

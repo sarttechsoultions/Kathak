@@ -9,7 +9,73 @@ type LiveClass = { id: string; title: string; teacherName: string; scheduledStar
 const format = (value: string) => new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default function StudentLiveClassesPage() {
-  const [classes, setClasses] = useState<LiveClass[]>([]); const [loading, setLoading] = useState(true);
-  useEffect(() => { apiRequest<{ data: { classes: LiveClass[] } }>("/student/classes").then((response) => setClasses(response.data.classes ?? [])).catch(() => setClasses([])).finally(() => setLoading(false)); }, []);
-  return <div className="max-w-[1100px] mx-auto space-y-8 pb-16"><div><h1 className="text-3xl font-bold text-stone-900">Live Classes</h1><p className="text-sm text-stone-500 mt-1">Your protected classes. Joining opens 10 minutes before the scheduled start.</p></div><div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex gap-3 text-sm text-sky-900"><ShieldCheck className="w-5 h-5 shrink-0" /><span>Your live class is private. A personalised watermark is shown throughout the session and recording is disabled.</span></div>{loading ? <div className="p-16 text-center"><Loader2 className="inline animate-spin" /> Loading your classes…</div> : classes.length ? <div className="grid md:grid-cols-2 gap-5">{classes.map((item) => { const joinAt = new Date(new Date(item.scheduledStart).getTime() - 10 * 60 * 1000); const canJoin = item.status === "LIVE" && Date.now() >= joinAt.getTime(); return <div key={item.id} className="bg-white rounded-3xl border border-stone-200 p-6 space-y-5"><div className="flex justify-between"><span className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === "LIVE" ? "bg-rose-100 text-rose-700" : "bg-sky-100 text-sky-700"}`}>{item.status === "LIVE" ? "LIVE NOW" : "UPCOMING"}</span><Video className="w-5 h-5 text-[#900C27]" /></div><div><h2 className="font-bold text-lg text-stone-900">{item.title}</h2><p className="text-sm text-stone-500">{item.batchName} · {item.courseName}</p></div><div className="text-sm text-stone-600 space-y-1"><p className="flex gap-2"><Calendar className="w-4 h-4" />{format(item.scheduledStart)}</p><p className="flex gap-2"><Clock className="w-4 h-4" />Teacher: {item.teacherName}</p></div>{canJoin ? <Link href={`/student/classes/room?classId=${item.id}`} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#900C27] text-white font-bold text-sm"><Play className="w-4 h-4 fill-white" />Join protected class</Link> : <p className="text-xs font-semibold text-stone-500">{item.status === "LIVE" ? `Join opens ${format(joinAt.toISOString())}` : "The Join button appears when the teacher starts this class."}</p>}</div>; })}</div> : <div className="bg-white border border-stone-200 rounded-3xl p-16 text-center text-stone-500"><Video className="w-10 h-10 mx-auto mb-3 text-stone-300" />No live classes are scheduled for your batches yet.</div>}</div>;
+  const [classes, setClasses] = useState<LiveClass[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiRequest<{ data: { classes: LiveClass[] } }>("/student/classes")
+      .then((response) => setClasses(response.data.classes ?? []))
+      .catch(() => setClasses([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="max-w-[1100px] mx-auto space-y-8 pb-16">
+      <div>
+        <h1 className="text-3xl font-bold text-stone-900">Live Classes</h1>
+        <p className="text-sm text-stone-500 mt-1">Your protected classes. Join active live classes anytime.</p>
+      </div>
+
+      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex gap-3 text-sm text-sky-900">
+        <ShieldCheck className="w-5 h-5 shrink-0" />
+        <span>Your live class is private. A personalised watermark is shown throughout the session and recording is disabled.</span>
+      </div>
+
+      {loading ? (
+        <div className="p-16 text-center"><Loader2 className="inline animate-spin" /> Loading your classes…</div>
+      ) : classes.length ? (
+        <div className="grid md:grid-cols-2 gap-5">
+          {classes.map((item) => {
+            const canJoin = item.status === "LIVE";
+            return (
+              <div key={item.id} className="bg-white rounded-3xl border border-stone-200 p-6 space-y-5">
+                <div className="flex justify-between">
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === "LIVE" ? "bg-rose-100 text-rose-700 animate-pulse" : "bg-sky-100 text-sky-700"}`}>
+                    {item.status === "LIVE" ? "LIVE NOW 🔴" : "UPCOMING"}
+                  </span>
+                  <Video className="w-5 h-5 text-[#900C27]" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-lg text-stone-900">{item.title}</h2>
+                  <p className="text-sm text-stone-500">{item.batchName} · {item.courseName}</p>
+                </div>
+                <div className="text-sm text-stone-600 space-y-1">
+                  <p className="flex gap-2"><Calendar className="w-4 h-4" />{format(item.scheduledStart)}</p>
+                  <p className="flex gap-2"><Clock className="w-4 h-4" />Teacher: {item.teacherName}</p>
+                </div>
+                {canJoin ? (
+                  <Link
+                    href={`/student/classes/room?classId=${item.id}`}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#900C27] hover:bg-[#780A20] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 fill-white" />
+                    Join protected class
+                  </Link>
+                ) : (
+                  <p className="text-xs font-semibold text-stone-500">
+                    The Join button will appear as soon as the teacher starts this class.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white border border-stone-200 rounded-3xl p-16 text-center text-stone-500">
+          <Video className="w-10 h-10 mx-auto mb-3 text-stone-300" />
+          No live classes are scheduled for your batches yet.
+        </div>
+      )}
+    </div>
+  );
 }
