@@ -115,15 +115,16 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
   const isTeacherRole = currentUser?.role === "TEACHER" || joinInfo?.role === "teacher" || joinInfo?.uid === 1;
   const userDisplayName = currentUser?.fullName || (isTeacherRole ? liveClass.teacherName : "Super Admin");
   const userRoleName = isTeacherRole ? "Teacher" : "Admin";
+const channelName = joinInfo?.channelName;
+const appId = joinInfo?.appId;
+const myUid = joinInfo?.uid || (isTeacherRole ? 1 : 999999);
 
-  const channelName = joinInfo?.channelName || "kathak-live";
-  const appId = joinInfo?.appId || "testing";
-  const myUid = joinInfo?.uid || (isTeacherRole ? 1 : 999999);
+const agoraReady = Boolean(appId && channelName);
 
-  useJoin(
-    { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: myUid },
-    Boolean(joinInfo?.channelName && joinInfo?.appId)
-  );
+useJoin(
+  { appid: appId || "", channel: channelName || "", token: joinInfo?.token || null, uid: myUid },
+  agoraReady
+);
 
   const [handRaises, setHandRaises] = useState<{ senderName: string; at: string }[]>([]);
   const [joinedParticipants, setJoinedParticipants] = useState<Participant[]>([]);
@@ -215,6 +216,12 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
+        {!agoraReady && (
+      <div className="lg:col-span-2 p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-800 text-sm font-semibold">
+        ⚠️ Video service could not initialize (missing App ID / channel from server). 
+        Please check backend AGORA_APP_ID configuration.
+      </div>
+    )}
       
       {/* LEFT COLUMN: Main Video Window, Thumbnails & Participant Names below Video */}
       <div className="space-y-3">
