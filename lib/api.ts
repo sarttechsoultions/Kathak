@@ -1,10 +1,17 @@
 /**
  * Centralized API Client & Base URL Configuration for Kathak Next
  * 
- * Changing NEXT_PUBLIC_API_BASE_URL in .env.local will update all API calls across the app!
+ * Dynamically resolves API_BASE_URL to support local network IP testing (e.g. 192.168.1.3:3000 from Mobile Phone)
  */
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+export const getApiBaseUrl = () => {
+  if (typeof window !== "undefined" && window.location.hostname && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    return `http://${window.location.hostname}:5000/api/v1`;
+  }
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
@@ -17,8 +24,9 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
+  const baseUrl = getApiBaseUrl();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  const url = `${API_BASE_URL}${cleanEndpoint}`;
+  const url = `${baseUrl}${cleanEndpoint}`;
 
   const defaultHeaders: Record<string, string> = {
     "Content-Type": "application/json",
