@@ -29,7 +29,9 @@ import {
   DollarSign,
   ShieldCheck,
   CheckCircle2,
-  UserX
+  UserX,
+  Upload,
+  FileText
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 import { SIDEBAR_PERMISSIONS, SidebarPermission, MODULE_PERMISSIONS_MATRIX } from "@/lib/permissions";
@@ -42,6 +44,10 @@ interface TeacherRecord {
   email: string;
   avatar: string;
   batches: string[];
+  id_proof: string;
+  qualifications: string[];
+  bank_details: string[];
+  emergency_contact: number[];
   status: "Active" | "Disabled";
   disabledMessage?: string;
   actionType: "Edit Profile" | "Manage Access";
@@ -49,6 +55,10 @@ interface TeacherRecord {
   expertise: string;
   phone?: string;
   permissions?: SidebarPermission[];
+  maritalStatus?: string;
+  nationality?: string;
+  languagesKnown?: string;
+  idProofType?: string;
 }
 
 interface DirectoryRecord {
@@ -61,11 +71,19 @@ interface DirectoryRecord {
   category: "Classical" | "Folk" | "Contemporary";
 }
 
+const ID_PROOF_TYPES = [
+  { value: "AADHAR_CARD", label: "Aadhar Card" },
+  { value: "PAN_CARD", label: "PAN Card" },
+  { value: "DRIVING_LICENCE", label: "Driving Licence" },
+  { value: "VOTER_ID", label: "Voter ID" },
+  { value: "PASSPORT", label: "Passport" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
 export default function TeacherView() {
   const [viewMode, setViewMode] = useState<"MANAGEMENT" | "ADD_FORM">("MANAGEMENT");
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
-  
-  // Real Dynamic State (NO Dummy Fallback Data)
+
   const [facultyList, setFacultyList] = useState<TeacherRecord[]>([]);
   const [directoryList, setDirectoryList] = useState<DirectoryRecord[]>([]);
   const [directoryFilter, setDirectoryFilter] = useState<"All" | "Classical" | "Folk" | "Contemporary">("All");
@@ -78,7 +96,6 @@ export default function TeacherView() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form State for Add / Edit Teacher
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("Select Gender");
@@ -97,7 +114,42 @@ export default function TeacherView() {
   const [avatarUrl, setAvatarUrl] = useState<string>("/Ananya.png");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- NEW: additional Personal Information fields ---
+  const [maritalStatus, setMaritalStatus] = useState("Select Status");
+  const [nationality, setNationality] = useState("Indian");
+  const [languagesKnown, setLanguagesKnown] = useState("");
+
+  // --- NEW: Emergency Contact & Bank Details (add/remove chip lists) ---
+  const [emergencyContacts, setEmergencyContacts] = useState<string[]>([]);
+  const [emergencyContactInput, setEmergencyContactInput] = useState("");
+  const [bankDetailsList, setBankDetailsList] = useState<string[]>([]);
+  const [bankDetailInput, setBankDetailInput] = useState("");
+
+  const addEmergencyContact = () => {
+    const val = emergencyContactInput.trim();
+    if (!val) return;
+    if (!/^[0-9+\-\s]{6,15}$/.test(val)) {
+      alert("Please enter a valid phone number (digits only, 6-15 characters).");
+      return;
+    }
+    setEmergencyContacts((prev) => [...prev, val]);
+    setEmergencyContactInput("");
+  };
+
+  const addBankDetail = () => {
+    const val = bankDetailInput.trim();
+    if (!val) return;
+    setBankDetailsList((prev) => [...prev, val]);
+    setBankDetailInput("");
+  };
+
+  // --- FIXED: ID proof is now a type dropdown + file upload, instead of a free-text field ---
+  const [idProofType, setIdProofType] = useState<string>("");
+  const [idProofFile, setIdProofFile] = useState<File | null>(null);
+  const [idProofExistingUrl, setIdProofExistingUrl] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const idProofInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,7 +168,16 @@ export default function TeacherView() {
     }
   };
 
-  // Fetch Live Teachers Data directly from Express + Prisma PostgreSQL Backend API
+  const handleIdProofFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Please upload a document under 5MB.");
+      return;
+    }
+    setIdProofFile(file);
+  };
+
   const fetchTeachersData = async () => {
     setIsLoading(true);
     try {
@@ -143,13 +204,21 @@ export default function TeacherView() {
           title: t.designation || "Kathak Instructor",
           email: t.email,
           phone: t.phone,
+          emergency_contact: t.emergency_contact || [],
+          id_proof: t.id_proof || "",
+          qualifications: t.qualifications || [],
+          bank_details: t.bank_details || [],
           avatar: t.avatar || "/Ananya.png",
           batches: t.assignedBatches || ["Beginners Morning Zen"],
           status: t.status === "Active" ? "Active" : "Disabled",
           actionType: "Edit Profile",
           category: "Kathak",
           expertise: t.designation || "Senior Instructor",
-          permissions: t.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"]
+          permissions: t.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"],
+          maritalStatus: t.maritalStatus || "",
+          nationality: t.nationality || "Indian",
+          languagesKnown: t.languagesKnown || "",
+          idProofType: t.idProofType || ""
         }));
         setFacultyList(mappedFaculty);
 
@@ -164,7 +233,7 @@ export default function TeacherView() {
         }));
         setDirectoryList(mappedDirectory);
       }
-      
+
       if (res.data?.metrics) {
         setMetrics({
           totalActiveFaculty: res.data.metrics.totalTeachers || res.data.teachers?.length || 0,
@@ -183,6 +252,12 @@ export default function TeacherView() {
     fetchTeachersData();
   }, []);
 
+  const resetIdProofState = () => {
+    setIdProofType("");
+    setIdProofFile(null);
+    setIdProofExistingUrl("");
+  };
+
   const handleOpenCreateForm = () => {
     setEditingTeacherId(null);
     setFullName("");
@@ -193,6 +268,14 @@ export default function TeacherView() {
     setDesignation("Senior Instructor");
     setAssignedBatches(["Beginners Morning Zen"]);
     setSelectedPermissions(["VIEW_DASHBOARD", "MANAGE_CLASSES"]);
+    setMaritalStatus("Select Status");
+    setNationality("Indian");
+    setLanguagesKnown("");
+    setEmergencyContacts([]);
+    setEmergencyContactInput("");
+    setBankDetailsList([]);
+    setBankDetailInput("");
+    resetIdProofState();
     setViewMode("ADD_FORM");
   };
 
@@ -205,6 +288,16 @@ export default function TeacherView() {
     setDesignation(faculty.title || "Senior Instructor");
     setAssignedBatches(faculty.batches || ["Beginners Morning Zen"]);
     setSelectedPermissions(faculty.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"]);
+    setMaritalStatus(faculty.maritalStatus || "Select Status");
+    setNationality(faculty.nationality || "Indian");
+    setLanguagesKnown(faculty.languagesKnown || "");
+    setEmergencyContacts((faculty.emergency_contact || []).map(String));
+    setEmergencyContactInput("");
+    setBankDetailsList(faculty.bank_details || []);
+    setBankDetailInput("");
+    setIdProofType(faculty.idProofType || "");
+    setIdProofFile(null);
+    setIdProofExistingUrl(faculty.id_proof || "");
     setViewMode("ADD_FORM");
   };
 
@@ -235,8 +328,18 @@ export default function TeacherView() {
     setIsSubmitting(true);
 
     try {
+      // NOTE: idProofFile is a File object. If your upload module returns a hosted
+      // URL (like the avatar flow could), upload it first via ENDPOINTS.UPLOAD and
+      // send the resulting URL as `idProofUrl` instead of the raw file. For now we
+      // just send the selected type + filename as a placeholder reference.
+      const idProofPayload = idProofType
+        ? {
+            idProofType,
+            idProofFileName: idProofFile?.name || undefined,
+          }
+        : {};
+
       if (editingTeacherId) {
-        // PUT Edit Teacher Request
         await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${editingTeacherId}`, {
           method: "PUT",
           body: JSON.stringify({
@@ -245,7 +348,13 @@ export default function TeacherView() {
             phone,
             avatarUrl,
             ...(password && { password }),
-            permissions: selectedPermissions
+            permissions: selectedPermissions,
+            maritalStatus,
+            nationality,
+            languagesKnown,
+            emergencyContact: emergencyContacts.map(Number),
+            bankDetails: bankDetailsList,
+            ...idProofPayload,
           })
         });
 
@@ -254,7 +363,6 @@ export default function TeacherView() {
           "Teacher Account Updated"
         );
       } else {
-        // POST Create Teacher Request
         await apiRequest(ENDPOINTS.ADMIN_TEACHERS, {
           method: "POST",
           body: JSON.stringify({
@@ -263,7 +371,13 @@ export default function TeacherView() {
             phone,
             avatarUrl,
             password,
-            permissions: selectedPermissions
+            permissions: selectedPermissions,
+            maritalStatus,
+            nationality,
+            languagesKnown,
+            emergencyContact: emergencyContacts.map(Number),
+            bankDetails: bankDetailsList,
+            ...idProofPayload,
           })
         });
 
@@ -280,6 +394,7 @@ export default function TeacherView() {
       setEmail("");
       setPhone("");
       setPassword("");
+      resetIdProofState();
     } catch (err: any) {
       alert(err.message || "Failed to save teacher account.");
     } finally {
@@ -301,12 +416,10 @@ export default function TeacherView() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 max-w-[1300px] mx-auto">
-      
-      {/* ================= SCREEN 1: TEACHER MANAGEMENT WORKSPACE ================= */}
+
       {viewMode === "MANAGEMENT" && (
         <div className="space-y-8">
-          
-          {/* Header Bar */}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
@@ -326,10 +439,8 @@ export default function TeacherView() {
             </button>
           </div>
 
-          {/* 3 Summary Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            
-            {/* Card 1: TOTAL ACTIVE FACULTY */}
+
             <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">TOTAL ACTIVE FACULTY</p>
@@ -343,14 +454,12 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Card 2: CLASSES TODAY */}
             <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-1">
               <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">CLASSES TODAY</p>
               <h3 className="font-sans font-extrabold text-3xl text-stone-900">{metrics.classesToday}</h3>
               <div className="w-16 h-1 bg-[#9E0C25] rounded-full mt-2" />
             </div>
 
-            {/* Card 3: AVERAGE RATING */}
             <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-1">
               <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">AVERAGE RATING</p>
               <div className="flex items-baseline gap-2">
@@ -362,7 +471,6 @@ export default function TeacherView() {
 
           </div>
 
-          {/* Loading State */}
           {isLoading && (
             <div className="p-12 rounded-3xl bg-white border border-stone-200/80 text-center flex flex-col items-center justify-center space-y-3">
               <Loader2 className="w-8 h-8 text-[#9E0C25] animate-spin" />
@@ -370,18 +478,16 @@ export default function TeacherView() {
             </div>
           )}
 
-          {/* Faculty Cards Grid */}
           {!isLoading && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              
+
               {facultyList.map((faculty) => (
                 <div
                   key={faculty.id}
                   className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs hover:shadow-md transition-all space-y-5 flex flex-col justify-between"
                 >
                   <div className="space-y-4">
-                    
-                    {/* Top Profile Row & Active Toggle */}
+
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -398,7 +504,6 @@ export default function TeacherView() {
                         </div>
                       </div>
 
-                      {/* Toggle Switch */}
                       <button
                         onClick={() => handleToggleStatus(faculty.id, faculty.name, faculty.status)}
                         className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
@@ -411,10 +516,8 @@ export default function TeacherView() {
                       </button>
                     </div>
 
-                    {/* Email Line */}
                     <p className="text-xs font-semibold text-stone-400 truncate">{faculty.email}</p>
 
-                    {/* Batches / Disabled Alert Box */}
                     {faculty.status === "Active" ? (
                       <div className="space-y-1 text-xs">
                         <span className="font-bold text-stone-500">Batches: </span>
@@ -429,7 +532,6 @@ export default function TeacherView() {
 
                   </div>
 
-                  {/* Bottom Actions */}
                   <div className="pt-4 border-t border-stone-100 flex items-center justify-between gap-3">
                     <button
                       onClick={() => handleOpenEditTeacherForm(faculty)}
@@ -449,7 +551,6 @@ export default function TeacherView() {
                 </div>
               ))}
 
-              {/* + Add New Faculty Dashed Card */}
               <div
                 onClick={() => setViewMode("ADD_FORM")}
                 className="bg-white rounded-3xl p-8 border-2 border-dashed border-stone-300 hover:border-[#9E0C25] transition-colors cursor-pointer flex flex-col items-center justify-center text-center space-y-3 group shadow-xs min-h-[220px]"
@@ -466,13 +567,11 @@ export default function TeacherView() {
             </div>
           )}
 
-          {/* Teacher Directory Section */}
           <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 sm:p-8 space-y-6">
-            
+
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <h3 className="font-sans font-bold text-xl text-stone-900">Teacher Directory</h3>
-              
-              {/* Category Filter Tabs */}
+
               <div className="flex items-center gap-2">
                 {(["All", "Classical", "Folk", "Contemporary"] as const).map((cat) => (
                   <button
@@ -490,7 +589,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Directory Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[750px]">
                 <thead>
@@ -513,7 +611,7 @@ export default function TeacherView() {
                       .filter((d) => directoryFilter === "All" || d.category === directoryFilter)
                       .map((item) => (
                         <tr key={item.id} className="hover:bg-stone-50/80 transition-colors">
-                          
+
                           <td className="py-4 px-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-rose-100 text-[#9E0C25] font-extrabold text-xs flex items-center justify-center shrink-0">
@@ -560,10 +658,9 @@ export default function TeacherView() {
         </div>
       )}
 
-      {/* ================= SCREEN 2: ADD NEW TEACHER FORM WORKSPACE ================= */}
       {viewMode === "ADD_FORM" && (
         <form onSubmit={handleAddTeacherSubmit} className="space-y-6 animate-in fade-in duration-300 max-w-[1100px] mx-auto">
-          
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <button
@@ -599,8 +696,7 @@ export default function TeacherView() {
           </div>
 
           <div className="bg-white rounded-3xl p-6 sm:p-10 border border-stone-200/80 shadow-xs space-y-8">
-            
-            {/* Section 1: Personal Information */}
+
             <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-5">
               <div className="flex items-center gap-2 text-[#9E0C25]">
                 <User className="w-4 h-4" />
@@ -608,7 +704,7 @@ export default function TeacherView() {
               </div>
 
               <div className="space-y-5 text-xs font-semibold">
-                
+
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-stone-200/90 shadow-xs">
                   <div className="relative group shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -685,6 +781,140 @@ export default function TeacherView() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-stone-700 font-bold uppercase text-[10.5px]">MARITAL STATUS</label>
+                    <select
+                      value={maritalStatus}
+                      onChange={(e) => setMaritalStatus(e.target.value)}
+                      className="w-full h-11 px-4 rounded-xl bg-white border border-stone-200/90 text-stone-900 font-semibold focus:outline-none focus:border-[#9E0C25]"
+                    >
+                      <option>Select Status</option>
+                      <option>Single</option>
+                      <option>Married</option>
+                      <option>Divorced</option>
+                      <option>Widowed</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-stone-700 font-bold uppercase text-[10.5px]">NATIONALITY</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Indian"
+                      value={nationality}
+                      onChange={(e) => setNationality(e.target.value)}
+                      className="w-full h-11 px-4 rounded-xl bg-white border border-stone-200/90 text-stone-900 font-semibold focus:outline-none focus:border-[#9E0C25]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-stone-700 font-bold uppercase text-[10.5px]">LANGUAGES KNOWN</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Hindi, English, Rajasthani"
+                    value={languagesKnown}
+                    onChange={(e) => setLanguagesKnown(e.target.value)}
+                    className="w-full h-11 px-4 rounded-xl bg-white border border-stone-200/90 text-stone-900 font-semibold focus:outline-none focus:border-[#9E0C25]"
+                  />
+                </div>
+
+                {/* --- NEW: Emergency Contact (add/remove chip list) --- */}
+                <div className="space-y-2">
+                  <label className="block text-stone-700 font-bold uppercase text-[10.5px]">EMERGENCY CONTACT</label>
+                  <div className="p-3.5 rounded-xl bg-white border border-stone-200/90 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {emergencyContacts.length === 0 ? (
+                        <span className="text-xs text-stone-400 font-medium italic">No emergency contact numbers added yet.</span>
+                      ) : (
+                        emergencyContacts.map((num, idx) => (
+                          <span key={idx} className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-[#9E0C25] font-extrabold text-xs flex items-center gap-2">
+                            <PhoneCall className="w-3.5 h-3.5" />
+                            <span>{num}</span>
+                            <button
+                              type="button"
+                              onClick={() => setEmergencyContacts(emergencyContacts.filter((_, i) => i !== idx))}
+                              className="hover:text-stone-900 cursor-pointer font-bold"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+                      <input
+                        type="text"
+                        placeholder="Enter emergency contact number"
+                        value={emergencyContactInput}
+                        onChange={(e) => setEmergencyContactInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addEmergencyContact();
+                          }
+                        }}
+                        className="flex-1 h-10 px-3.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-900 font-semibold text-xs focus:outline-none focus:border-[#9E0C25]"
+                      />
+                      <button
+                        type="button"
+                        onClick={addEmergencyContact}
+                        className="h-10 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-extrabold text-xs cursor-pointer"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- NEW: Bank Details (add/remove chip list) --- */}
+                <div className="space-y-2">
+                  <label className="block text-stone-700 font-bold uppercase text-[10.5px]">BANK DETAILS</label>
+                  <div className="p-3.5 rounded-xl bg-white border border-stone-200/90 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {bankDetailsList.length === 0 ? (
+                        <span className="text-xs text-stone-400 font-medium italic">No bank details added yet.</span>
+                      ) : (
+                        bankDetailsList.map((detail, idx) => (
+                          <span key={idx} className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-[#9E0C25] font-extrabold text-xs flex items-center gap-2">
+                            <span>{detail}</span>
+                            <button
+                              type="button"
+                              onClick={() => setBankDetailsList(bankDetailsList.filter((_, i) => i !== idx))}
+                              className="hover:text-stone-900 cursor-pointer font-bold"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+                      <input
+                        type="text"
+                        placeholder="e.g. Bank Name: HDFC, A/C: 1234567890, IFSC: HDFC0001234"
+                        value={bankDetailInput}
+                        onChange={(e) => setBankDetailInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addBankDetail();
+                          }
+                        }}
+                        className="flex-1 h-10 px-3.5 rounded-xl bg-stone-50 border border-stone-200 text-stone-900 font-semibold text-xs focus:outline-none focus:border-[#9E0C25]"
+                      />
+                      <button
+                        type="button"
+                        onClick={addBankDetail}
+                        className="h-10 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-extrabold text-xs cursor-pointer"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="block text-stone-700 font-bold uppercase text-[10.5px]">PRIMARY EXPERTISE</label>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -708,7 +938,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Section 2: Contact Details */}
             <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-5">
               <div className="flex items-center gap-2 text-[#9E0C25]">
                 <Mail className="w-4 h-4" />
@@ -727,6 +956,53 @@ export default function TeacherView() {
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full h-11 px-4 rounded-xl bg-white border border-stone-200/90 text-stone-900 font-semibold focus:outline-none focus:border-[#9E0C25]"
                     />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-stone-700 font-bold uppercase text-[10.5px]">ID PROOF</label>
+                    <select
+                      value={idProofType}
+                      onChange={(e) => {
+                        setIdProofType(e.target.value);
+                        setIdProofFile(null);
+                      }}
+                      className="w-full h-11 px-4 rounded-xl bg-white border border-stone-200/90 text-stone-900 font-semibold focus:outline-none focus:border-[#9E0C25]"
+                    >
+                      <option value="">Select ID proof type</option>
+                      {ID_PROOF_TYPES.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+
+                    {idProofType && (
+                      <div className="mt-2 flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-stone-300 bg-white">
+                        <input
+                          ref={idProofInputRef}
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={handleIdProofFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => idProofInputRef.current?.click()}
+                          className="flex items-center gap-1.5 text-[11px] font-extrabold text-[#9E0C25] hover:underline cursor-pointer shrink-0"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          {idProofFile ? "Change document" : "Upload document"}
+                        </button>
+                        {idProofFile ? (
+                          <span className="text-[11px] text-stone-500 font-medium truncate flex items-center gap-1">
+                            <FileText className="w-3.5 h-3.5 shrink-0" />
+                            {idProofFile.name}
+                          </span>
+                        ) : idProofExistingUrl ? (
+                          <span className="text-[11px] text-stone-400 font-medium truncate">Existing document on file</span>
+                        ) : (
+                          <span className="text-[11px] text-stone-400 font-medium">No file selected yet</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -755,7 +1031,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Section 3: Professional Details */}
             <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-5">
               <div className="flex items-center gap-2 text-[#9E0C25]">
                 <Briefcase className="w-4 h-4" />
@@ -796,7 +1071,6 @@ export default function TeacherView() {
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-white border border-stone-200/90 space-y-3">
-                    {/* Selected Batch Badges */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {assignedBatches.length === 0 ? (
                         <span className="text-xs text-stone-400 font-medium italic">No batches assigned yet. Select a batch below.</span>
@@ -810,7 +1084,6 @@ export default function TeacherView() {
                       )}
                     </div>
 
-                    {/* Dynamic Batch Selector Dropdown */}
                     <div className="pt-2 border-t border-stone-100">
                       <select
                         onChange={(e) => {
@@ -845,7 +1118,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Section 4: Account Credentials */}
             <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-5">
               <div className="flex items-center gap-2 text-[#9E0C25]">
                 <KeyRound className="w-4 h-4" />
@@ -907,7 +1179,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Section 5: Granular Teacher Permissions & Sub-Actions */}
             <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#9E0C25]">
@@ -954,7 +1225,6 @@ export default function TeacherView() {
                         isModuleEnabled ? "border-[#9E0C25]/40 bg-white shadow-xs" : "border-stone-200/80 bg-white/60"
                       }`}
                     >
-                      {/* Module Header Bar */}
                       <div className="p-4 flex items-center justify-between bg-stone-50/70 border-b border-stone-100">
                         <label className="flex items-center gap-3 cursor-pointer select-none">
                           <input
@@ -978,7 +1248,6 @@ export default function TeacherView() {
                         )}
                       </div>
 
-                      {/* Sub-Action Permissions Grid */}
                       {isModuleEnabled && (
                         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white">
                           {group.subPermissions.map((sp) => {
@@ -1022,7 +1291,6 @@ export default function TeacherView() {
               </div>
             </div>
 
-            {/* Bottom Buttons */}
             <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
               <button
                 type="button"

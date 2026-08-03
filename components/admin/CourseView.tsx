@@ -417,11 +417,14 @@ export default function CourseView() {
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8">
               {/* Cover Thumbnail Image */}
-              <div className="w-full lg:w-72 h-48 rounded-2xl overflow-hidden border border-stone-200 shadow-sm shrink-0">
+              <div className="w-full lg:w-72 h-48 rounded-2xl overflow-hidden border border-stone-200 shadow-sm shrink-0 bg-stone-100 flex items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={viewingCourse.thumbnail}
+                  src={viewingCourse.thumbnail || "/Ananya.png"}
                   alt={viewingCourse.title}
+                  onError={(e) => {
+                    (e.target as HTMLElement).setAttribute("src", "/Ananya.png");
+                  }}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -430,11 +433,11 @@ export default function CourseView() {
               <div className="space-y-4 flex-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="px-3 py-1 rounded-lg bg-stone-100 text-stone-800 font-extrabold text-xs uppercase tracking-wider border border-stone-200">
-                    {viewingCourse.code}
+                    {viewingCourse.code || `CRS-${viewingCourse.id ? viewingCourse.id.slice(-4).toUpperCase() : "1001"}`}
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100/80 text-emerald-700 border border-emerald-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    {viewingCourse.status}
+                    {viewingCourse.status || (viewingCourse.published !== false ? "Active" : "Draft")}
                   </span>
                 </div>
 
@@ -446,23 +449,23 @@ export default function CourseView() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                   <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80">
                     <span className="block text-[10.5px] font-extrabold text-stone-400 uppercase tracking-wider">Category</span>
-                    <span className="font-bold text-xs text-[#0B1C30] block mt-0.5">{viewingCourse.category}</span>
+                    <span className="font-bold text-xs text-[#0B1C30] block mt-0.5">{viewingCourse.category || "Classical Dance"}</span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80">
                     <span className="block text-[10.5px] font-extrabold text-stone-400 uppercase tracking-wider">Level</span>
-                    <span className="font-bold text-xs text-sky-700 block mt-0.5">{viewingCourse.level}</span>
+                    <span className="font-bold text-xs text-sky-700 block mt-0.5 uppercase">{viewingCourse.level || viewingCourse.category || "BEGINNER"}</span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-stone-50 border border-stone-200/80">
                     <span className="block text-[10.5px] font-extrabold text-stone-400 uppercase tracking-wider">Duration</span>
-                    <span className="font-bold text-xs text-[#0B1C30] block mt-0.5">{viewingCourse.duration}</span>
+                    <span className="font-bold text-xs text-[#0B1C30] block mt-0.5">{viewingCourse.duration || viewingCourse.groupClassesCount || "12 Sessions"}</span>
                   </div>
 
                   <div className="p-3 rounded-2xl bg-rose-50/50 border border-rose-200/60">
                     <span className="block text-[10.5px] font-extrabold text-rose-500 uppercase tracking-wider">Fee Structure</span>
                     <span className="font-extrabold text-xs text-[#9E0C25] block mt-0.5">
-                      ₹ {viewingCourse.feeINR ? Number(viewingCourse.feeINR).toLocaleString("en-IN") : "12,000"}
+                      ₹ {viewingCourse.groupFeeINR ? Number(viewingCourse.groupFeeINR).toLocaleString("en-IN") : viewingCourse.feeINR ? Number(viewingCourse.feeINR).toLocaleString("en-IN") : "4,999"}
                     </span>
                   </div>
                 </div>
@@ -735,24 +738,31 @@ export default function CourseView() {
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-3">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={crs.thumbnail} alt={crs.title} className="w-12 h-10 rounded-lg object-cover border border-stone-200 shrink-0" />
+                            <img
+                              src={crs.thumbnail || "/Ananya.png"}
+                              alt={crs.title}
+                              onError={(e) => {
+                                (e.target as HTMLElement).setAttribute("src", "/Ananya.png");
+                              }}
+                              className="w-12 h-10 rounded-lg object-cover border border-stone-200 shrink-0 bg-stone-100"
+                            />
                             <div>
                               <span className="block font-bold text-stone-900 text-sm">{crs.title}</span>
-                              <span className="block text-[11px] text-stone-400 font-semibold uppercase">{crs.code}</span>
+                              <span className="block text-[11px] text-stone-400 font-semibold uppercase">{crs.code || `CRS-${crs.id.slice(-4).toUpperCase()}`}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-stone-700 font-semibold">{crs.category}</td>
+                        <td className="py-4 px-4 text-stone-700 font-semibold">{crs.category || "Classical Dance"}</td>
                         <td className="py-4 px-4">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-[10.5px] font-bold bg-sky-100 text-sky-700 border border-sky-200">
-                            {crs.level}
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-[10.5px] font-bold bg-sky-100 text-sky-700 border border-sky-200 uppercase">
+                            {crs.level || crs.category || "BEGINNER"}
                           </span>
                         </td>
-                        <td className="py-4 px-4 text-stone-700 font-medium">{crs.duration}</td>
+                        <td className="py-4 px-4 text-stone-700 font-medium">{crs.duration || (crs as any).groupClassesCount || "12 Sessions"}</td>
                         <td className="py-4 px-4">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold bg-emerald-100/80 text-emerald-700 border border-emerald-200/60">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            {crs.status}
+                            {crs.status || ((crs as any).published !== false ? "Active" : "Draft")}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-right">

@@ -485,7 +485,9 @@ export default function BatchView() {
                           <tr key={batch.id} className="hover:bg-stone-50/80 transition-colors">
                             <td className="py-4 px-6">
                               <div className="space-y-1">
-                                <h5 className="font-bold text-stone-900 text-sm leading-tight">{batch.course}</h5>
+                                <h5 className="font-bold text-stone-900 text-sm leading-tight">
+                                  {typeof batch.course === "object" ? (batch.course as any)?.title || (batch.course as any)?.name || "Kathak Foundations" : batch.course}
+                                </h5>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[11px] font-bold text-[#9E0C25]">{batch.name}</span>
                                   <span className="text-[10px] font-bold text-stone-400">ID: {batch.code}</span>
