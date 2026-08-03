@@ -37,7 +37,7 @@ export default function StudentLoginPage() {
         if (res.data.user) {
           localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
         }
-        router.push("/student/dashboard");
+        window.location.href = "/student/dashboard";
       } else {
         setError("Invalid email or password. Please check your credentials or complete enrollment first.");
       }

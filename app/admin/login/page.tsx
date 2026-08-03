@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
           (Date.now() + 7 * 24 * 60 * 60 * 1000).toString()
         );
         document.cookie = `kathak_admin_token=${res.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        router.push(destination);
+        window.location.href = destination;
       } else {
         alert(res.message || "Login failed. Invalid response from server.");
       }
