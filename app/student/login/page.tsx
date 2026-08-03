@@ -20,40 +20,45 @@ export default function StudentLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
+  setIsSubmitting(true);
 
-    try {
-      const res = await apiRequest(ENDPOINTS.AUTH_LOGIN, {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
+  try {
+    // ✅ Student login endpoint (NOT AUTH_LOGIN)
+    const res = await apiRequest( "/student/login", {
+      method: "POST",
+      body: JSON.stringify({
+        emailOrPhone: email,   // student controller yeh field expect karta hai
+        password,
+        rememberMe,
+      }),
+    });
 
-      if (res.data?.token) {
-        localStorage.setItem("kathak_student_token", res.data.token);
-        localStorage.setItem("kathak_token", res.data.token);
-        if (res.data.user) {
-          localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
-        }
-        window.location.href = "/student/dashboard";
-      } else {
-        setError("Invalid email or password. Please check your credentials or complete enrollment first.");
+    if (res.data?.token) {
+      localStorage.setItem("kathak_student_token", res.data.token);
+      localStorage.setItem("kathak_token", res.data.token);
+      if (res.data.user) {
+        localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
       }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : "Invalid credentials. Only registered students who have completed enrollment can log in.";
-
-      setError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
+      router.push("/student/dashboard");
+    } else {
+      setError("Invalid email or password. Please check your credentials or complete enrollment first.");
     }
-  };
+  } catch (err: unknown) {
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+        ? err
+        : "Invalid credentials. Only registered students who have completed enrollment can log in.";
+
+    setError(errorMessage);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   return (
     // Figma Frame: Fill #FFFFFF, Corner radius 0

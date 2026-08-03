@@ -24,6 +24,8 @@ import {
   Percent
 } from "lucide-react";
 
+import { apiRequest } from "@/lib/api";
+
 interface StudentExamResultItem {
   id: string;
   studentName: string;
@@ -35,78 +37,59 @@ interface StudentExamResultItem {
   status: "Passed" | "Absent" | "Failed";
 }
 
-const mockExamResults: StudentExamResultItem[] = [
-  {
-    id: "res-1",
-    studentName: "Ananya Patel",
-    studentEmail: "ananya.p@institution.edu",
-    studentAvatar: "/Ananya.png",
-    studentIdCode: "KTL-2024-0530",
-    batchName: "Harmony Alpha 24",
-    score: "98/100",
-    status: "Passed"
-  },
-  {
-    id: "res-2",
-    studentName: "Elena Rodriguez",
-    studentEmail: "elena.r@institution.edu",
-    studentAvatar: "/Sunita.png",
-    studentIdCode: "KTL-2024-0401",
-    batchName: "Harmony Alpha 24",
-    score: "92/100",
-    status: "Passed"
-  },
-  {
-    id: "res-3",
-    studentName: "Julian Vance",
-    studentEmail: "julian.v@institution.edu",
-    studentAvatar: "/Meera.png",
-    studentIdCode: "KTL-2024-0732",
-    batchName: "Harmony Beta 24",
-    score: "--",
-    status: "Absent"
-  },
-  {
-    id: "res-4",
-    studentName: "Saki Nakamura",
-    studentEmail: "saki.n@institution.edu",
-    studentAvatar: "/Grace1.png",
-    studentIdCode: "KTL-2024-0418",
-    batchName: "Harmony Alpha 24",
-    score: "80/100",
-    status: "Passed"
-  },
-  {
-    id: "res-5",
-    studentName: "Marcus Thorne",
-    studentEmail: "marcus.t@institution.edu",
-    studentAvatar: "/Sunita.png",
-    studentIdCode: "KTL-2024-1102",
-    batchName: "Harmony Gamma 24",
-    score: "42/100",
-    status: "Failed"
-  }
-];
-
 export default function ExamResultsView() {
-  const [resultsList, setResultsList] = useState<StudentExamResultItem[]>(mockExamResults);
+  const [resultsList, setResultsList] = useState<StudentExamResultItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedStudentResult, setSelectedStudentResult] = useState<StudentExamResultItem | null>(null);
 
   // Evaluation Form State
   const [teacherOverride, setTeacherOverride] = useState(2.0);
   const [flagDiscussion, setFlagDiscussion] = useState(false);
-  const [overallFeedback, setOverallFeedback] = useState(
-    "Ananya, your grasp of harmonic structure is exceptional. The minor error in Modal Interchange was consistent across your work - I suggest a quick refresher on minor-key relationship."
-  );
+  const [overallFeedback, setOverallFeedback] = useState("");
+
+  const fetchExamResults = async () => {
+    try {
+      setLoading(true);
+      const res = await apiRequest("/admin/exams/results");
+      if (res?.data?.results) {
+        setResultsList(res.data.results);
+      }
+    } catch (err) {
+      console.error("Failed to fetch exam results:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchExamResults();
+  }, []);
 
   const handleOpenEvaluation = (student: StudentExamResultItem) => {
     setSelectedStudentResult(student);
   };
 
-  const handleVerifyResult = (e: React.FormEvent) => {
+  const handleVerifyResult = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Result for "${selectedStudentResult?.studentName}" verified & finalized!`);
-    setSelectedStudentResult(null);
+    if (!selectedStudentResult?.id) return;
+
+    try {
+      const rawScore = selectedStudentResult.score.split("/")[0] || "0";
+      await apiRequest(`/admin/exams/results/${selectedStudentResult.id}/evaluate`, {
+        method: "POST",
+        body: JSON.stringify({
+          grade: rawScore,
+          feedback: overallFeedback || "Exam evaluation finalized.",
+          status: "GRADED"
+        }),
+      });
+
+      alert(`Result for "${selectedStudentResult.studentName}" verified & finalized!`);
+      setSelectedStudentResult(null);
+      fetchExamResults();
+    } catch (err: any) {
+      alert(err?.message || "Failed to finalize evaluation.");
+    }
   };
 
   return (

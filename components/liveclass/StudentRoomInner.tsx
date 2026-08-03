@@ -82,11 +82,11 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
 
   useEffect(() => {
     const socket = getSocket();
-    if (studentName && studentName !== "Student") {
-      socket.emit("liveclass:join", { roomName: joinInfo.channelName, userName: studentName, userRole: "Student" });
+    if (studentName) {
+      socket.emit("liveclass:join", { roomName: joinInfo.channelName, userName: studentName, userRole: "Student", studentId: joinInfo?.uid ? String(joinInfo.uid) : undefined });
     }
     return () => { socket.emit("liveclass:leave", { roomName: joinInfo.channelName }); };
-  }, [joinInfo.channelName, studentName]);
+  }, [joinInfo.channelName, joinInfo.uid, studentName]);
 
   const handRaise = () => {
     getSocket().emit("liveclass:raise-hand", { roomName: joinInfo.channelName, senderName: studentName });

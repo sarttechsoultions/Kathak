@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Clock,
@@ -14,94 +14,196 @@ import {
   ArrowRight
 } from "lucide-react";
 
+import { apiRequest } from "@/lib/api";
+
+interface StudentExamItem {
+  id: string;
+  name: string;
+  code: string;
+  date: string;
+  category: string;
+  score: string;
+  isRedScore?: boolean;
+  status: string;
+  statusBadge: string;
+  actionRoute: string;
+}
+
+const defaultMockExams: StudentExamItem[] = [
+  {
+    id: "1",
+    name: "Theory: Advanced Harmony",
+    code: "Code: MUS-402",
+    date: "Oct 12, 2024",
+    category: "FINAL",
+    score: "94/100",
+    status: "Completed",
+    statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
+    actionRoute: "/student/exam/results?id=1",
+  },
+  {
+    id: "2",
+    name: "Modern Acoustical Physics",
+    code: "Code: PHY-109",
+    date: "Nov 22, 2024",
+    category: "MONTHLY",
+    score: "--",
+    status: "Upcoming",
+    statusBadge: "bg-[#E5F2FF] text-[#2B78C5]",
+    actionRoute: "/student/exam/take?id=2",
+  },
+  {
+    id: "3",
+    name: "History of Classical Era",
+    code: "Code: HIS-201",
+    date: "Oct 29, 2024",
+    category: "MIDTERM",
+    score: "--",
+    status: "In Progress",
+    statusBadge: "bg-[#FEF3C7] text-[#D97706]",
+    actionRoute: "/student/exam/take?id=3",
+  },
+  {
+    id: "4",
+    name: "Music Composition Ethics",
+    code: "Code: ETH-310",
+    date: "Sep 15, 2024",
+    category: "MONTHLY",
+    score: "0/100",
+    isRedScore: true,
+    status: "Missed",
+    statusBadge: "bg-[#FDF2F4] text-[#C10F3A]",
+    actionRoute: "/student/exam/results?id=4",
+  },
+  {
+    id: "5",
+    name: "Digital Sound Design",
+    code: "Code: DSD-501",
+    date: "Aug 30, 2024",
+    category: "MIDTERM",
+    score: "82/100",
+    status: "Completed",
+    statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
+    actionRoute: "/student/exam/results?id=5",
+  },
+];
+
 export default function StudentExamDashboardPage() {
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [exams, setExams] = useState<StudentExamItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const historyList = [
-    {
-      id: 1,
-      name: "Theory: Advanced Harmony",
-      code: "Code: MUS-402",
-      date: "Oct 12, 2024",
-      category: "FINAL",
-      score: "94/100",
-      status: "Completed",
-      statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
-      actionRoute: "/student/exam/results",
-    },
-    {
-      id: 2,
-      name: "Modern Acoustical Physics",
-      code: "Code: PHY-109",
-      date: "Nov 22, 2024",
-      category: "MONTHLY",
-      score: "--",
-      status: "Upcoming",
-      statusBadge: "bg-[#E5F2FF] text-[#2B78C5]",
-      actionRoute: "/student/exam/take",
-    },
-    {
-      id: 3,
-      name: "History of Classical Era",
-      code: "Code: HIS-201",
-      date: "Oct 29, 2024",
-      category: "MIDTERM",
-      score: "--",
-      status: "In Progress",
-      statusBadge: "bg-[#FEF3C7] text-[#D97706]",
-      actionRoute: "/student/exam/take",
-    },
-    {
-      id: 4,
-      name: "Music Composition Ethics",
-      code: "Code: ETH-310",
-      date: "Sep 15, 2024",
-      category: "MONTHLY",
-      score: "0/100",
-      isRedScore: true,
-      status: "Missed",
-      statusBadge: "bg-[#FDF2F4] text-[#C10F3A]",
-      actionRoute: "/student/exam/results",
-    },
-    {
-      id: 5,
-      name: "Digital Sound Design",
-      code: "Code: DSD-501",
-      date: "Aug 30, 2024",
-      category: "MIDTERM",
-      score: "82/100",
-      status: "Completed",
-      statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
-      actionRoute: "/student/exam/results",
-    },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    const fetchExams = async () => {
+      setLoading(true);
+      try {
+        const res = await apiRequest("/student/exams");
+        if (isMounted) {
+          if (res?.data?.exams && res.data.exams.length > 0) {
+            setExams(res.data.exams);
+          } else {
+            setExams(defaultMockExams);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch student exams:", err);
+        if (isMounted) setExams(defaultMockExams);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchExams();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const isExamBannerVisible = (exam: StudentExamItem): boolean => {
+    if (
+      exam.status === "Completed" ||
+      exam.status === "Submitted" ||
+      exam.status === "EVALUATED" ||
+      exam.status === "Missed" ||
+      exam.actionRoute?.includes("/results")
+    ) {
+      return false;
+    }
+
+    if (!exam.date) return false;
+
+    let examTimestamp: number | null = null;
+    const cleanedDateStr = exam.date.replace("•", "").trim();
+    const parsed = new Date(cleanedDateStr).getTime();
+    if (!isNaN(parsed)) {
+      examTimestamp = parsed;
+    } else {
+      const fallbackParsed = new Date(exam.date).getTime();
+      if (!isNaN(fallbackParsed)) examTimestamp = fallbackParsed;
+    }
+
+    const now = Date.now();
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+
+    if (examTimestamp) {
+      const timeDiff = examTimestamp - now;
+      if (timeDiff <= twoHoursMs && timeDiff >= -6 * 60 * 60 * 1000) {
+        return true;
+      }
+      return false;
+    }
+
+    return exam.status === "Upcoming";
+  };
+
+  const upcomingExam = exams.find((e) => isExamBannerVisible(e));
+
+  const filteredExams = exams.filter((item) => {
+    if (selectedFilter === "All") return true;
+    if (selectedFilter === "Midterm" || selectedFilter === "MIDTERM") return item.category.toUpperCase() === "MIDTERM";
+    if (selectedFilter === "Final" || selectedFilter === "FINAL") return item.category.toUpperCase() === "FINAL";
+    if (selectedFilter === "Pending") return item.status === "Upcoming";
+    if (selectedFilter === "Completed") return item.status === "Completed" || item.status === "Submitted";
+    if (selectedFilter === "Missed") return item.status === "Missed";
+    return true;
+  });
+
+  const completedExams = exams.filter((e) => e.status === "Completed");
+  const upcomingExams = exams.filter((e) => e.status === "Upcoming" || e.status === "In Progress");
+
+  const avgScoreDisplay = completedExams.length > 0
+    ? `${Math.round(completedExams.reduce((acc, curr) => acc + (parseInt(curr.score.split("/")[0], 10) || 0), 0) / completedExams.length)}%`
+    : "0%";
 
   return (
     <div className="space-y-8 font-sans pb-16">
       
-      {/* 1. TOP UPCOMING EXAM ALERT BANNER */}
-      <div className="bg-[#FFF8E6] border border-[#FCD34D] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
-        <div className="flex items-start sm:items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5" />
+      {/* 1. TOP UPCOMING EXAM ALERT BANNER (Only visible 2 hours before exam starts & hides once submitted) */}
+      {upcomingExam && (
+        <div className="bg-[#FFF8E6] border border-[#FCD34D] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-[#1B1B24]">
+                Upcoming Exam: {upcomingExam.name}
+              </h2>
+              <p className="text-xs text-stone-600 font-medium">
+                {upcomingExam.date}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm sm:text-base font-bold text-[#1B1B24]">
-              Upcoming Exam: Advanced Music Theory - Grade 4
-            </h2>
-            <p className="text-xs text-stone-600 font-medium">
-              Starts in 45 minutes (10:00 AM)
-            </p>
-          </div>
-        </div>
 
-        <Link
-          href="/student/exam/take"
-          className="bg-[#D97706] hover:bg-[#b45309] text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shrink-0 cursor-pointer"
-        >
-          Join Exam Lobby
-        </Link>
-      </div>
+          <Link
+            href={upcomingExam.actionRoute}
+            className="bg-[#D97706] hover:bg-[#b45309] text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shrink-0 cursor-pointer"
+          >
+            Join Exam Lobby
+          </Link>
+        </div>
+      )}
 
       {/* 2. PAGE HEADER & SUBTITLE */}
       <div className="space-y-1">
@@ -122,7 +224,7 @@ export default function StudentExamDashboardPage() {
             <FileText className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">12</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">{exams.length}</span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">TOTAL EXAMS</span>
           </div>
         </div>
@@ -133,7 +235,9 @@ export default function StudentExamDashboardPage() {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">8</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">
+              {completedExams.length}
+            </span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">COMPLETED</span>
           </div>
         </div>
@@ -144,7 +248,9 @@ export default function StudentExamDashboardPage() {
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">88%</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">
+              {avgScoreDisplay}
+            </span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">AVERAGE SCORE</span>
           </div>
         </div>
@@ -155,7 +261,9 @@ export default function StudentExamDashboardPage() {
             <Calendar className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">2</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">
+              {upcomingExams.length}
+            </span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">UPCOMING</span>
           </div>
         </div>
@@ -209,7 +317,7 @@ export default function StudentExamDashboardPage() {
             </thead>
 
             <tbody className="divide-y divide-stone-100 text-xs font-medium">
-              {historyList.map((exam) => (
+              {filteredExams.map((exam) => (
                 <tr key={exam.id} className="hover:bg-stone-50/60 transition-colors">
                   
                   {/* Exam Name & Code */}
@@ -247,10 +355,10 @@ export default function StudentExamDashboardPage() {
                   <td className="py-4 px-4 text-right">
                     <Link
                       href={exam.actionRoute}
-                      className="p-2 rounded-lg text-rose-700 hover:bg-rose-50 transition-colors inline-block"
+                      className="p-2 rounded-lg text-[#900C27] hover:bg-rose-50 transition-colors inline-block"
                       title="View Exam Details"
                     >
-                      <Eye className="w-4 h-4 text-rose-700 ml-auto" />
+                      <Eye className="w-4 h-4 text-[#900C27] ml-auto" />
                     </Link>
                   </td>
 
@@ -263,7 +371,7 @@ export default function StudentExamDashboardPage() {
 
         {/* Pagination Footer */}
         <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400 font-medium">
-          <span>Showing 5 of 12 assessments</span>
+          <span>Showing {filteredExams.length} of {exams.length} assessments</span>
 
           <div className="flex items-center gap-1.5">
             <button className="p-1 rounded hover:bg-stone-100 text-stone-400 cursor-not-allowed">‹</button>

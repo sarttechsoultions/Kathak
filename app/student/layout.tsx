@@ -25,7 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X
+  X,
 } from "lucide-react";
 
 const sidebarMenuItems = [
@@ -46,6 +46,15 @@ const sidebarMenuItems = [
   { label: "Support", href: "/student/support", icon: HelpCircle },
 ];
 
+function clearAllStudentTokens() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("kathak_student_token");
+  localStorage.removeItem("kathak_student_user");
+  localStorage.removeItem("kathak_session_user");
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+}
+
 export default function StudentLayout({
   children,
 }: {
@@ -55,16 +64,45 @@ export default function StudentLayout({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [studentUser, setStudentUser] = useState<{ fullName?: string; name?: string; email?: string; studentId?: string; avatarUrl?: string } | null>(null);
+  const [studentUser, setStudentUser] = useState<{
+    fullName?: string;
+    name?: string;
+    email?: string;
+    studentId?: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Auth guard + user load
+useEffect(() => {
+  let cancelled = false;
+
+  const checkAuth = async () => {
+    // Login / enroll pages → guard skip
+    if (pathname === "/student/login" || pathname === "/student/enroll") {
+      if (!cancelled) setAuthChecked(true);
+      return;
+    }
+
+    const studentToken = localStorage.getItem("kathak_student_token");
+    const hasCookie =
+      typeof document !== "undefined" &&
+      document.cookie.includes("kathak_student_session=");
+
+    // No token + no cookie → login
+    if (!studentToken && !hasCookie) {
+      clearAllStudentTokens();
+      router.replace("/student/login");
+      return;
+    }
+
+    // Local user load
     const studentSaved = localStorage.getItem("kathak_student_user");
     if (studentSaved) {
       try {
         const parsed = JSON.parse(studentSaved);
         if (parsed && (parsed.role === "STUDENT" || !parsed.role)) {
-          setStudentUser(parsed);
+          if (!cancelled) setStudentUser(parsed);
         }
       } catch {}
     } else {
@@ -73,48 +111,99 @@ export default function StudentLayout({
         try {
           const parsed = JSON.parse(sessionSaved);
           if (parsed && parsed.role === "STUDENT") {
-            setStudentUser(parsed);
+            if (!cancelled) setStudentUser(parsed);
           }
         } catch {}
       }
     }
 
-    const studentToken = localStorage.getItem("kathak_student_token");
+    // Fresh profile fetch
     if (studentToken) {
-      import("@/lib/api").then(({ apiRequest, ENDPOINTS }) => {
-        apiRequest<{ data: { user?: any; profile?: any } }>(ENDPOINTS.AUTH_ME, {
-          headers: { Authorization: `Bearer ${studentToken}` }
-        })
-          .then((res) => {
-            const u = res.data?.user || res.data?.profile;
-            if (u) {
-              setStudentUser(u);
-              localStorage.setItem("kathak_student_user", JSON.stringify(u));
-            }
-          })
-          .catch(() => {});
-      });
+      try {
+        const { apiRequest, ENDPOINTS } = await import("@/lib/api");
+        const res = await apiRequest<{ data: { user?: any; profile?: any } }>(
+          ENDPOINTS.AUTH_ME,
+          { headers: { Authorization: `Bearer ${studentToken}` } }
+        );
+        const u = res.data?.user || res.data?.profile;
+        if (u && !cancelled) {
+          setStudentUser(u);
+          localStorage.setItem("kathak_student_user", JSON.stringify(u));
+        }
+      } catch {
+        clearAllStudentTokens();
+        router.replace("/student/login");
+        return;
+      }
     }
-  }, []);
+
+    if (!cancelled) setAuthChecked(true);
+  };
+
+  checkAuth();
+
+  return () => {
+    cancelled = true;
+  };
+}, [pathname, router]);
 
   const displayName = studentUser?.fullName || studentUser?.name || "Student";
-  const studentIdDisplay = studentUser?.studentId ? `#${studentUser.studentId}` : studentUser?.email ? studentUser.email : "#DNC2025";
-  const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "ST";
+  const studentIdDisplay = studentUser?.studentId
+    ? `#${studentUser.studentId}`
+    : studentUser?.email
+    ? studentUser.email
+    : "#DNC2025";
+  const initials =
+    displayName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "ST";
 
-  // If on login or enroll full-screen pages, render children directly without sidebar
+  // Login / enroll pe sidebar mat dikhao
   if (pathname === "/student/login" || pathname === "/student/enroll") {
     return <>{children}</>;
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("kathak_student_user");
-    localStorage.removeItem("kathak_session_user");
+  // Auth check complete hone tak blank (optional loader)
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <div className="w-8 h-8 border-2 border-[#900C27] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem("kathak_student_token");
+
+    try {
+      // Backend logout call (token revoke + cookie clear)
+      if (token) {
+        const { apiRequest, ENDPOINTS } = await import("@/lib/api");
+        // Prefer student logout route if available, else auth logout
+        await apiRequest(ENDPOINTS.STUDENT_LOGOUT || ENDPOINTS.AUTH_LOGOUT || "/api/v1/student/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {
+          // fallback to auth logout
+          return apiRequest("/api/v1/auth/logout", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        });
+      }
+    } catch {
+      // ignore network errors – local clear still hoga
+    }
+
+    clearAllStudentTokens();
     router.push("/student/login");
   };
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#1B1B24] flex selection:bg-[#900C27] selection:text-white font-sans">
-      
       {/* MOBILE TOP NAVIGATION BAR */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
@@ -135,15 +224,13 @@ export default function StudentLayout({
         </div>
       </div>
 
-      {/* FIGMA SIDEBAR (W: 250px, Background: White #FFFFFF, Border: #E5E7EB) */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r border-stone-200 flex flex-col justify-between transition-all duration-300 ${
           collapsed ? "w-20" : "w-[250px]"
         } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="flex flex-col h-full overflow-y-auto px-4 py-5 scrollbar-thin">
-          
-          {/* Logo & Collapse Header */}
           <div className="flex items-center justify-between mb-6 px-1">
             <Link href="/student/dashboard" className="flex items-center gap-2 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -163,11 +250,12 @@ export default function StudentLayout({
             </button>
           </div>
 
-          {/* Navigation Menu List */}
           <nav className="space-y-1.5 flex-1">
             {sidebarMenuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href === "/student/dashboard" && pathname === "/student");
+              const isActive =
+                pathname === item.href ||
+                (item.href === "/student/dashboard" && pathname === "/student");
 
               return (
                 <Link
@@ -187,7 +275,6 @@ export default function StudentLayout({
               );
             })}
 
-            {/* Logout Button */}
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[15px] font-medium text-stone-700 hover:text-[#900C27] hover:bg-rose-50 transition-all cursor-pointer text-left mt-2"
@@ -197,17 +284,12 @@ export default function StudentLayout({
               {!collapsed && <span>Log Out</span>}
             </button>
           </nav>
-
         </div>
       </aside>
 
-      {/* MAIN LAYOUT WRAPPER (Top Header + Page Content) */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0">
-        
-        {/* FIGMA TOP HEADER (Search bar + Bell + Student Profile Badge) */}
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 px-6 lg:px-10 py-3.5 flex items-center justify-between gap-4">
-          
-          {/* Left Search Bar (Pill with soft background) */}
           <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="w-4 h-4 text-stone-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -219,16 +301,12 @@ export default function StudentLayout({
             </div>
           </div>
 
-          {/* Right Notifications & Student Profile */}
           <div className="flex items-center gap-4 shrink-0">
-            
-            {/* Notification Bell */}
             <button className="relative p-2 rounded-full hover:bg-stone-100 text-stone-600 transition-colors cursor-pointer">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#900C27]" />
             </button>
 
-            {/* Student Profile Info */}
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <span className="font-semibold text-sm text-[#1B1B24] block leading-tight">
@@ -239,7 +317,6 @@ export default function StudentLayout({
                 </span>
               </div>
 
-              {/* Student Avatar */}
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#900C27] to-amber-500 flex items-center justify-center font-bold text-white text-sm shadow-sm overflow-hidden shrink-0">
                 {studentUser?.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -255,18 +332,13 @@ export default function StudentLayout({
                 <span>{initials}</span>
               </div>
             </div>
-
           </div>
-
         </header>
 
-        {/* MAIN PAGE CONTAINER */}
         <main className="flex-1 p-6 lg:p-10 max-w-[1400px] w-full mx-auto">
           {children}
         </main>
-
       </div>
-
     </div>
   );
 }

@@ -42,10 +42,16 @@ export default function AttendanceView() {
   ];
 
   const loadBatches = async () => {
-    const response = await apiRequest(ENDPOINTS.ADMIN_BATCHES);
-    const loaded = (response.data?.batches ?? []).filter((batch: Batch) => batch.status === "Active");
-    setBatches(loaded);
-    setSelectedBatchId((current) => loaded.some((batch: Batch) => batch.id === current) ? current : loaded[0]?.id || "");
+    try {
+      const response = await apiRequest(ENDPOINTS.ADMIN_BATCHES);
+      const rawBatches = response.data?.batches ?? [];
+      const activeBatches = rawBatches.filter((batch: Batch) => !batch.status || batch.status.toLowerCase() === "active");
+      const loaded = activeBatches.length > 0 ? activeBatches : rawBatches;
+      setBatches(loaded);
+      setSelectedBatchId((current) => loaded.some((batch: Batch) => batch.id === current) ? current : loaded[0]?.id || "");
+    } catch (err) {
+      console.error("Failed to load batches:", err);
+    }
   };
 
   const loadAttendance = async () => {
