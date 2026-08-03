@@ -117,7 +117,7 @@ function AdminLiveRoomInner({ liveClass, joinInfo, onBack }: { liveClass: LiveCl
   const userRoleName = isTeacherRole ? "Teacher" : "Admin";
 const channelName = joinInfo?.channelName;
 const appId = joinInfo?.appId;
-const myUid = joinInfo?.uid || (isTeacherRole ? 1 : 999999);
+const myUid = Number(joinInfo?.uid) || (isTeacherRole ? 1 : 999999);
 
 const agoraReady = Boolean(appId && channelName);
 

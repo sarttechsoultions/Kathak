@@ -20,9 +20,11 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   const channelName = joinInfo?.channelName || "kathak-live";
   const appId = joinInfo?.appId || "testing";
   
+  const joinUid = Number(joinInfo?.uid) || 0;
+  
   useJoin(
-    { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinInfo?.uid || 0 },
-    Boolean(joinInfo?.channelName && joinInfo?.appId)
+    { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinUid },
+    Boolean(joinInfo?.channelName && joinInfo?.appId && joinUid > 0)
   );
 
   const [micOn, setMicOn] = useState(true);
