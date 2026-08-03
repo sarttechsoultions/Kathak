@@ -19,6 +19,7 @@ export type JoinInfo = {
 function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; onLeave: () => void }) {
   const channelName = joinInfo?.channelName || "kathak-live";
   const appId = joinInfo?.appId || "testing";
+  
   useJoin(
     { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinInfo?.uid || 0 },
     Boolean(joinInfo?.channelName && joinInfo?.appId)
@@ -67,10 +68,15 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
     ...(micOn && localMicrophoneTrack ? [localMicrophoneTrack] : []),
     ...(camOn && localCameraTrack ? [localCameraTrack] : []),
   ];
-  usePublish(tracksToPublish);
+  usePublish(tracksToPublish, Boolean(joinInfo?.channelName && joinInfo?.appId) && tracksToPublish.length > 0);
 
   const remoteUsers = useRemoteUsers();
-  const hostUser = remoteUsers.find((u) => u.uid === 1) || remoteUsers.find((u) => u.uid === 999999) || remoteUsers[0];
+  
+  // Robust Teacher/Host user resolution (supports UID 1, 999999, string UIDs, or active video publisher)
+  const hostUser =
+    remoteUsers.find((u) => u.uid == 1 || u.uid == 999999 || String(u.uid) === "1" || String(u.uid) === "999999") ||
+    remoteUsers.find((u) => u.hasVideo) ||
+    remoteUsers[0];
 
   useEffect(() => {
     const socket = getSocket();

@@ -154,7 +154,7 @@ useJoin(
     ...(micOn && localMicrophoneTrack ? [localMicrophoneTrack] : []),
     ...(camOn && localCameraTrack ? [localCameraTrack] : []),
   ];
-  usePublish(tracksToPublish);
+  usePublish(tracksToPublish, agoraReady && tracksToPublish.length > 0);
 
   useEffect(() => {
     const socket = getSocket();
@@ -194,7 +194,10 @@ useJoin(
   }, [joinInfo.channelName, userDisplayName, userRoleName]);
 
   const remoteUsers = useRemoteUsers();
-  const teacher = remoteUsers.find((u) => u.uid === 1);
+  const teacher =
+    remoteUsers.find((u) => u.uid == 1 || u.uid == 999999 || String(u.uid) === "1" || String(u.uid) === "999999") ||
+    remoteUsers.find((u) => u.hasVideo) ||
+    remoteUsers[0];
   const students = remoteUsers.filter((u) => u.uid !== 1 && u.uid !== 999999);
 
   // Filter out generic strings (Student/User) & Admin/Teacher names to isolate actual joined students
