@@ -64,8 +64,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // 2. Validate session directly against PostgreSQL Database via GET /api/v1/auth/me API
     async function verifyAuthWithApi() {
       try {
-        const res = await apiRequest(ENDPOINTS.AUTH_ME);
-        const user = res.data?.user as AuthSessionUser;
+        const res = await apiRequest<{ data?: { user?: AuthSessionUser } }>(ENDPOINTS.AUTH_ME);
+        const user = res.data?.user as AuthSessionUser | undefined;
 
         if (user && isMounted) {
           localStorage.setItem("kathak_session_user", JSON.stringify(user));
@@ -76,10 +76,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             router.replace(destination || "/admin/login");
           }
         }
-      } catch (err: any) {
-        console.warn("API Auth check:", err.message);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("API Auth check:", msg);
         // Only kick out if explicitly Unauthorized (401 / 403) from API
-        if (err.message?.includes("401") || err.message?.includes("403") || err.message?.includes("Unauthorized") || err.message?.includes("expired")) {
+        if (msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized") || msg.includes("expired")) {
           localStorage.removeItem("kathak_admin_token");
           localStorage.removeItem("kathak_admin_token_expiry");
           localStorage.removeItem("kathak_session_user");

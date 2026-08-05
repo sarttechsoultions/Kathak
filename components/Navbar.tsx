@@ -119,7 +119,7 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
 
           {/* Student Login Button */}
           <Link
-            href="/student/login"
+            href="/login"
             className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-7 py-2 rounded-full font-playfair font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] inline-flex items-center justify-center cursor-pointer"
           >
             Login
@@ -177,7 +177,7 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
 
               {/* Mobile Login Button */}
               <Link
-                href="/student/login"
+                href="/login"
                 onClick={() => setMobileMenuOpen(false)}
                 className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-6 py-1.5 rounded-full font-playfair font-semibold text-xs transition-all cursor-pointer inline-block text-center"
               >

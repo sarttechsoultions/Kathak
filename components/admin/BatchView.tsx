@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Plus,
@@ -47,6 +47,7 @@ interface CohortStudent {
   studentId: string;
   level?: string;
   batchCode: string;
+  batchId?: string;
   joiningDate: string;
   assignmentsSubmitted: string;
 }
@@ -67,6 +68,40 @@ interface AvailableStudent {
   status: string;
 }
 
+interface BatchStudentResponse {
+    id:string;
+    fullName:string;
+    email:string;
+    avatar?:string;
+    batchName:string;
+    studentId?:string;
+    joiningDate?:string;
+    assignmentsSubmitted?:number;
+}
+
+interface TeacherResponseItem {
+  id: string;
+  name?: string;
+  fullName?: string;
+}
+
+interface CourseResponseItem {
+  id: string;
+  title?: string;
+  name?: string;
+}
+
+const formatScheduleDisplay = (rawSchedule?: string) => {
+  if (!rawSchedule) return "Mon, Wed, Fri (06:30 PM)";
+  if (rawSchedule.includes("|")) {
+    const parts = rawSchedule.split("|");
+    const days = parts[0] || "Mon, Wed, Fri";
+    const time = parts[1] || "06:30 PM";
+    return `${days} (${time})`;
+  }
+  return rawSchedule;
+};
+
 export default function BatchView() {
   const [viewMode, setViewMode] = useState<"OVERVIEW" | "STUDENT_DIRECTORY" | "CREATE_FORM" | "EDIT_FORM">("OVERVIEW");
   const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
@@ -74,7 +109,7 @@ export default function BatchView() {
 
   // Real Dynamic State
   const [batches, setBatches] = useState<BatchRecord[]>([]);
-  const [dbCourses, setDbCourses] = useState<any[]>([]);
+  const [dbCourses, setDbCourses] = useState<CourseResponseItem[]>([]);
   const [metrics, setMetrics] = useState({
     activeBatches: 0,
     totalStudents: 0,
@@ -126,10 +161,22 @@ export default function BatchView() {
   };
 
   // Fetch Live Batches, Teachers & Registered Students from Express Backend API
-  const fetchBatchesData = async () => {
-    setIsLoading(true);
+  const fetchBatchesData = useCallback(async () => {
     try {
-      const res = await apiRequest(ENDPOINTS.ADMIN_BATCHES);
+      const res = await apiRequest<{
+        data?: {
+          batches?: BatchRecord[];
+          metrics?: {
+            activeBatches?: number;
+            totalStudents?: number;
+            completedBatches?: number;
+            batchesA?: number;
+            batchesB?: number;
+            batchesC?: number;
+          };
+        };
+      }>(ENDPOINTS.ADMIN_BATCHES);
+
       if (res.data?.batches) {
         setBatches(res.data.batches);
       }
@@ -145,32 +192,30 @@ export default function BatchView() {
       }
 
       // Fetch dynamic courses list
-      const courseRes = await apiRequest(ENDPOINTS.COURSES);
+      const courseRes = await apiRequest<{ data?: { courses?: CourseResponseItem[] } }>(ENDPOINTS.COURSES);
       if (courseRes.data?.courses && courseRes.data.courses.length > 0) {
         setDbCourses(courseRes.data.courses);
       }
 
       // Fetch dynamic teachers list
-      const teacherRes = await apiRequest(ENDPOINTS.ADMIN_TEACHERS);
+      const teacherRes = await apiRequest<{ data?: { teachers?: TeacherResponseItem[] } }>(ENDPOINTS.ADMIN_TEACHERS);
       if (teacherRes.data?.teachers) {
-        const names = teacherRes.data.teachers.map((t: any) => t.name || t.fullName);
+        const names = teacherRes.data.teachers.map((t: TeacherResponseItem) => t.name || t.fullName || "Teacher");
         setTeacherList(names);
-        if (names.length > 0 && !assignedTeacher) {
-          setAssignedTeacher(names[0]);
-        }
+        setAssignedTeacher((prev) => (prev ? prev : names[0] || ""));
       }
 
       // Fetch registered students list
-      const studentRes = await apiRequest(ENDPOINTS.ADMIN_STUDENTS);
+      const studentRes = await apiRequest<{ data?: { students?: AvailableStudent[] } }>(ENDPOINTS.ADMIN_STUDENTS);
       if (studentRes.data?.students) {
         setAvailableStudents(studentRes.data.students);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to fetch dynamic batches data:", err);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const handleDeleteBatch = async (id: string, name: string) => {
     if (await openThemeConfirm(`Are you sure you want to delete batch "${name}"?`, "Delete Batch")) {
@@ -178,15 +223,41 @@ export default function BatchView() {
         await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${id}`, { method: "DELETE" });
         await openThemeSuccess(`Batch "${name}" deleted successfully from Database!`, "Batch Deleted");
         fetchBatchesData();
-      } catch (err: any) {
-        showNotification(err.message || "Failed to delete batch.");
+      } catch (err: unknown) {
+        showNotification((err as Error).message || "Failed to delete batch.");
       }
     }
   };
 
   useEffect(() => {
     fetchBatchesData();
-  }, []);
+  }, [fetchBatchesData]);
+
+  // Auto-calculate batch status dynamically based on Start Date & End Date
+  useEffect(() => {
+    if (!startDate) return;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+
+    if (!isNaN(start.getTime()) && start > now) {
+      setBatchStatus("UPCOMING");
+      return;
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (!isNaN(end.getTime()) && now > end) {
+        setBatchStatus("DONE");
+        return;
+      }
+    }
+
+    setBatchStatus("ACTIVE");
+  }, [startDate, endDate]);
 
   // Open Batch Student Directory
   const handleOpenBatchDirectory = async (batch: BatchRecord) => {
@@ -195,17 +266,47 @@ export default function BatchView() {
     setIsLoading(true);
 
     try {
-      const res = await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${batch.id}/students`);
-      if (res.data?.students) {
-        setCohortStudents(res.data.students);
-      } else {
-        setCohortStudents([]);
-      }
-    } catch (err) {
+      const res = await apiRequest<{ status: string; data: BatchStudentResponse[] }>(
+        `${ENDPOINTS.ADMIN_BATCHES}/${batch.id}/students`
+      );
+
+      const students: BatchStudentResponse[] = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray((res as unknown as { students?: BatchStudentResponse[] }).students)
+        ? (res as unknown as { students: BatchStudentResponse[] }).students
+        : [];
+
+      setCohortStudents(
+        students.map((s) => ({
+          id: s.id,
+          name: s.fullName || (s as unknown as { name?: string }).name || "Student",
+          email: s.email || "-",
+          avatar: s.avatar || "/Ananya.png",
+          studentId: s.studentId || `#STU-${s.id.slice(0, 4).toUpperCase()}`,
+          batchCode: s.batchName || batch.code || "BATCH",
+          batchId: (s as unknown as { batchId?: string }).batchId || batch.id,
+          joiningDate: s.joiningDate || "Aug 2024",
+          assignmentsSubmitted: String(s.assignmentsSubmitted || "0")
+        }))
+      );
+    } catch (err: unknown) {
       console.error("Failed to fetch batch students:", err);
       setCohortStudents([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleQuickStatusChange = async (batchId: string, newStatus: string) => {
+    try {
+      await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${batchId}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus })
+      });
+      showNotification(`Batch status updated to "${newStatus}"!`);
+      await fetchBatchesData();
+    } catch (err: unknown) {
+      showNotification((err as Error).message || "Failed to update batch status.");
     }
   };
 
@@ -217,14 +318,72 @@ export default function BatchView() {
     setLevel(batch.level);
     setAssignedTeacher(batch.teacher);
     setStudentCapacity(String(batch.totalStudents || 25));
-    setBatchStatus(batch.status === "Active" ? "ACTIVE" : batch.status === "Upcoming" ? "UPCOMING" : "DONE");
+    setBatchStatus(
+      batch.status === "Active"
+        ? "ACTIVE"
+        : batch.status === "Upcoming"
+        ? "UPCOMING"
+        : "DONE"
+    );
+
+    // Parse schedule string or set robust default dates
+    let parsedDays = ["Mon", "Wed", "Fri"];
+    let parsedTime = "06:30 PM";
+    let parsedStart = new Date().toISOString().split("T")[0];
+    let parsedEnd = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().split("T")[0];
+
+    if (batch.schedule) {
+      if (batch.schedule.includes("|")) {
+        const parts = batch.schedule.split("|");
+        if (parts[0]) parsedDays = parts[0].split(",").map((d) => d.trim()).filter(Boolean);
+        if (parts[1]) parsedTime = parts[1].trim();
+        if (parts[2]) parsedStart = parts[2].trim();
+        if (parts[3]) parsedEnd = parts[3].trim();
+      } else {
+        const timeMatch = batch.schedule.match(/\((.*?)\)/);
+        if (timeMatch && timeMatch[1]) {
+          parsedTime = timeMatch[1].trim();
+        }
+        const daysPart = batch.schedule.replace(/\(.*?\)/, "").trim();
+        if (daysPart) {
+          const daysArr = daysPart.split(/[, ]+/).filter((d) =>
+            ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].includes(d.trim())
+          );
+          if (daysArr.length > 0) parsedDays = daysArr;
+        }
+      }
+    }
+
+    setStartDate(parsedStart);
+    setEndDate(parsedEnd);
+    setClassTime(parsedTime);
+    setSelectedDays(parsedDays);
+
     try {
-      const response = await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${batch.id}/students`);
-      const students = response.data?.students ?? [];
-      setEnrolledStudents(students.map((student: CohortStudent) => ({ id: student.id, name: student.name, initials: student.name.substring(0, 2).toUpperCase(), studentId: student.studentId, level: "INTERMEDIATE" as const })));
-    } catch {
+      const response = await apiRequest<{ status: string; data: BatchStudentResponse[] }>(
+        `${ENDPOINTS.ADMIN_BATCHES}/${batch.id}/students`
+      );
+
+      const students: BatchStudentResponse[] = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray((response as unknown as { students?: BatchStudentResponse[] }).students)
+        ? (response as unknown as { students: BatchStudentResponse[] }).students
+        : [];
+
+      setEnrolledStudents(
+        students.map((student) => ({
+          id: student.id,
+          name: student.fullName || (student as unknown as { name?: string }).name || "Student",
+          initials: (student.fullName || "ST").substring(0, 2).toUpperCase(),
+          studentId: student.studentId ?? `#STU-${student.id.slice(0, 4).toUpperCase()}`,
+          level: "INTERMEDIATE" as const
+        }))
+      );
+    } catch (err: unknown) {
+      console.error("Failed to fetch batch students for edit:", err);
       setEnrolledStudents([]);
     }
+
     setViewMode("EDIT_FORM");
   };
 
@@ -237,35 +396,57 @@ export default function BatchView() {
     setBatchDescription("");
     setEnrolledStudents([]);
     setBatchStatus("ACTIVE");
+    setStartDate(new Date().toISOString().split("T")[0]);
+    setEndDate(new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().split("T")[0]);
+    setClassTime("06:30 PM");
+    setSelectedDays(["Mon", "Wed", "Fri"]);
     setViewMode("CREATE_FORM");
   };
 
   // Submit Form (Create or Update)
   const handleSaveBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchName || !course) {
-      showNotification("Please enter Batch Name and Course.");
+    if (!batchName.trim() || !course.trim()) {
+      showNotification("Please enter a valid Batch Name and Course.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const scheduleString = `${selectedDays.join(",") || "Mon,Wed,Fri"} ${classTime}`;
-      
+      const scheduleString = `${selectedDays.join(",") || "Mon,Wed,Fri"}|${classTime || "06:30 PM"}|${startDate || ""}|${endDate || ""}`;
+      const newStatusStr = batchStatus === "ACTIVE" ? "Active" : batchStatus === "UPCOMING" ? "Upcoming" : "Completed";
+
       if (viewMode === "EDIT_FORM" && editingBatchId) {
+        // Optimistically update local batches state first for instant UI response
+        setBatches((prev) =>
+          prev.map((b) =>
+            b.id === editingBatchId
+              ? {
+                  ...b,
+                  name: batchName.trim(),
+                  course: course,
+                  teacher: assignedTeacher || b.teacher,
+                  status: newStatusStr as any,
+                  schedule: scheduleString,
+                  level: level as any
+                }
+              : b
+          )
+        );
+
         // PUT Update Request
         await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${editingBatchId}`, {
           method: "PUT",
           body: JSON.stringify({
-            name: batchName,
+            name: batchName.trim(),
             courseName: course,
             level,
             teacherName: assignedTeacher || "Kathak Faculty",
             schedule: scheduleString,
             totalStudents: enrolledStudents.length,
             studentIds: enrolledStudents.map((student) => student.id),
-            status: batchStatus === "ACTIVE" ? "Active" : batchStatus === "UPCOMING" ? "Upcoming" : "Completed"
+            status: newStatusStr
           })
         });
         showNotification(`Batch "${batchName}" updated successfully!`);
@@ -274,14 +455,14 @@ export default function BatchView() {
         await apiRequest(ENDPOINTS.ADMIN_BATCHES, {
           method: "POST",
           body: JSON.stringify({
-            name: batchName,
+            name: batchName.trim(),
             courseName: course,
             level,
             teacherName: assignedTeacher || "Kathak Faculty",
             schedule: scheduleString,
             totalStudents: enrolledStudents.length,
             studentIds: enrolledStudents.map((student) => student.id),
-            status: batchStatus === "ACTIVE" ? "Active" : batchStatus === "UPCOMING" ? "Upcoming" : "Completed"
+            status: newStatusStr
           })
         });
         showNotification(`Batch "${batchName}" created & saved to database!`);
@@ -290,8 +471,8 @@ export default function BatchView() {
       await fetchBatchesData();
       setViewMode("OVERVIEW");
       setBatchName("");
-    } catch (err: any) {
-      showNotification(err.message || "Failed to save batch.");
+    } catch (err: unknown) {
+      showNotification((err as Error).message || "Failed to save batch.");
     } finally {
       setIsSubmitting(false);
     }
@@ -319,24 +500,48 @@ export default function BatchView() {
   };
 
   // Confirm selection from Student Picker Modal
-  const confirmSelectedStudentsToBatch = () => {
+  const confirmSelectedStudentsToBatch = async () => {
+    if (selectedStudentIds.length === 0) {
+      showNotification("Please select at least one student to enroll.");
+      return;
+    }
+
     const newlySelected = availableStudents
       .filter((s) => selectedStudentIds.includes(s.id))
       .map((s) => ({
         id: s.id,
         name: s.name,
         initials: (s.name || "ST").substring(0, 2).toUpperCase(),
-        studentId: `#STU-2024-${s.id.substring(0, 4)}`,
+        studentId: `#STU-2024-${s.id.substring(0, 4).toUpperCase()}`,
         level: "INTERMEDIATE" as const
       }));
 
     const existingIds = enrolledStudents.map((es) => es.id);
     const filteredNew = newlySelected.filter((ns) => !existingIds.includes(ns.id));
+    const updatedEnrolled = [...enrolledStudents, ...filteredNew];
+    setEnrolledStudents(updatedEnrolled);
 
-    setEnrolledStudents([...enrolledStudents, ...filteredNew]);
+    if (viewMode === "STUDENT_DIRECTORY" && selectedBatch) {
+      try {
+        const allStudentIds = Array.from(new Set([...cohortStudents.map((cs) => cs.id), ...selectedStudentIds]));
+        await apiRequest(`${ENDPOINTS.ADMIN_BATCHES}/${selectedBatch.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            studentIds: allStudentIds
+          })
+        });
+        showNotification(`${selectedStudentIds.length} student(s) added to batch cohort successfully!`);
+        await handleOpenBatchDirectory(selectedBatch);
+        await fetchBatchesData();
+      } catch (err: unknown) {
+        showNotification((err as Error).message || "Failed to add students to batch.");
+      }
+    } else {
+      showNotification(`${filteredNew.length} student(s) added to batch cohort!`);
+    }
+
     setIsStudentPickerOpen(false);
     setSelectedStudentIds([]);
-    showNotification(`${filteredNew.length} students enrolled in batch cohort!`);
   };
 
   return (
@@ -360,7 +565,7 @@ export default function BatchView() {
           {/* Header Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-[#0B1C30] tracking-tight">
                 Batch Management
               </h1>
             </div>
@@ -485,9 +690,13 @@ export default function BatchView() {
                           <tr key={batch.id} className="hover:bg-stone-50/80 transition-colors">
                             <td className="py-4 px-6">
                               <div className="space-y-1">
-                                <h5 className="font-bold text-stone-900 text-sm leading-tight">
-                                  {typeof batch.course === "object" ? (batch.course as any)?.title || (batch.course as any)?.name || "Kathak Foundations" : batch.course}
-                                </h5>
+                                  <h5 className="font-bold text-stone-900 text-sm leading-tight">
+                                    {typeof batch.course === "object"
+                                      ? (batch.course as unknown as { title?: string; name?: string })?.title ||
+                                        (batch.course as unknown as { title?: string; name?: string })?.name ||
+                                        "Kathak Foundations"
+                                      : String(batch.course || "Kathak Foundations")}
+                                  </h5>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[11px] font-bold text-[#9E0C25]">{batch.name}</span>
                                   <span className="text-[10px] font-bold text-stone-400">ID: {batch.code}</span>
@@ -503,7 +712,7 @@ export default function BatchView() {
                             </td>
 
                             <td className="py-4 px-6 font-medium text-stone-600">
-                              {batch.schedule}
+                              {formatScheduleDisplay(batch.schedule)}
                             </td>
 
                             <td className="py-4 px-6 font-extrabold text-stone-900">
@@ -511,9 +720,21 @@ export default function BatchView() {
                             </td>
 
                             <td className="py-4 px-6">
-                              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-[10.5px] border border-emerald-200">
-                                • {batch.status}
-                              </span>
+                              <select
+                                value={batch.status}
+                                onChange={(e) => handleQuickStatusChange(batch.id, e.target.value)}
+                                className={`px-3 py-1.5 rounded-full font-extrabold text-[11px] border focus:outline-none cursor-pointer shadow-2xs ${
+                                  batch.status === "Active" || batch.status === "ACTIVE"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : batch.status === "Upcoming" || batch.status === "UPCOMING"
+                                    ? "bg-sky-50 text-[#0284C7] border-sky-200"
+                                    : "bg-purple-50 text-purple-700 border-purple-200"
+                                }`}
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Upcoming">Upcoming</option>
+                                <option value="Completed">Completed</option>
+                              </select>
                             </td>
 
                             <td className="py-4 px-6 text-right">
@@ -567,7 +788,7 @@ export default function BatchView() {
                 <ArrowLeft className="w-4 h-4" />
                 <span>Batch Management &gt; {viewMode === "EDIT_FORM" ? "Edit Batch" : "Create New Batch"}</span>
               </button>
-              <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-[#0B1C30] tracking-tight">
                 {viewMode === "EDIT_FORM" ? `Edit Batch: ${batchName}` : "Create Batch"}
               </h1>
               <p className="text-xs font-medium text-stone-500">
@@ -647,7 +868,7 @@ export default function BatchView() {
                     <label className="block text-stone-700 font-bold uppercase text-[10.5px]">LEVEL *</label>
                     <select
                       value={level}
-                      onChange={(e) => setLevel(e.target.value as any)}
+                      onChange={(e) => setLevel(e.target.value as "BEGINNER" | "INTERMEDIATE" | "ADVANCED")}
                       className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25] cursor-pointer"
                     >
                       <option value="BEGINNER">Beginner</option>
@@ -814,12 +1035,33 @@ export default function BatchView() {
               <div className="lg:col-span-5 space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-stone-700 font-bold uppercase text-[10.5px]">CLASS TIME</label>
-                  <input
-                    type="text"
-                    value={classTime}
-                    onChange={(e) => setClassTime(e.target.value)}
-                    className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25]"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={classTime}
+                      onChange={(e) => setClassTime(e.target.value)}
+                      placeholder="06:30 PM"
+                      className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25]"
+                    />
+                    <select
+                      value={["08:00 AM", "09:30 AM", "10:00 AM", "11:30 AM", "04:00 PM", "05:30 PM", "06:30 PM", "07:30 PM", "08:30 PM"].includes(classTime) ? classTime : ""}
+                      onChange={(e) => {
+                        if (e.target.value) setClassTime(e.target.value);
+                      }}
+                      className="h-11 px-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-700 text-xs font-extrabold focus:outline-none cursor-pointer shrink-0"
+                    >
+                      <option value="">Presets ▼</option>
+                      <option value="08:00 AM">08:00 AM</option>
+                      <option value="09:30 AM">09:30 AM</option>
+                      <option value="10:00 AM">10:00 AM</option>
+                      <option value="11:30 AM">11:30 AM</option>
+                      <option value="04:00 PM">04:00 PM</option>
+                      <option value="05:30 PM">05:30 PM</option>
+                      <option value="06:30 PM">06:30 PM</option>
+                      <option value="07:30 PM">07:30 PM</option>
+                      <option value="08:30 PM">08:30 PM</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -935,7 +1177,7 @@ export default function BatchView() {
                 <span>Batches &gt; {selectedBatch.name}</span>
               </button>
               
-              <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+              <h1 className="font-extrabold text-2xl sm:text-3xl text-[#0B1C30] tracking-tight">
                 Batch Student Directory
               </h1>
               
@@ -966,11 +1208,22 @@ export default function BatchView() {
                     • {selectedBatch.status}
                   </span>
                 </div>
-                <h2 className="font-playfair font-bold text-2xl text-stone-900 pt-1">{selectedBatch.name}</h2>
+                <h2 className="font-extrabold text-2xl text-[#0B1C30] tracking-tight pt-1">{selectedBatch.name}</h2>
                 <p className="text-xs font-bold text-stone-500">{selectedBatch.course}</p>
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStudentIds([]);
+                    setIsStudentPickerOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer uppercase tracking-wide"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Add Students</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handleOpenEditForm(selectedBatch)}
@@ -1062,15 +1315,42 @@ export default function BatchView() {
 
                         <td className="py-4 px-6">
                           <select
-                            value={student.batchCode}
-                            onChange={(e) => {
-                              setCohortStudents(
-                                cohortStudents.map((s) => s.id === student.id ? { ...s, batchCode: e.target.value } : s)
-                              );
+                            value={student.batchId || selectedBatch.id}
+                            onChange={async (e) => {
+                              const newBatchId = e.target.value;
+                              const targetB = batches.find((b) => b.id === newBatchId || b.code === newBatchId);
+                              if (!targetB) return;
+
+                              try {
+                                await apiRequest(`${ENDPOINTS.ADMIN_STUDENTS}/${student.id}`, {
+                                  method: "PUT",
+                                  body: JSON.stringify({ batchId: targetB.id })
+                                });
+
+                                setCohortStudents(
+                                  cohortStudents.map((s) =>
+                                    s.id === student.id ? { ...s, batchCode: targetB.code, batchId: targetB.id } : s
+                                  )
+                                );
+
+                                showNotification(`Student "${student.name}" moved to batch "${targetB.name}" (${targetB.code})!`);
+                                await fetchBatchesData();
+                                if (selectedBatch) {
+                                  await handleOpenBatchDirectory(selectedBatch);
+                                }
+                              } catch (err: unknown) {
+                                showNotification((err as Error).message || "Failed to change student batch.");
+                              }
                             }}
                             className="h-9 px-3 rounded-xl bg-white border border-stone-200 text-stone-800 font-bold text-xs focus:outline-none focus:border-[#9E0C25] cursor-pointer"
                           >
-                            <option value={selectedBatch.code}>{selectedBatch.code}</option>
+                            {batches
+                              .filter((b) => !selectedBatch?.course || b.course === selectedBatch.course || (b as unknown as { courseName?: string }).courseName === selectedBatch.course)
+                              .map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.code} ({b.name})
+                                </option>
+                              ))}
                           </select>
                         </td>
 
@@ -1103,7 +1383,7 @@ export default function BatchView() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
-                <h3 className="font-playfair font-bold text-xl text-stone-900">Select Students to Enroll</h3>
+                <h3 className="font-extrabold text-xl text-[#0B1C30] tracking-tight">Select Students to Enroll</h3>
                 <p className="text-xs text-stone-400 font-medium">Choose registered students from academy directory.</p>
               </div>
               <button

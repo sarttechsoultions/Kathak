@@ -1,31 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import type { Country as PhoneCountryCode } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { Country, State, City } from "country-state-city";
+import type { ICountry, IState, ICity } from "country-state-city";
 import {
-  User,
   Mail,
   Upload,
   ArrowRight,
   ChevronLeft,
   Lock,
   ChevronDown,
-  Phone,
   BookOpen,
-  Users,
-  CreditCard,
   Check,
   ShieldCheck,
-  Calendar,
   CheckCircle2,
-  Film,
-  Play,
-  X,
   Eye,
   EyeOff,
-  Info,
-  Sparkles
+  X,
+  User,
+  Film,
+  Users,
+  CreditCard,
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
@@ -43,34 +43,49 @@ const getTodayDateString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const isValidPhone = (value: string | undefined) =>
+  !!value && isValidPhoneNumber(value);
+
 // Video URL Formatter Helper
 function getEmbedVideoUrl(url: string): { isIframe: boolean; finalUrl: string } {
   if (!url) return { isIframe: false, finalUrl: "" };
-  let cleanUrl = url.trim();
+  const cleanUrl = url.trim();
 
-  // YouTube watch URL -> embed URL
   if (cleanUrl.includes("youtube.com/watch?v=")) {
     const videoId = cleanUrl.split("v=")[1]?.split("&")[0];
-    return { isIframe: true, finalUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1` };
+    return {
+      isIframe: true,
+      finalUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+    };
   }
   if (cleanUrl.includes("youtu.be/")) {
     const videoId = cleanUrl.split("youtu.be/")[1]?.split("?")[0];
-    return { isIframe: true, finalUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1` };
+    return {
+      isIframe: true,
+      finalUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1`,
+    };
   }
-
-  // Vimeo URL -> embed URL
   if (cleanUrl.includes("vimeo.com/") && !cleanUrl.includes("player.vimeo.com")) {
     const videoId = cleanUrl.split("vimeo.com/")[1]?.split("?")[0];
-    return { isIframe: true, finalUrl: `https://player.vimeo.com/video/${videoId}` };
+    return {
+      isIframe: true,
+      finalUrl: `https://player.vimeo.com/video/${videoId}`,
+    };
   }
-
-  // Bunny Stream / iframe URL
-  if (cleanUrl.includes("mediadelivery.net") || cleanUrl.includes("b-cdn.net") || cleanUrl.includes("iframe")) {
-    return { isIframe: true, finalUrl: cleanUrl.startsWith("http") ? cleanUrl : `https://${cleanUrl}` };
+  if (
+    cleanUrl.includes("mediadelivery.net") ||
+    cleanUrl.includes("b-cdn.net") ||
+    cleanUrl.includes("iframe")
+  ) {
+    return {
+      isIframe: true,
+      finalUrl: cleanUrl.startsWith("http") ? cleanUrl : `https://${cleanUrl}`,
+    };
   }
-
-  // Direct MP4 / Cloudinary video URL
-  return { isIframe: false, finalUrl: cleanUrl.startsWith("http") ? cleanUrl : `https://${cleanUrl}` };
+  return {
+    isIframe: false,
+    finalUrl: cleanUrl.startsWith("http") ? cleanUrl : `https://${cleanUrl}`,
+  };
 }
 
 export default function StudentEnrollPage() {
@@ -78,7 +93,27 @@ export default function StudentEnrollPage() {
   const [currentStep, setCurrentStep] = useState(1);
 
   // DYNAMIC COURSES FROM DATABASE
-  const [dbCourses, setDbCourses] = useState<any[]>([]);
+  type BatchOption = {
+    id: string;
+    name: string;
+    schedule?: string;
+    courseId?: string;
+    courseName?: string;
+  };
+
+  type Course = {
+    id: string;
+    title: string;
+    groupFeeINR?: number;
+    groupFeeUSD?: number;
+    level?: string;
+    feeINR?: number;
+    duration?: string;
+    videoUrl?: string;
+    batches?: BatchOption[];
+  };
+
+  const [dbCourses, setDbCourses] = useState<Course[]>([]);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const videoModalContainerRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +122,8 @@ export default function StudentEnrollPage() {
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState<string | undefined>(undefined);
+  const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [password, setPassword] = useState("");
@@ -95,31 +131,76 @@ export default function StudentEnrollPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Country / State / City
+  const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(
+    Country.getCountryByCode("IN") || null
+  );
+  const [selectedState, setSelectedState] = useState<IState | null>(null);
+  const [selectedCity, setSelectedCity] = useState<ICity | null>(null);
+
+  const states = useMemo(
+    () => (selectedCountry ? State.getStatesOfCountry(selectedCountry.isoCode) : []),
+    [selectedCountry]
+  );
+  const cities = useMemo(
+    () =>
+      selectedCountry && selectedState
+        ? City.getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode)
+        : [],
+    [selectedCountry, selectedState]
+  );
+
+  // Validation errors
+  const [phoneError, setPhoneError] = useState("");
+  const [regionError, setRegionError] = useState("");
+  const [cityError, setCityError] = useState("");
+  const [postalCodeError, setPostalCodeError] = useState("");
+  const [addressError, setAddressError] = useState("");
+
   // STEP 2 FIELDS
-  const [course, setCourse] = useState("Kathak Beginners Course");
+  const [courseId, setCourseId] = useState("");
   const [skillLevel, setSkillLevel] = useState("Beginner (Prathama)");
-  const [batch, setBatch] = useState("Morning Zen (7:00 AM)");
+  const [batchId, setBatchId] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [isUnder18, setIsUnder18] = useState(false);
   const [guardianName, setGuardianName] = useState("");
   const [relationship, setRelationship] = useState("Mother");
   const [emergencyContact, setEmergencyContact] = useState("");
 
+
+
   // STEP 3 FIELDS
   const [paymentMethod, setPaymentMethod] = useState<"upi" | "card">("upi");
-  const [autoBilling, setAutoBilling] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Load states when country changes
 
   // Fetch dynamic courses from PostgreSQL DB on mount
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const res = await apiRequest(ENDPOINTS.COURSES);
+        const res = await apiRequest<{
+          data: {
+            courses: Array<{
+              id: string;
+              title: string;
+              groupFeeINR?: number;
+              groupFeeUSD?: number;
+              level?: string;
+              feeINR?: number;
+              duration?: string;
+              videoUrl?: string;
+              batches?: BatchOption[];
+            }>;
+          };
+        }>(ENDPOINTS.PUBLIC_COURSES);
         if (res.data?.courses && res.data.courses.length > 0) {
           setDbCourses(res.data.courses);
-          setCourse(res.data.courses[0].title);
+          setCourseId(res.data.courses[0].id);
+          const firstBatch = res.data.courses[0].batches?.[0];
+          setBatchId(firstBatch?.id || "");
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Failed to fetch dynamic courses:", err);
       }
     };
@@ -137,8 +218,11 @@ export default function StudentEnrollPage() {
         }
         if (
           e.key === "F12" ||
-          (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j")) ||
-          (e.ctrlKey && (e.key === "u" || e.key === "U" || e.key === "s" || e.key === "S"))
+          (e.ctrlKey &&
+            e.shiftKey &&
+            (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j")) ||
+          (e.ctrlKey &&
+            (e.key === "u" || e.key === "U" || e.key === "s" || e.key === "S"))
         ) {
           e.preventDefault();
           return false;
@@ -150,22 +234,114 @@ export default function StudentEnrollPage() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showVideoModal]);
 
-  const selectedCourseObj = dbCourses.find((c) => c.title === course) || dbCourses[0];
+  const selectedCourseObj = useMemo(
+    () => dbCourses.find((c) => c.id === courseId) || dbCourses[0] || null,
+    [courseId, dbCourses]
+  );
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const selectedBatch = useMemo(
+    () =>
+      selectedCourseObj?.batches?.find((item) => item.id === batchId) ||
+      selectedCourseObj?.batches?.[0] ||
+      null,
+    [batchId, selectedCourseObj]
+  );
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+
+const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (file.size > 2 * 1024 * 1024) {
+    alert("Image size should be less than 2MB");
+    return;
+  }
+
+  setIsUploadingImage(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    // ✅ fallback — undefined mat hone do
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+      "http://localhost:5000/api/v1";
+
+    const res = await fetch(`${base}/upload/image/public`, {
+      method: "POST",
+      body: formData,
+      // Authorization mat bhejo — public route
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.status === "error") {
+      throw new Error(data.message || "Failed to upload image");
     }
-  };
+
+    setProfileImage(data.data?.url || data.data?.secure_url);
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : "Image upload failed";
+    alert(message);
+    setProfileImage(null);
+  } finally {
+    setIsUploadingImage(false);
+  }
+};
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (currentStep === 1) {
+      const hasValidPhone = isValidPhone(phone);
+      const hasStreetAddress = address.trim().length > 0;
+      const hasPostalCode = postalCode.trim().length > 0;
+
+      setPhoneError("");
+      setRegionError("");
+      setCityError("");
+      setPostalCodeError("");
+      setAddressError("");
+
+      if (!phone) {
+        setPhoneError("Phone number is required.");
+        return;
+      }
+
+      if (!hasValidPhone) {
+        setPhoneError("Please enter a valid international phone number.");
+        return;
+      }
+
+      if (!selectedCountry) {
+        alert("Please select your country.");
+        return;
+      }
+
+      if (!selectedState) {
+        setRegionError("State / region is required.");
+        return;
+      }
+
+      if (cities.length > 0 && !selectedCity) {
+        setCityError("City is required.");
+        return;
+      }
+
+      if (!hasStreetAddress) {
+        setAddressError("Street address is required.");
+        return;
+      }
+
+      if (!hasPostalCode) {
+        setPostalCodeError("Postal / ZIP code is required.");
+        return;
+      }
+
       if (!password || password.length < 6) {
         alert("Please create a portal password with at least 6 characters.");
         return;
@@ -175,6 +351,14 @@ export default function StudentEnrollPage() {
         return;
       }
     }
+
+    if (currentStep === 2) {
+      if (selectedCourseObj?.batches?.length && !batchId) {
+        alert("Please select a batch assignment for this course.");
+        return;
+      }
+    }
+
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     }
@@ -189,21 +373,29 @@ export default function StudentEnrollPage() {
   const handleCompleteEnrollment = async () => {
     setIsSubmitted(true);
     try {
-      const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
-        method: "POST",
-        body: JSON.stringify({
-          fullName,
-          email,
-          phone,
+const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
+  method: "POST",
+  body: JSON.stringify({
+    fullName,
+    email,
+    phone,
+          country: selectedCountry?.name || "India",
+          countryCode: selectedCountry
+            ? `+${selectedCountry.phonecode}`
+            : "+91",
           password,
           dob,
           gender,
           address,
+          region: selectedState?.name || "",
+          city: selectedCity?.name || "",
+          postalCode,
           profileImage,
-          courseTitle: course,
+          courseTitle: selectedCourseObj?.title || "",
           courseId: selectedCourseObj?.id,
+          batchId,
+          batch: selectedBatch?.name || "",
           skillLevel,
-          batch,
           joiningDate,
           isUnder18,
           guardianName,
@@ -211,33 +403,37 @@ export default function StudentEnrollPage() {
           emergencyContact,
           paymentMethod,
           groupFeeINR: selectedCourseObj?.groupFeeINR || 2200,
-          groupFeeUSD: selectedCourseObj?.groupFeeUSD || 50
-        })
+          groupFeeUSD: selectedCourseObj?.groupFeeUSD || 50,
+        }),
       });
 
-      if (res.data?.token) {
-        localStorage.setItem("kathak_token", res.data.token);
-        if (res.data.user) {
-          localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
-        }
-      }
+      const token = res?.data?.token;
+const user = res?.data?.user;
+
+if (token) {
+  localStorage.setItem("kathak_student_token", token); 
+  localStorage.setItem("kathak_token", token);         
+}
+
+if (user) {
+  localStorage.setItem("kathak_student_user", JSON.stringify(user));
+}
 
       await openThemeSuccess(
-        `Congratulations ${fullName}! Your enrollment for "${course}" is complete. Redirecting to your Student Portal...`,
+        `Congratulations ${fullName}! Your enrollment for "${selectedCourseObj?.title || "your selected course"}" is complete. Redirecting to your Student Portal...`,
         "Enrollment & Course Unlocked"
       );
 
       router.push("/student/dashboard");
-    } catch (err: any) {
-      alert(err.message || "Failed to complete enrollment.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(message || "Failed to complete enrollment.");
       setIsSubmitted(false);
     }
   };
 
   return (
-    // Figma Frame: Fill #FFFFFF, Corner radius 0
     <div className="min-h-screen relative bg-white text-stone-900 flex flex-col justify-between selection:bg-[#C10F3A] selection:text-white overflow-x-hidden">
-
       {/* Background Image Layer with Translucent Vignette */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -249,13 +445,12 @@ export default function StudentEnrollPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/30 to-white/50" />
       </div>
 
-      {/* Main Container (Width 1280 max) */}
+      {/* Main Container */}
       <div className="relative z-10 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 flex flex-col justify-center">
-
         {/* Back to Login — only on Step 1 */}
         {currentStep === 1 && (
           <Link
-            href="/student/login"
+            href="/login"
             className="inline-flex items-center gap-1 text-xs font-semibold text-stone-500 hover:text-[#C10F3A] transition-colors mb-4 w-fit"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -279,15 +474,19 @@ export default function StudentEnrollPage() {
           </p>
         </div>
 
-        {/* STEPPER PROGRESS INDICATOR (Step 1 -> Step 2 -> Step 3) */}
+        {/* STEPPER PROGRESS INDICATOR */}
         <div className="mb-10 max-w-2xl mx-auto w-full px-4">
           <div className="relative flex items-center justify-between">
-            {/* Connecting Line */}
             <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-stone-300 z-0" />
             <div
               className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-[#C10F3A] transition-all duration-300 z-0"
               style={{
-                width: currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
+                width:
+                  currentStep === 1
+                    ? "0%"
+                    : currentStep === 2
+                    ? "50%"
+                    : "100%",
               }}
             />
 
@@ -356,13 +555,15 @@ export default function StudentEnrollPage() {
           </div>
         </div>
 
-        {/* STEP 1 FORM: PERSONAL INFO */}
+        {/* ======================= STEP 1 ======================= */}
         {currentStep === 1 && (
           <form onSubmit={handleNext} className="space-y-6 max-w-4xl mx-auto w-full">
-
             {/* CARD 1: PERSONAL INFORMATION */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <User className="w-4 h-4 text-[#C10F3A]" />
                 <span>Personal Information</span>
               </div>
@@ -370,33 +571,45 @@ export default function StudentEnrollPage() {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-2">
                 {/* Photo Upload */}
                 <div className="md:col-span-4 flex flex-col items-center">
-                  <div className="relative w-full max-w-[180px] aspect-square rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/40 hover:bg-sky-50/80 transition-colors flex flex-col items-center justify-center p-4 text-center group cursor-pointer overflow-hidden">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                    />
+                 <div className="relative w-full max-w-[180px] aspect-square rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/40 hover:bg-sky-50/80 transition-colors flex flex-col items-center justify-center p-4 text-center group cursor-pointer overflow-hidden">
+  <input
+    type="file"
+    accept="image/*"
+    onChange={handleImageUpload}
+    disabled={isUploadingImage}
+    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+  />
 
-                    {profileImage ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={profileImage} alt="Profile" className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      <>
-                        <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 mb-2 group-hover:scale-110 transition-transform">
-                          <Upload className="w-5 h-5" />
-                        </div>
-                        <span className="text-[11px] font-medium text-stone-500 leading-tight">
-                          Upload high-res JPG or PNG
-                        </span>
-                      </>
-                    )}
+  {isUploadingImage ? (
+    <div className="flex flex-col items-center justify-center gap-2">
+      <div className="w-8 h-8 border-2 border-[#C10F3A] border-t-transparent rounded-full animate-spin" />
+      <span className="text-[11px] text-stone-500">Uploading...</span>
+    </div>
+  ) : profileImage ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={profileImage}
+      alt="Profile"
+      className="w-full h-full object-cover rounded-lg"
+    />
+  ) : (
+    <>
+      <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 mb-2 group-hover:scale-110 transition-transform">
+        <Upload className="w-5 h-5" />
+      </div>
+      <span className="text-[11px] font-medium text-stone-500 leading-tight">
+        Upload high-res JPG or PNG
+      </span>
+    </>
+  )}
 
-                    <div className="absolute bottom-2 right-2 z-10 bg-[#C10F3A] text-white p-1 rounded-md shadow-xs">
-                      <Lock className="w-3 h-3" />
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-stone-400 mt-2">Profile Photo</span>
+  <div className="absolute bottom-2 right-2 z-10 bg-[#C10F3A] text-white p-1 rounded-md shadow-xs">
+    <Lock className="w-3 h-3" />
+  </div>
+</div>
+                  <span className="text-[10px] text-stone-400 mt-2">
+                    Profile Photo
+                  </span>
                 </div>
 
                 {/* Form Inputs */}
@@ -450,18 +663,21 @@ export default function StudentEnrollPage() {
                     </div>
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* CARD 2: CONTACT DETAILS */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <Mail className="w-4 h-4 text-[#C10F3A]" />
                 <span>Contact Details</span>
               </div>
 
               <div className="space-y-4 pt-2">
+                {/* Email + Phone */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
@@ -479,43 +695,186 @@ export default function StudentEnrollPage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                      Phone Number
+                      Mobile Number
                     </label>
-                    <div className="flex items-center gap-2">
-                      <span className="bg-stone-50 border border-stone-200 text-stone-600 px-3 py-2.5 rounded-xl text-xs font-semibold shrink-0">
-                        +91
-                      </span>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="98765 43210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs"
-                      />
-                    </div>
+                 <div className="bg-white border border-stone-200 rounded-xl focus-within:border-[#C10F3A] transition-colors shadow-2xs overflow-hidden">
+ <PhoneInput
+  international
+  defaultCountry={(selectedCountry?.isoCode || "IN") as PhoneCountryCode}
+  value={phone}
+  onChange={(value) => setPhone(value)}
+  onCountryChange={(iso) => {
+    if (iso) {
+      const country = Country.getCountryByCode(iso);
+      if (country) setSelectedCountry(country);
+    }
+  }}
+  placeholder="Enter phone number"
+  className="PhoneInput w-full"
+  numberInputProps={{
+    className:
+      "PhoneInputInput w-full bg-transparent text-xs text-stone-800 focus:outline-none",
+  }}
+/>
+</div>
+                    {phoneError ? (
+                      <p className="mt-2 text-[11px] text-rose-600">
+                        {phoneError}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-[11px] text-stone-500">
+                        Selected country: {selectedCountry?.name || "India"} (+
+                        {selectedCountry?.phonecode || "91"})
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    Residential Address
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Street, Apartment, Locality, City, State, ZIP"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs"
-                  />
+                {/* Country / State / City */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Country */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      Country
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCountry?.isoCode || ""}
+                        onChange={(e) => {
+                          const country = Country.getCountryByCode(
+                            e.target.value
+                          );
+                          setSelectedCountry(country || null);
+                        }}
+                        className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
+                      >
+                        <option value="">Select Country</option>
+                        {Country.getAllCountries().map((c) => (
+                          <option key={c.isoCode} value={c.isoCode}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* State */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      State / Region
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedState?.isoCode || ""}
+                        onChange={(e) => {
+                          const state = states.find(
+                            (s) => s.isoCode === e.target.value
+                          );
+                          setSelectedState(state || null);
+                        }}
+                        disabled={!selectedCountry}
+                        className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs disabled:bg-stone-50 disabled:text-stone-400"
+                      >
+                        <option value="">Select State</option>
+                        {states.map((s) => (
+                          <option key={s.isoCode} value={s.isoCode}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    {regionError && (
+                      <p className="mt-2 text-[11px] text-rose-600">
+                        {regionError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* City */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      City
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCity?.name || ""}
+                        onChange={(e) => {
+                          const cityObj = cities.find(
+                            (c) => c.name === e.target.value
+                          );
+                          setSelectedCity(cityObj || null);
+                        }}
+                        disabled={!selectedState}
+                        className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs disabled:bg-stone-50 disabled:text-stone-400"
+                      >
+                        <option value="">Select City</option>
+                        {cities.map((c) => (
+                          <option key={`${c.name}-${c.latitude}`} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    {cityError && (
+                      <p className="mt-2 text-[11px] text-rose-600">
+                        {cityError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Street Address + Postal Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      Street Address
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Flat / House / Street"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs"
+                    />
+                    {addressError && (
+                      <p className="mt-2 text-[11px] text-rose-600">
+                        {addressError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                      Postal / ZIP Code
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="PIN or ZIP code"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs"
+                    />
+                    {postalCodeError && (
+                      <p className="mt-2 text-[11px] text-rose-600">
+                        {postalCodeError}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* CARD 3: ACCOUNT SECURITY & PORTAL PASSWORD SETUP */}
+            {/* CARD 3: ACCOUNT SECURITY */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <Lock className="w-4 h-4 text-[#C10F3A]" />
                 <span>Account Security & Portal Password Setup</span>
               </div>
@@ -541,7 +900,11 @@ export default function StudentEnrollPage() {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -562,10 +925,16 @@ export default function StudentEnrollPage() {
                       />
                       <button
                         type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
                       >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -573,7 +942,10 @@ export default function StudentEnrollPage() {
 
                 <div className="p-3 rounded-xl bg-sky-50/80 border border-sky-200 flex items-center gap-2.5 text-[11.5px] text-sky-800 font-medium">
                   <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span>Use this password along with your Email address to sign in to the Student Portal anytime.</span>
+                  <span>
+                    Use this password along with your Email address to sign in
+                    to the Student Portal anytime.
+                  </span>
                 </div>
               </div>
             </div>
@@ -591,44 +963,51 @@ export default function StudentEnrollPage() {
           </form>
         )}
 
-        {/* STEP 2 FORM: DYNAMIC ENROLLMENT DETAILS & PROMOTIONAL VIDEO PREVIEW */}
+        {/* ======================= STEP 2 ======================= */}
         {currentStep === 2 && (
           <form onSubmit={handleNext} className="space-y-6 max-w-4xl mx-auto w-full">
-
-            {/* CARD 1: DYNAMIC ENROLLMENT DETAILS */}
+            {/* CARD 1: ENROLLMENT DETAILS */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <BookOpen className="w-4 h-4 text-[#C10F3A]" />
                 <span>Enrollment Details</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                {/* 100% DYNAMIC COURSE SELECTION DROPDOWN FROM POSTGRESQL DB */}
+                {/* Dynamic Course Selection */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                     Course Selection (100% Dynamic from Database)
                   </label>
                   <div className="relative">
                     <select
-                      value={course}
-                      onChange={(e) => setCourse(e.target.value)}
+                      value={courseId}
+                      onChange={(e) => {
+                        const newCourseId = e.target.value;
+                        setCourseId(newCourseId);
+                        const newSelected = dbCourses.find((c) => c.id === newCourseId);
+                        setBatchId(newSelected?.batches?.[0]?.id || "");
+                      }}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs font-bold text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
                     >
                       {dbCourses.length > 0 ? (
                         dbCourses.map((c) => (
-                          <option key={c.id} value={c.title}>
+                          <option key={c.id} value={c.id}>
                             {c.title} — ({c.level || "Beginner"})
                           </option>
                         ))
                       ) : (
-                        <option value="Kathak Beginners Course">Kathak Beginners Course</option>
+                        <option value="">Kathak Beginners Course</option>
                       )}
                     </select>
                     <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* SELECTED COURSE PROMOTIONAL VIDEO & SPECIFICATION BANNER CARD */}
+                {/* Selected Course Banner */}
                 {selectedCourseObj && (
                   <div className="sm:col-span-2 p-4 rounded-2xl bg-[#FDF2F4] border border-rose-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -645,7 +1024,12 @@ export default function StudentEnrollPage() {
                           </span>
                         </div>
                         <p className="text-[11px] text-stone-600 font-medium mt-0.5">
-                          Group Fee: ₹{selectedCourseObj.groupFeeINR || selectedCourseObj.feeINR || "2,200"}/mo (USD ${selectedCourseObj.groupFeeUSD || 50}) • {selectedCourseObj.duration || "10 Classes/month"}
+                          Group Fee: ₹
+                          {selectedCourseObj.groupFeeINR ||
+                            selectedCourseObj.feeINR ||
+                            "2,200"}
+                          /mo (USD ${selectedCourseObj.groupFeeUSD || 50}) •{" "}
+                          {selectedCourseObj.duration || "10 Classes/month"}
                         </p>
                       </div>
                     </div>
@@ -677,9 +1061,15 @@ export default function StudentEnrollPage() {
                       onChange={(e) => setSkillLevel(e.target.value)}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
                     >
-                      <option value="Beginner (Prathama)">Beginner (Prathama)</option>
-                      <option value="Intermediate (Praveshika)">Intermediate (Praveshika)</option>
-                      <option value="Advanced (Madhyama)">Advanced (Madhyama)</option>
+                      <option value="Beginner (Prathama)">
+                        Beginner (Prathama)
+                      </option>
+                      <option value="Intermediate (Praveshika)">
+                        Intermediate (Praveshika)
+                      </option>
+                      <option value="Advanced (Madhyama)">
+                        Advanced (Madhyama)
+                      </option>
                     </select>
                     <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -691,13 +1081,22 @@ export default function StudentEnrollPage() {
                   </label>
                   <div className="relative">
                     <select
-                      value={batch}
-                      onChange={(e) => setBatch(e.target.value)}
+                      value={batchId}
+                      onChange={(e) => setBatchId(e.target.value)}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
                     >
-                      <option value="Morning Zen (7:00 AM)">Morning Zen (7:00 AM)</option>
-                      <option value="Evening Batch (5:00 PM)">Evening Batch (5:00 PM)</option>
-                      <option value="Weekend Batch (10:00 AM)">Weekend Batch (10:00 AM)</option>
+                      {selectedCourseObj?.batches && selectedCourseObj.batches.length > 0 ? (
+                        selectedCourseObj.batches.map((batchOption) => (
+                          <option key={batchOption.id} value={batchOption.id}>
+                            {batchOption.name}
+                            {batchOption.schedule ? ` • ${batchOption.schedule}` : ""}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          No batch options available for this course
+                        </option>
+                      )}
                     </select>
                     <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   </div>
@@ -721,7 +1120,10 @@ export default function StudentEnrollPage() {
 
             {/* CARD 2: PARENT / GUARDIAN INFO */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <Users className="w-4 h-4 text-[#C10F3A]" />
                 <span>Parent / Guardian Info</span>
               </div>
@@ -807,37 +1209,54 @@ export default function StudentEnrollPage() {
           </form>
         )}
 
-        {/* STEP 3 FORM: PAYMENT SETUP */}
+        {/* ======================= STEP 3 ======================= */}
         {currentStep === 3 && (
           <div className="space-y-6 max-w-4xl mx-auto w-full">
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
-              <div className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide" style={fontJakarta}>
+              <div
+                className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
+                style={fontJakarta}
+              >
                 <CreditCard className="w-4 h-4 text-[#C10F3A]" />
                 <span>Payment Setup</span>
               </div>
 
-              {/* ENROLLMENT SUMMARY CARD */}
+              {/* ENROLLMENT SUMMARY */}
               <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
-                <h4 className="font-bold text-sm text-stone-900">Enrollment Summary</h4>
+                <h4 className="font-bold text-sm text-stone-900">
+                  Enrollment Summary
+                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <span className="text-stone-500 block text-[11px]">Selected Course</span>
-                    <span className="font-bold text-[#C10F3A]">{course}</span>
+                    <span className="text-stone-500 block text-[11px]">
+                      Selected Course
+                    </span>
+                    <span className="font-bold text-[#C10F3A]">{selectedCourseObj?.title || "Selected Course"}</span>
                   </div>
                   <div>
-                    <span className="text-stone-500 block text-[11px]">Assigned Batch</span>
-                    <span className="font-bold text-stone-800">{batch}</span>
+                    <span className="text-stone-500 block text-[11px]">
+                      Assigned Batch
+                    </span>
+                    <span className="font-bold text-stone-800">
+                    {selectedBatch?.name || "Not assigned"}
+                  </span>
                   </div>
                   <div>
-                    <span className="text-stone-500 block text-[11px]">Monthly Fee</span>
-                    <span className="font-bold text-stone-900">₹{selectedCourseObj?.groupFeeINR || "2,200"} / month</span>
+                    <span className="text-stone-500 block text-[11px]">
+                      Monthly Fee
+                    </span>
+                    <span className="font-bold text-stone-900">
+                      ₹{selectedCourseObj?.groupFeeINR || "2,200"} / month
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* PAYMENT METHOD SELECTOR */}
+              {/* PAYMENT METHOD */}
               <div className="space-y-3">
-                <label className="block text-xs font-semibold text-stone-700">Select Payment Method</label>
+                <label className="block text-xs font-semibold text-stone-700">
+                  Select Payment Method
+                </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div
                     onClick={() => setPaymentMethod("upi")}
@@ -852,11 +1271,17 @@ export default function StudentEnrollPage() {
                         UPI
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-stone-800 block">GPay / PhonePe / Paytm</span>
-                        <span className="text-[10.5px] text-stone-500">Instant UPI Auto-Pay</span>
+                        <span className="font-bold text-xs text-stone-800 block">
+                          GPay / PhonePe / Paytm
+                        </span>
+                        <span className="text-[10.5px] text-stone-500">
+                          Instant UPI Auto-Pay
+                        </span>
                       </div>
                     </div>
-                    {paymentMethod === "upi" && <CheckCircle2 className="w-5 h-5 text-[#C10F3A]" />}
+                    {paymentMethod === "upi" && (
+                      <CheckCircle2 className="w-5 h-5 text-[#C10F3A]" />
+                    )}
                   </div>
 
                   <div
@@ -872,11 +1297,17 @@ export default function StudentEnrollPage() {
                         CARD
                       </div>
                       <div>
-                        <span className="font-bold text-xs text-stone-800 block">Credit / Debit Card</span>
-                        <span className="text-[10.5px] text-stone-500">Visa, Mastercard, RuPay</span>
+                        <span className="font-bold text-xs text-stone-800 block">
+                          Credit / Debit Card
+                        </span>
+                        <span className="text-[10.5px] text-stone-500">
+                          Visa, Mastercard, RuPay
+                        </span>
                       </div>
                     </div>
-                    {paymentMethod === "card" && <CheckCircle2 className="w-5 h-5 text-[#C10F3A]" />}
+                    {paymentMethod === "card" && (
+                      <CheckCircle2 className="w-5 h-5 text-[#C10F3A]" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -904,31 +1335,37 @@ export default function StudentEnrollPage() {
                 disabled={isSubmitted}
                 className="bg-[#C10F3A] hover:bg-[#A01830] text-white px-8 py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <span>{isSubmitted ? "Processing Registration..." : "Complete Registration & Pay"}</span>
+                <span>
+                  {isSubmitted
+                    ? "Processing Registration..."
+                    : "Complete Registration & Pay"}
+                </span>
                 <ShieldCheck className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
-
       </div>
 
-      {/* PROMOTIONAL VIDEO PREVIEW MODAL (With Kathak Logo Watermark & Anti-Piracy Protection) */}
+      {/* PROMOTIONAL VIDEO MODAL */}
       {showVideoModal && selectedCourseObj?.videoUrl && (
         <div className="fixed inset-0 z-[999999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div
             ref={videoModalContainerRef}
             className="relative w-full max-w-4xl bg-stone-900 rounded-3xl overflow-hidden shadow-2xl border border-stone-700 flex flex-col"
           >
-            {/* Modal Header Bar */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-stone-950/80">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-[#C10F3A] text-white flex items-center justify-center font-bold">
                   <Film className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">{selectedCourseObj.title}</h3>
-                  <span className="text-[11px] text-stone-400 font-medium">Promotional Demo Video</span>
+                  <h3 className="font-bold text-sm text-white">
+                    {selectedCourseObj.title}
+                  </h3>
+                  <span className="text-[11px] text-stone-400 font-medium">
+                    Promotional Demo Video
+                  </span>
                 </div>
               </div>
 
@@ -941,12 +1378,10 @@ export default function StudentEnrollPage() {
               </button>
             </div>
 
-            {/* Video Player Frame with Kathak Logo Watermark Overlay */}
             <div
               onContextMenu={(e) => e.preventDefault()}
               className="relative w-full aspect-video bg-black overflow-hidden select-none"
             >
-              {/* Pure Kathak Logo Watermark Badge (Top Right) */}
               <div className="absolute top-4 right-4 z-50 pointer-events-none select-none drop-shadow-xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -956,7 +1391,6 @@ export default function StudentEnrollPage() {
                 />
               </div>
 
-              {/* Anti-Piracy Floating Watermark (Bottom Left) */}
               <div className="absolute bottom-4 left-4 z-50 pointer-events-none text-white/50 text-[10px] font-bold uppercase tracking-widest select-none drop-shadow-md">
                 Protected Demo • Kathak Next
               </div>

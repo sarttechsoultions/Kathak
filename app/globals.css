@@ -28,3 +28,54 @@ body {
 .font-playfair {
   font-family: var(--font-playfair), 'Playfair Display', serif;
 }
+/* ===== PhoneInput Flag Fix ===== */
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.PhoneInputCountry {
+  margin-right: 8px;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.PhoneInputCountryIcon {
+  width: 22px !important;
+  height: 16px !important;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.PhoneInputCountryIcon--border {
+  box-shadow: none !important;
+  background: none !important;
+}
+
+.PhoneInputCountrySelectArrow {
+  margin-left: 4px;
+  opacity: 0.5;
+}
+
+.PhoneInputInput {
+  flex: 1;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  padding: 10px 12px 10px 0 !important;
+  color: #292524;
+}
+
+/* ===== Hide Scrollbar Utility ===== */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

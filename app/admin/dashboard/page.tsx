@@ -204,6 +204,8 @@ const mockStudents: StudentRecord[] = [
   }
 ];
 
+import DashboardOverview from "@/components/admin/DashboardOverview";
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -236,177 +238,10 @@ export default function AdminDashboardPage() {
   return (
     <>
       {activeTab === "Dashboard" && (
-        <div className="space-y-8 animate-in fade-in duration-300">
-          {/* Header Title Banner */}
-      <div className="space-y-1">
-        <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
-          Dashboard Overview
-        </h1>
-                <p className="text-xs sm:text-sm font-medium text-stone-500">
-                  Unified management console for institutional operations.
-                </p>
-              </div>
+        <DashboardOverview />
+      )}
 
-              {/* Top 4 Stat Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">TOTAL STUDENTS</p>
-                    <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">1,248</h3>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-red-50 text-[#9E0C25] flex items-center justify-center">
-                    <Users className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">TOTAL TEACHERS</p>
-                    <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">56</h3>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                    <UserCheck className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">ACTIVE COURSES</p>
-                    <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">24</h3>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-xs flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">LIVE CLASSES TODAY</p>
-                    <h3 className="font-sans font-extrabold text-2xl text-stone-900 mt-1">18</h3>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Video className="w-6 h-6" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Middle Row Charts: Revenue Overview + Attendance Summary */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                <div className="lg:col-span-8 bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-between space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-sans font-bold text-base text-stone-900">Revenue Overview</h3>
-                      <p className="text-xs text-stone-500 font-medium">Monthly revenue trends and performance</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-extrabold text-xl text-stone-900">₹18,75,000</span>
-                      <span className="block text-xs font-bold text-emerald-600">↑ 16.5% Growth</span>
-                    </div>
-                  </div>
-
-                  <div className="h-48 flex items-end justify-between gap-3 pt-6 px-2 border-b border-stone-200/80">
-                    {[
-                      { month: "JAN", height: "45%", color: "bg-[#EFEAEA]" },
-                      { month: "FEB", height: "60%", color: "bg-[#EFEAEA]" },
-                      { month: "MAR", height: "55%", color: "bg-[#EFEAEA]" },
-                      { month: "APR", height: "75%", color: "bg-[#EFEAEA]" },
-                      { month: "MAY", height: "70%", color: "bg-[#EFEAEA]" },
-                      { month: "JUN", height: "95%", color: "bg-[#9E0C25]" },
-                    ].map((bar) => (
-                      <div key={bar.month} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
-                        <div style={{ height: bar.height }} className={`w-full rounded-t-lg transition-all duration-300 group-hover:opacity-90 ${bar.color}`} />
-                        <span className="text-[10px] font-bold text-stone-400">{bar.month}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-between space-y-6">
-                  <div>
-                    <h3 className="font-sans font-bold text-base text-stone-900">Attendance Summary</h3>
-                    <p className="text-xs text-stone-500 font-medium">Daily attendance tracking rate</p>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center my-auto py-2">
-                    <div className="relative w-36 h-36 rounded-full border-8 border-stone-100 flex items-center justify-center border-t-emerald-500 border-r-emerald-500 border-b-emerald-500">
-                      <div className="text-center">
-                        <span className="font-extrabold text-2xl text-stone-900">87%</span>
-                        <span className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider">PRESENT TODAY</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-around text-center pt-2 border-t border-stone-100">
-                    <div>
-                      <span className="block text-xs font-bold text-emerald-600">87%</span>
-                      <span className="text-[10px] font-semibold text-stone-400">PRESENT</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-rose-500">9%</span>
-                      <span className="text-[10px] font-semibold text-stone-400">ABSENT</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-amber-500">4%</span>
-                      <span className="text-[10px] font-semibold text-stone-400">LEAVE</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Grid 1: Today's Schedule + Recent Students */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-sans font-bold text-base text-stone-900">Today&apos;s Schedule</h3>
-                    <button className="text-xs font-bold text-[#9E0C25] hover:underline">View Full Schedule</button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {[
-                      { title: "Kathak Beginner", type: "Basic Footwork", time: "07:00 PM - 08:00 PM", count: "28 Students" },
-                      { title: "Kathak Intermediate", type: "Chakkar Techniques", time: "08:15 PM - 09:15 PM", count: "32 Students" },
-                      { title: "Advanced Abhinaya", type: "Expressions & Mudras", time: "09:30 PM - 10:30 PM", count: "16 Students" },
-                    ].map((item) => (
-                      <div key={item.title} className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/60 flex items-center justify-between">
-                        <div>
-                          <h4 className="font-bold text-sm text-stone-900">{item.title}</h4>
-                          <p className="text-xs text-stone-500">{item.type} • <span className="font-semibold text-stone-700">{item.time}</span></p>
-                          <span className="text-[10.5px] font-semibold text-stone-400">{item.count}</span>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700">Upcoming</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:col-span-6 bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-sans font-bold text-base text-stone-900">Recent Students</h3>
-                    <button className="text-xs font-bold text-[#9E0C25] hover:underline">View All</button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {mockStudents.map((student) => (
-                      <div key={student.id} onClick={() => setSelectedStudent(student)} className="flex items-center justify-between p-2 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={student.avatar} alt={student.name} className="w-9 h-9 rounded-full object-cover border border-stone-200" />
-                          <span className="font-semibold text-sm text-stone-900">{student.name}</span>
-                        </div>
-                        <span className={`text-[11px] font-bold ${
-                          student.status === "Active" ? "text-emerald-600" : "text-rose-500"
-                        }`}>
-                          {student.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ================= VIEW 2: STUDENT MANAGEMENT ================= */}
+      {/* ================= VIEW 2: STUDENT MANAGEMENT ================= */}
           {activeTab === "Student" && !selectedStudent && (
             <div className="space-y-8 animate-in fade-in duration-300">
               

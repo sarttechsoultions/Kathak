@@ -56,10 +56,14 @@ export default function AdminLoginPage() {
       } else {
         alert(res.message || "Login failed. Invalid response from server.");
       }
-    } catch (err: any) {
-      console.error("Login failed:", err);
-      alert(err.message || "Login failed. Please check your credentials.");
-    } finally {
+    }catch (err: unknown) {
+  console.error("Login failed:", err);
+  const message =
+    err instanceof Error
+      ? err.message
+      : "Login failed. Please check your credentials.";
+  alert(message);
+} finally {
       setIsLoading(false);
     }
   };

@@ -91,7 +91,7 @@ export default function AdminProfilePage() {
     fetchProfile();
   }, []);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
@@ -99,14 +99,42 @@ export default function AdminProfilePage() {
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         if (reader.result) {
-          setAvatarUrl(reader.result as string);
+          const newAvatar = reader.result as string;
+          setAvatarUrl(newAvatar);
+
+          try {
+            const res = await apiRequest<{ data?: { user?: Record<string, unknown> } }>(ENDPOINTS.AUTH_PROFILE, {
+              method: "PATCH",
+              body: JSON.stringify({ avatarUrl: newAvatar })
+            });
+
+            const updatedUser = res.data?.user || { avatarUrl: newAvatar };
+
+            const savedStr = localStorage.getItem("kathak_session_user") || localStorage.getItem("kathak_admin_user");
+            if (savedStr) {
+              try {
+                const u = JSON.parse(savedStr);
+                const merged = { ...u, ...updatedUser, avatarUrl: newAvatar };
+                localStorage.setItem("kathak_session_user", JSON.stringify(merged));
+                localStorage.setItem("kathak_admin_user", JSON.stringify(merged));
+              } catch {
+                // Ignore
+              }
+            }
+
+            await openThemeSuccess("Profile picture updated successfully!", "Profile Photo Updated");
+          } catch (err: unknown) {
+            console.error("Photo upload error:", err);
+          }
         }
       };
       reader.readAsDataURL(file);
     }
   };
+
+  const initialLetter = (fullName || "A").trim().charAt(0).toUpperCase() || "A";
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,8 +157,9 @@ export default function AdminProfilePage() {
       setNewPassword("");
       setConfirmPassword("");
       setActiveTab("SPECS");
-    } catch (err: any) {
-      alert(err.message || "Failed to update password.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(msg || "Failed to update password.");
     } finally {
       setIsResetting(false);
     }
@@ -176,12 +205,18 @@ export default function AdminProfilePage() {
             {/* Avatar & Photo Upload Box */}
             <div className="flex flex-col items-center text-center space-y-4 pt-2">
               <div className="relative group cursor-pointer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  className="w-28 h-28 rounded-full object-cover border-4 border-[#9E0C25] shadow-lg group-hover:opacity-90 transition-all"
-                />
+                {avatarUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={avatarUrl}
+                    alt={fullName}
+                    className="w-28 h-28 rounded-full object-cover border-4 border-[#9E0C25] shadow-lg group-hover:opacity-90 transition-all"
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-full bg-[#9E0C25] text-white flex items-center justify-center font-extrabold text-3xl border-4 border-white shadow-lg group-hover:opacity-90 transition-all">
+                    {initialLetter}
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}

@@ -11,6 +11,7 @@ interface RequestOptions extends RequestInit {
 /**
  * Universal Fetch API Helper
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestOptions = {}
@@ -24,10 +25,19 @@ export async function apiRequest<T = any>(
 
   // Automatically attach auth token from localStorage if in client browser environment
   if (typeof window !== "undefined") {
-    const isStudentRoute = window.location.pathname.startsWith("/student");
-    const token = isStudentRoute
-      ? (localStorage.getItem("kathak_student_token") || localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token"))
-      : (localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_student_token") || localStorage.getItem("kathak_token"));
+    const studentToken = localStorage.getItem("kathak_student_token");
+    const adminToken = localStorage.getItem("kathak_admin_token");
+    const genericToken = localStorage.getItem("kathak_token");
+
+    let token: string | null = null;
+    if (window.location.pathname.startsWith("/student")) {
+      token = studentToken || genericToken;
+    } else if (window.location.pathname.startsWith("/admin")) {
+      token = adminToken || genericToken;
+    } else {
+      token = adminToken || studentToken || genericToken;
+    }
+
     if (token) {
       defaultHeaders["Authorization"] = `Bearer ${token}`;
     }
@@ -35,6 +45,7 @@ export async function apiRequest<T = any>(
 
   const response = await fetch(url, {
     ...options,
+    credentials: "include", 
     headers: {
       ...defaultHeaders,
       ...options.headers,
@@ -66,10 +77,13 @@ export const ENDPOINTS = {
   ADMIN_CERTIFICATES: "/admin/certificates",
   ADMIN_EXAMS: "/admin/exams",
   STUDENT_ENROLL: "/student/enroll",
+  PUBLIC_COURSES: "/student/public/courses",
   INQUIRIES: "/inquiries",
   COURSES: "/courses",
   AUTH_ME: "/auth/me",
   AUTH_CHANGE_PASSWORD: "/auth/change-password",
+  AUTH_PROFILE: "/auth/profile",
+  LIVE_CLASS_TEACHER: "/liveclass/teacher/classes",
   UPLOAD_IMAGE: "/upload/image",
   UPLOAD_VIDEO: "/upload/video",
   UPLOAD_FILE: "/upload/file",

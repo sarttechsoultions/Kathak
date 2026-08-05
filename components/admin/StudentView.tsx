@@ -4,11 +4,9 @@ import React, { useState, useEffect } from "react";
 import {
   Search,
   ChevronDown,
-  Filter,
   Download,
   Eye,
   Pencil,
-  Ban,
   Trash2,
   ArrowLeft,
   Camera,
@@ -19,7 +17,8 @@ import {
   BarChart3,
   BookOpen,
   Users,
-  RotateCw
+  RotateCw,
+  FileText
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 import { openThemeSuccess, openThemeConfirm } from "@/components/ThemeDialogProvider";
@@ -78,14 +77,14 @@ export default function StudentView() {
       if (res.data?.metrics) {
         setMetrics({
           totalStudents: res.data.metrics.totalStudents ?? res.data.students?.length ?? 0,
-          activeNow: res.data.metrics.activeNow ?? res.data.students?.filter((s: any) => s.status === "Active").length ?? 0,
+          activeNow: res.data.metrics.activeNow ?? res.data.students?.filter((s: StudentRecord) => s.status === "Active").length ?? 0,
           newJoined: res.data.metrics.newJoined ?? 0,
           blockedStudents: res.data.metrics.blockedStudents ?? 0
         });
       } else {
         setMetrics({
           totalStudents: res.data.students?.length ?? 0,
-          activeNow: res.data.students?.filter((s: any) => s.status === "Active").length ?? 0,
+          activeNow: res.data.students?.filter((s: StudentRecord) => s.status === "Active").length ?? 0,
           newJoined: 0,
           blockedStudents: 0
         });
@@ -99,7 +98,10 @@ export default function StudentView() {
   };
 
   useEffect(() => {
-    fetchStudents();
+    const loadStudents = async () => {
+      await fetchStudents();
+    };
+    void loadStudents();
   }, []);
 
   const handleDeleteStudent = async (id: string, name: string) => {
@@ -111,8 +113,12 @@ export default function StudentView() {
         if (selectedStudent?.id === id) {
           setSelectedStudent(null);
         }
-      } catch (err: any) {
-        alert(err.message || "Failed to delete student.");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          alert(err.message || "Failed to delete student.");
+        } else {
+          alert("Failed to delete student.");
+        }
       }
     }
   };
@@ -120,10 +126,6 @@ export default function StudentView() {
   // Pagination state (10 students per page)
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, batchFilter, statusFilter]);
 
   const handleDownloadCSV = async () => {
     if (filteredStudents.length === 0) {
@@ -217,7 +219,10 @@ export default function StudentView() {
                     type="text"
                     placeholder="Search name or ID..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="w-full h-10 pl-9 pr-4 rounded-xl bg-stone-50 border border-stone-200/80 text-xs font-medium text-stone-800 placeholder:text-stone-400 focus:bg-white focus:outline-none focus:border-[#9E0C25]"
                   />
                 </div>
@@ -225,7 +230,10 @@ export default function StudentView() {
                 <div className="relative">
                   <select
                     value={batchFilter}
-                    onChange={(e) => setBatchFilter(e.target.value)}
+                    onChange={(e) => {
+                      setBatchFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
                     className="h-10 pl-4 pr-9 rounded-xl bg-stone-50 border border-stone-200/80 text-xs font-semibold text-stone-700 appearance-none cursor-pointer focus:bg-white focus:outline-none"
                   >
                     <option>All Batches</option>
@@ -507,24 +515,76 @@ export default function StudentView() {
               <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-4">
                 <h3 className="font-sans font-bold text-base text-stone-900 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-[#9E0C25]" />
-                  <span>Performance & Financial Summary</span>
+                  <span>Performance &amp; Financial Summary</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/60 text-center">
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/60 text-center flex flex-col justify-center">
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">ATTENDANCE</span>
-                    <span className="font-extrabold text-2xl text-stone-900 mt-1 block">{selectedStudent.attendanceRate || "92"}%</span>
+                    <span className="font-extrabold text-3xl text-stone-900 mt-1 block">{selectedStudent.attendanceRate || "92"}</span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/60 text-center">
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/60 text-center flex flex-col justify-center">
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">ASSIGNMENTS</span>
                     <span className="font-extrabold text-2xl text-stone-900 mt-1 block">{selectedStudent.assignmentsScore || "14 / 16"}</span>
                     <span className="text-[10px] font-semibold text-emerald-600">87.5% Completion Rate</span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100 text-center relative">
+                  <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100 text-center relative flex flex-col justify-center">
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-100 text-rose-700 absolute top-2 right-2">PENDING</span>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">FINANCIAL SUMMARY</span>
                     <div className="mt-2 text-xs">
                       <span className="block font-semibold text-stone-500">Total Fee: <strong className="text-stone-900">{selectedStudent.totalFee || "₹12,000"}</strong></span>
                       <span className="block font-bold text-rose-600">Pending: {selectedStudent.pendingFee || "₹2,000"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 4: ACADEMIC PERFORMANCE */}
+              <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-4">
+                <h3 className="font-sans font-bold text-base text-stone-900 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#9E0C25]" />
+                  <span>Academic Performance</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                  {/* Sub 1: ASSIGNMENT SCORING */}
+                  <div className="space-y-3">
+                    <span className="block text-[10.5px] font-bold uppercase tracking-wider text-stone-400">ASSIGNMENT SCORING</span>
+                    
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs text-stone-900 block">Monthly Kathak Theory</span>
+                        <span className="text-[10px] text-stone-400">15th Oct 2024</span>
+                      </div>
+                      <span className="font-extrabold text-xs text-[#9E0C25]">45/50</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs text-stone-900 block">Quarterly Practical Exam</span>
+                        <span className="text-[10px] text-stone-400">2nd Sept 2024</span>
+                      </div>
+                      <span className="font-extrabold text-xs text-[#9E0C25]">88/100</span>
+                    </div>
+                  </div>
+
+                  {/* Sub 2: TEST RESULTS */}
+                  <div className="space-y-3">
+                    <span className="block text-[10.5px] font-bold uppercase tracking-wider text-stone-400">TEST RESULTS</span>
+                    
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs text-stone-900 block">Monthly Kathak Theory</span>
+                        <span className="text-[10px] text-stone-400">15th Oct 2024</span>
+                      </div>
+                      <span className="font-extrabold text-xs text-[#9E0C25]">45/50</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-xs text-stone-900 block">Quarterly Practical Exam</span>
+                        <span className="text-[10px] text-stone-400">2nd Sept 2024</span>
+                      </div>
+                      <span className="font-extrabold text-xs text-[#9E0C25]">88/100</span>
                     </div>
                   </div>
                 </div>
@@ -537,25 +597,27 @@ export default function StudentView() {
                   <BookOpen className="w-4 h-4 text-[#9E0C25]" />
                   <span>Academic Profile</span>
                 </h3>
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3.5 pt-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-stone-500 font-medium">Course Name</span>
-                    <span className="font-bold text-xs text-stone-900">{selectedStudent.course}</span>
+                    <span className="text-stone-500 font-medium">Course Name</span>
+                    <span className="font-bold text-stone-900">{selectedStudent.course || "Kathak Foundations"}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-stone-500 font-medium">Current Level</span>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-[#9E0C25]">Intermediate</span>
+                    <span className="text-stone-500 font-medium">Current Level</span>
+                    <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-[#9E0C25]">
+                      {selectedStudent.level || "Intermediate"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-stone-500 font-medium">Batch Timing</span>
-                    <span className="font-bold text-xs text-stone-900">Tue & Thu | 06:00 PM</span>
+                    <span className="text-stone-500 font-medium">Batch Timing</span>
+                    <span className="font-bold text-stone-900">{selectedStudent.time || "Tue & Thu | 06:00 PM"}</span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-stone-100">
-                    <span className="text-xs text-stone-500 font-medium">Assigned Guru</span>
+                    <span className="text-stone-500 font-medium">Assigned Guru</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-stone-900">{selectedStudent.guru || "Guru Meenakshi"}</span>
+                      <span className="font-bold text-stone-900">{selectedStudent.guru || "Guru Meenakshi"}</span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/Sunita.png" alt="Guru" className="w-6 h-6 rounded-full object-cover" />
+                      <img src={selectedStudent.avatar || "/Sunita.png"} alt="Guru" className="w-6 h-6 rounded-full object-cover border border-stone-200" />
                     </div>
                   </div>
                 </div>
@@ -567,17 +629,17 @@ export default function StudentView() {
                   <span>Guardians</span>
                 </h3>
                 <div className="space-y-3 pt-2">
-                  <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/60">
+                  <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60">
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">FATHER</span>
                     <span className="font-bold text-xs text-stone-900 mt-0.5 block">{selectedStudent.father || "Mr. Suresh Sharma"}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/60">
+                  <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/60">
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-stone-400">MOTHER</span>
                     <span className="font-bold text-xs text-stone-900 mt-0.5 block">{selectedStudent.mother || "Mrs. Sunita Sharma"}</span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200/70">
-                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-rose-600">EMERGENCY CONTACT</span>
-                    <span className="font-extrabold text-sm text-rose-700 mt-0.5 block">{selectedStudent.emergencyContact || "+91 91234 56789"}</span>
+                  <div className="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200/70">
+                    <span className="block text-[10px] font-extrabold uppercase tracking-wider text-[#9E0C25]">EMERGENCY CONTACT</span>
+                    <span className="font-extrabold text-sm text-[#9E0C25] mt-0.5 block">{selectedStudent.emergencyContact || "+91 91234 56789"}</span>
                   </div>
                 </div>
               </div>

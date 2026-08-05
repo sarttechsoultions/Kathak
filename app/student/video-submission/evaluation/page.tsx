@@ -5,13 +5,9 @@ import Link from "next/link";
 import {
   RotateCcw,
   Play,
-  CheckCircle2,
   Lock,
   Sparkles,
-  ChevronRight,
-  Clock,
-  Calendar,
-  Award
+
 } from "lucide-react";
 
 export default function StudentTaskEvaluationPage() {

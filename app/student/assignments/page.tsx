@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
-  FileText,
+  
   Clock,
   CheckCircle2,
   Upload,
@@ -14,7 +14,7 @@ import {
   Calendar,
   Loader2,
   ListChecks,
-  AlertCircle
+  
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 
@@ -49,8 +49,8 @@ export default function StudentAssignmentsPage() {
         } else {
           setMetrics({
             totalAssigned: list.length,
-            pendingCount: list.filter((a: any) => a.status === "PENDING").length,
-            completedCount: list.filter((a: any) => a.status !== "PENDING").length,
+            pendingCount: list.filter((a: AssignmentRow) => a.status === "PENDING").length,
+            completedCount: list.filter((a: AssignmentRow) => a.status !== "PENDING").length,
           });
         }
       }
@@ -61,9 +61,46 @@ export default function StudentAssignmentsPage() {
     }
   };
 
-  useEffect(() => {
-    fetchStudentAssignments();
-  }, []);
+
+useEffect(() => {
+  let cancelled = false;
+
+  async function load() {
+    try {
+      const res = await apiRequest("/student/assignments");
+      if (cancelled) return;
+
+      if (res?.data) {
+        const list = Array.isArray(res.data.assignments) ? res.data.assignments : [];
+        setAssignments(list);
+
+        if (res.data.metrics) {
+          setMetrics(res.data.metrics);
+        } else {
+          setMetrics({
+            totalAssigned: list.length,
+            pendingCount: list.filter((a: AssignmentRow) => a.status === "PENDING").length,
+            completedCount: list.filter((a: AssignmentRow) => a.status !== "PENDING").length,
+          });
+        }
+      }
+    } catch (err) {
+      if (!cancelled) {
+        console.error("Failed to fetch student assignments from API:", err);
+      }
+    } finally {
+      if (!cancelled) {
+        setIsLoading(false);
+      }
+    }
+  }
+
+  load();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const coursesList = useMemo(() => {
     const set = new Set<string>();

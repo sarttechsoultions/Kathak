@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { apiRequest } from "@/lib/api";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 import {
@@ -16,7 +16,7 @@ import {
   Info,
   Upload,
   HelpCircle,
-  Play,
+  // Play,
   Lock,
   Download,
   Eye,
@@ -129,6 +129,10 @@ export default function AssignmentView() {
   });
   const [loading, setLoading] = useState(true);
 
+  const PAGE_SIZE = 10;
+  const [assignmentsPage, setAssignmentsPage] = useState(1);
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+
   // Filter States - Main List
   const [assignmentSearchTerm, setAssignmentSearchTerm] = useState("");
   const [assignmentBatchFilter, setAssignmentBatchFilter] = useState("All Batches");
@@ -142,13 +146,14 @@ export default function AssignmentView() {
 
   // Filter States - Teacher Detail View
   const [detailSearchTerm, setDetailSearchTerm] = useState("");
-  const [detailBatchFilter, setDetailBatchFilter] = useState("All Batches");
+  // const [detailBatchFilter, setDetailBatchFilter] = useState("All Batches");
   const [detailStatusFilter, setDetailStatusFilter] = useState("All Status");
 
   // View Mode Navigation
   const [isViewingSubmittedAssignments, setIsViewingSubmittedAssignments] = useState(false);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [selectedTeacherDetail, setSelectedTeacherDetail] = useState<AssignmentItem | null>(null);
+  const [assignmentDetails, setAssignmentDetails] = useState<any>(null);
   const [selectedVideoReview, setSelectedVideoReview] = useState<VideoSubmissionCard | null>(null);
 
   // Evaluation state
@@ -178,13 +183,50 @@ export default function AssignmentView() {
   const [newAssignmentDeadlineDate, setNewAssignmentDeadlineDate] = useState("");
   const [newAssignmentDeadlineTime, setNewAssignmentDeadlineTime] = useState("");
   const [allowLateSubmissions, setAllowLateSubmissions] = useState(true);
+
+  const adminInstructionsTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyAdminInstructionsFormat = (type: "bold" | "italic" | "list" | "link") => {
+    const textarea = adminInstructionsTextareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = newAssignmentInstructions.substring(start, end);
+
+    let replacement = "";
+    if (type === "bold") {
+      replacement = `**${selectedText || "bold text"}**`;
+    } else if (type === "italic") {
+      replacement = `_${selectedText || "italic text"}_`;
+    } else if (type === "list") {
+      replacement = selectedText
+        ? selectedText.split("\n").map((line) => `• ${line}`).join("\n")
+        : "• Step 1\n• Step 2\n• Step 3";
+    } else if (type === "link") {
+      const url = prompt("Enter URL:", "https://");
+      if (url) {
+        replacement = `[${selectedText || "Link Title"}](${url})`;
+      } else {
+        return;
+      }
+    }
+
+    const newInstructions = newAssignmentInstructions.substring(0, start) + replacement + newAssignmentInstructions.substring(end);
+    setNewAssignmentInstructions(newInstructions);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + replacement.length, start + replacement.length);
+    }, 50);
+  };
   const [selectedTargetBatches, setSelectedTargetBatches] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
 
   // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [uploadedFileName, setUploadedFileName] = useState("");
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(true);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFileType, setUploadedFileType] = useState<"image" | "video" | "other">("other");
 
@@ -194,9 +236,8 @@ export default function AssignmentView() {
     );
   };
 
-  const fetchAssignmentsData = async () => {
+  const fetchAssignmentsData = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await apiRequest("/admin/assignments");
       if (res?.data) {
         const fetchedList = res.data.assignments || res.data.records || [];
@@ -228,9 +269,45 @@ export default function AssignmentView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+  const fetchAssignmentDetails = useCallback(async (id: string) => {
+    try {
+      const res = await apiRequest(`/admin/assignments/${id}`);
 
-  const fetchBatches = async () => {
+      const a = res.data;
+
+      const formattedAssignment = {
+        ...a,
+
+        teacherName: "Admin User",
+        teacherDept: "Faculty Lead",
+        teacherAvatar: "/Ananya.png",
+
+        targetBatch:
+          a.batchName ||
+          a.batch?.name ||
+          "No Batch Assigned",
+
+        dueDate: a.dueDate
+          ? new Date(a.dueDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+          })
+          : "-",
+
+        totalStudents: `${a.submissions?.length || 0} Submissions`,
+      };
+
+      setAssignmentDetails(formattedAssignment);
+      setSelectedTeacherDetail(formattedAssignment);
+
+    } catch (err) {
+      console.error("Failed to fetch assignment details:", err);
+    }
+  }, []);
+
+  const fetchBatches = useCallback(async () => {
     try {
       const res = await apiRequest("/admin/batches");
       const list = res.data?.batches || [];
@@ -245,7 +322,7 @@ export default function AssignmentView() {
     } catch (err) {
       console.error("Failed to fetch batches from API:", err);
     }
-  };
+  }, []);
 
   const availableBatchesForSelectedCourse = useMemo(() => {
     if (!newAssignmentCourseId && !newAssignmentCourseTitle) return batches;
@@ -267,7 +344,7 @@ export default function AssignmentView() {
     return filtered.length > 0 ? filtered : batches;
   }, [batches, newAssignmentCourseId, newAssignmentCourseTitle]);
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     try {
       let res;
       try {
@@ -288,13 +365,21 @@ export default function AssignmentView() {
     } catch (err) {
       console.error("Failed to fetch courses from API:", err);
     }
-  };
+  }, [newAssignmentCourseId]);
 
   useEffect(() => {
     fetchAssignmentsData();
     fetchBatches();
     fetchCourses();
-  }, []);
+  }, [fetchAssignmentsData, fetchBatches, fetchCourses]);
+ 
+  useEffect(() => {
+    setAssignmentsPage(1);
+  }, [assignmentSearchTerm, assignmentBatchFilter, assignmentCourseFilter, assignmentStatusTab]);
+
+  useEffect(() => {
+    setSubmissionsPage(1);
+  }, [submissionBatchFilter, submissionTitleSearch, submissionStatusFilter]);
 
   const filteredAssignments = useMemo(() => {
     return assignmentsList.filter((asg) => {
@@ -322,19 +407,23 @@ export default function AssignmentView() {
     });
   }, [submittedList, submissionBatchFilter, submissionTitleSearch, submissionStatusFilter]);
 
+  const totalAssignmentsPages = Math.max(1, Math.ceil(filteredAssignments.length / PAGE_SIZE));
+  const paginatedAssignments = useMemo(() => {
+    const start = (assignmentsPage - 1) * PAGE_SIZE;
+    return filteredAssignments.slice(start, start + PAGE_SIZE);
+  }, [filteredAssignments, assignmentsPage]);
+
+  // const totalSubmissionsPages = Math.max(1, Math.ceil(filteredSubmissions.length / PAGE_SIZE));
+  // const paginatedSubmissions = useMemo(() => {
+  //   const start = (submissionsPage - 1) * PAGE_SIZE;
+  //   return filteredSubmissions.slice(start, start + PAGE_SIZE);
+  // }, [filteredSubmissions, submissionsPage]);
   // Dynamic filter for Teacher Detail view assignments table
   const teacherDetailAssignments = useMemo(() => {
-    if (!selectedTeacherDetail) return [];
-    return assignmentsList.filter((asg) => {
-      const matchesSearch =
-        !detailSearchTerm ||
-        asg.title?.toLowerCase().includes(detailSearchTerm.toLowerCase()) ||
-        asg.typeTag?.toLowerCase().includes(detailSearchTerm.toLowerCase());
-      const matchesBatch =
-        detailBatchFilter === "All Batches" || asg.targetBatch === detailBatchFilter;
-      return matchesSearch && matchesBatch;
-    });
-  }, [assignmentsList, selectedTeacherDetail, detailSearchTerm, detailBatchFilter]);
+    if (!assignmentDetails) return [];
+
+    return [assignmentDetails];
+  }, [assignmentDetails]);
 
   const handleAssignmentFileUpload = async (file: File) => {
     if (file.size > 50 * 1024 * 1024) {
@@ -408,11 +497,14 @@ export default function AssignmentView() {
 
       setUploadedFileUrl(url);
       setUploadedFileName(file.name);
-      setUploadProgress(100);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert(err?.message || "File upload failed");
-      setUploadProgress(0);
+
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("File upload failed");
+      }
     } finally {
       setUploadingFile(false);
     }
@@ -516,6 +608,25 @@ export default function AssignmentView() {
       fetchAssignmentsData();
     } catch (err: any) {
       alert(err?.message || "Failed to submit grade.");
+    }
+  };
+
+  const openAssignmentSubmission = async (assignmentId: string) => {
+    try {
+      const res = await apiRequest(
+        `/admin/assignments/${assignmentId}/submissions`
+      );
+
+      const submission = res.data?.submissions?.[0];
+
+      if (!submission) {
+        alert("No submissions found.");
+        return;
+      }
+
+      openReviewFromSubmission(submission);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -757,21 +868,19 @@ export default function AssignmentView() {
                   <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1">
                     <button
                       onClick={() => setAssignmentStatusTab("Active")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        assignmentStatusTab === "Active"
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${assignmentStatusTab === "Active"
                           ? "bg-white text-[#8C2329] shadow-xs"
                           : "text-slate-500 hover:text-slate-800"
-                      }`}
+                        }`}
                     >
                       Active
                     </button>
                     <button
                       onClick={() => setAssignmentStatusTab("Draft")}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        assignmentStatusTab === "Draft"
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${assignmentStatusTab === "Draft"
                           ? "bg-white text-[#8C2329] shadow-xs"
                           : "text-slate-500 hover:text-slate-800"
-                      }`}
+                        }`}
                     >
                       Draft
                     </button>
@@ -805,7 +914,7 @@ export default function AssignmentView() {
                         </td>
                       </tr>
                     ) : filteredAssignments.length > 0 ? (
-                      filteredAssignments.map((asg) => (
+                      paginatedAssignments.map((asg) => (
                         <tr key={asg.id} className="hover:bg-slate-50/70 transition-colors">
                           {/* TEACHER */}
                           <td className="py-4 px-5">
@@ -856,7 +965,7 @@ export default function AssignmentView() {
                           {/* ACTIONS */}
                           <td className="py-4 px-5 text-right">
                             <button
-                              onClick={() => setSelectedTeacherDetail(asg)}
+                              onClick={() => fetchAssignmentDetails(asg.id)}
                               className="px-4 py-1.5 rounded-lg border border-indigo-200/80 bg-white hover:bg-indigo-50 text-indigo-600 font-bold text-xs cursor-pointer transition-colors shadow-2xs"
                             >
                               Details
@@ -878,16 +987,26 @@ export default function AssignmentView() {
               {/* Pagination */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 text-xs">
                 <span className="text-slate-500 font-medium">
-                  Showing {filteredAssignments.length > 0 ? 1 : 0}-{filteredAssignments.length} of {assignmentsList.length} results
+                  Showing {filteredAssignments.length > 0 ? (assignmentsPage - 1) * PAGE_SIZE + 1 : 0}-
+                  {Math.min(assignmentsPage * PAGE_SIZE, filteredAssignments.length)} of {filteredAssignments.length} results
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <button className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer">
+                  <button
+                    onClick={() => setAssignmentsPage((p) => Math.max(1, p - 1))}
+                    disabled={assignmentsPage === 1}
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button className="w-8 h-8 rounded-lg bg-[#8C2329] text-white font-bold flex items-center justify-center text-xs shadow-xs">
-                    1
+                    {assignmentsPage}
                   </button>
-                  <button className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 cursor-pointer">
+                  <span className="text-slate-400 text-xs px-1">of {totalAssignmentsPages}</span>
+                  <button
+                    onClick={() => setAssignmentsPage((p) => Math.min(totalAssignmentsPages, p + 1))}
+                    disabled={assignmentsPage === totalAssignmentsPages}
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -1754,16 +1873,15 @@ export default function AssignmentView() {
                         <div
                           key={batch.id}
                           onClick={() => toggleBatchSelection(batch.name)}
-                          className={`flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer border transition-all ${
-                            isChecked
+                          className={`flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 cursor-pointer border transition-all ${isChecked
                               ? "bg-rose-50/50 border-[#8C2329]/40"
                               : "border-slate-100"
-                          }`}
+                            }`}
                         >
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => {}}
+                            onChange={() => { }}
                             className="w-4 h-4 rounded cursor-pointer text-[#8C2329]"
                           />
                           <div>
@@ -1800,7 +1918,13 @@ export default function AssignmentView() {
           {/* Breadcrumb Navigation */}
           <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
             <button
-              onClick={() => setSelectedTeacherDetail(null)}
+              onClick={() => {
+                setSelectedTeacherDetail(null);
+                setAssignmentDetails(null);
+                setDetailSearchTerm("");
+                // setDetailBatchFilter("All Batches");
+                setDetailStatusFilter("All Status");
+              }}
               className="inline-flex items-center gap-2 hover:text-[#8C2329] cursor-pointer transition-colors"
             >
               <ArrowLeft className="w-4 h-4 text-slate-700" />
@@ -1856,7 +1980,7 @@ export default function AssignmentView() {
                   ACTIVE ASSIGNMENTS
                 </p>
                 <h3 className="text-3xl font-extrabold text-slate-900 mt-1">
-                  {assignmentsList.length || 1}
+                  {assignmentDetails ? 1 : 0}
                 </h3>
               </div>
             </div>
@@ -1908,20 +2032,11 @@ export default function AssignmentView() {
               </div>
 
               {/* All Batches Dropdown */}
-              <div className="relative">
-                <select
-                  value={detailBatchFilter}
-                  onChange={(e) => setDetailBatchFilter(e.target.value)}
-                  className="h-10 pl-4 pr-9 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:border-[#8C2329] cursor-pointer shadow-2xs"
-                >
-                  <option value="All Batches">All Batches</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.name}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              {/* Target Batch */}
+              <div className="h-10 px-4 rounded-xl bg-blue-50 border border-blue-100 flex items-center">
+                <span className="text-xs font-bold text-blue-700">
+                  {assignmentDetails?.targetBatch || "No Batch Assigned"}
+                </span>
               </div>
 
               {/* All Status Dropdown */}
@@ -1963,73 +2078,56 @@ export default function AssignmentView() {
                 <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
                   {teacherDetailAssignments.length > 0 ? (
                     teacherDetailAssignments.map((asg) => (
-                      <tr key={asg.id} className="hover:bg-slate-50/70 transition-colors">
-                        {/* ASSIGNMENT TITLE */}
+                      <tr key={asg.id}>
+
                         <td className="py-4 px-5">
-                          <span className="block font-bold text-slate-900 text-sm">
+                          <span className="font-bold text-slate-900">
                             {asg.title}
                           </span>
-                          <span className="block text-xs text-slate-400 font-medium mt-0.5">
-                            Code: {asg.id.substring(0, 10).toUpperCase()}
+
+                          <span className="block text-sky-500 mt-1">
+                            {asg.typeTag}
                           </span>
                         </td>
 
-                        {/* DATES */}
-                        <td className="py-4 px-5 space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Start Date</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600">
-                            <Calendar className="w-3.5 h-3.5 text-rose-500" />
-                            <span>{asg.dueDate}</span>
-                          </div>
+                        <td className="py-4 px-5">
+                          {asg.dueDate}
                         </td>
 
-                        {/* TARGET BATCH */}
                         <td className="py-4 px-5">
-                          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold inline-block border border-blue-100/60">
+                          <span className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-bold">
                             {asg.targetBatch}
                           </span>
                         </td>
 
-                        {/* SUBMISSIONS */}
                         <td className="py-4 px-5">
-                          <span className="block font-bold text-slate-900 text-sm">
-                            {asg.totalStudents}
-                          </span>
-                          <span className="block text-[11px] text-slate-400 font-normal">
-                            Students
-                          </span>
+                          {asg.totalStudents}
                         </td>
 
-                        {/* STATUS */}
                         <td className="py-4 px-5">
-                          <span className="px-3 py-1 rounded-full bg-purple-100/70 text-purple-700 text-xs font-bold inline-flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold">
                             Active
                           </span>
                         </td>
 
-                        {/* ACTIONS */}
                         <td className="py-4 px-5 text-right">
                           <button
-                            onClick={() => {
-                              setSelectedTeacherDetail(null);
-                              setIsViewingSubmittedAssignments(true);
-                            }}
-                            className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 cursor-pointer inline-flex items-center justify-center transition-colors"
-                            title="View Submissions"
+                            onClick={() => openAssignmentSubmission(asg.id)}
+                            className="text-indigo-600 font-bold hover:underlinepx-4 px-6 py-1.5 rounded-lg border border-indigo-200/80 bg-white hover:bg-indigo-50 text-indigo-600 font-bold text-xs cursor-pointer transition-colors shadow-2xs"
                           >
-                            <Eye className="w-4 h-4" />
+                            View
                           </button>
                         </td>
+
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-400 text-xs font-semibold">
-                        No assignments listed for this teacher.
+                      <td
+                        colSpan={6}
+                        className="py-12 text-center text-slate-400"
+                      >
+                        No assignment found.
                       </td>
                     </tr>
                   )}

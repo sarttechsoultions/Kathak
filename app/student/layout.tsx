@@ -46,9 +46,33 @@ const sidebarMenuItems = [
   { label: "Support", href: "/student/support", icon: HelpCircle },
 ];
 
+type AuthMeResponse = {
+  data: {
+    user?: {
+      fullName?: string;
+      name?: string;
+      email?: string;
+      studentId?: string;
+      avatarUrl?: string;
+      role?: string;
+      [key: string]: unknown;
+    };
+    profile?: {
+      fullName?: string;
+      name?: string;
+      email?: string;
+      studentId?: string;
+      avatarUrl?: string;
+      role?: string;
+      [key: string]: unknown;
+    };
+  };
+};
+
 function clearAllStudentTokens() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("kathak_student_token");
+  localStorage.removeItem("kathak_token");
   localStorage.removeItem("kathak_student_user");
   localStorage.removeItem("kathak_session_user");
   localStorage.removeItem("token");
@@ -121,7 +145,7 @@ useEffect(() => {
     if (studentToken) {
       try {
         const { apiRequest, ENDPOINTS } = await import("@/lib/api");
-        const res = await apiRequest<{ data: { user?: any; profile?: any } }>(
+        const res = await apiRequest<AuthMeResponse>(
           ENDPOINTS.AUTH_ME,
           { headers: { Authorization: `Bearer ${studentToken}` } }
         );
@@ -182,8 +206,11 @@ useEffect(() => {
       // Backend logout call (token revoke + cookie clear)
       if (token) {
         const { apiRequest, ENDPOINTS } = await import("@/lib/api");
-        // Prefer student logout route if available, else auth logout
-        await apiRequest(ENDPOINTS.STUDENT_LOGOUT || ENDPOINTS.AUTH_LOGOUT || "/api/v1/student/logout", {
+        const logoutEndpoint =
+          (ENDPOINTS as Record<string, string>).STUDENT_LOGOUT ||
+          ENDPOINTS.AUTH_LOGOUT ||
+          "/api/v1/student/logout";
+        await apiRequest(logoutEndpoint, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         }).catch(() => {
