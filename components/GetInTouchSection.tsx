@@ -119,7 +119,7 @@ export default function GetInTouchSection() {
                   className="w-full h-[60px] rounded-xl bg-white pl-7 pr-14 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer appearance-none truncate"
                 >
                   <option value="" disabled>
-                    Subject
+                    Courses
                   </option>
                   <option value="Beginner – Foundation Level (Structured Diploma Path)">
                     Beginner – Foundation Level (Structured Diploma Path)

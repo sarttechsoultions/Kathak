@@ -5,9 +5,15 @@ import { Search, Bell, Menu } from "lucide-react";
 
 interface TeacherHeaderProps {
   onToggleMobileMenu?: () => void;
+  className?: string;
+  height?: string;
 }
 
-export default function TeacherHeader({ onToggleMobileMenu }: TeacherHeaderProps) {
+export default function TeacherHeader({
+  onToggleMobileMenu,
+  className = "",
+  height = "h-[70px]",
+}: TeacherHeaderProps) {
   const [profile, setProfile] = useState({
     name: "Harshita Sharma",
     avatar: "",
@@ -36,7 +42,7 @@ export default function TeacherHeader({ onToggleMobileMenu }: TeacherHeaderProps
   const initial = profile.name.trim().charAt(0).toUpperCase() || "H";
 
   return (
-    <header className="h-[96px] bg-white border-b border-stone-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+    <header className={`w-full bg-white border-b border-stone-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-2xs shrink-0 transition-all ${height} ${className}`}>
       {/* Left: Mobile Menu Toggle & Search Bar */}
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <button
@@ -80,10 +86,10 @@ export default function TeacherHeader({ onToggleMobileMenu }: TeacherHeaderProps
             <img
               src={profile.avatar}
               alt={profile.name}
-              className="w-11 h-11 rounded-full object-cover border-2 border-[#900C27] shadow-2xs"
+              className="w-10 h-10 rounded-full object-cover border-2 border-[#900C27] shadow-2xs"
             />
           ) : (
-            <div className="w-11 h-11 rounded-full bg-[#900C27] text-white flex items-center justify-center font-extrabold text-base border-2 border-white shadow-2xs">
+            <div className="w-10 h-10 rounded-full bg-[#900C27] text-white flex items-center justify-center font-extrabold text-base border-2 border-white shadow-2xs">
               {initial}
             </div>
           )}

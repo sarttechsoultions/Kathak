@@ -24,7 +24,7 @@ import {
   Lightbulb,
   X
 } from "lucide-react";
-import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { apiRequest, ENDPOINTS, API_BASE_URL } from "@/lib/api";
 import { openThemeSuccess, openThemeConfirm } from "@/components/ThemeDialogProvider";
 function getFormatVideoUrl(url: string): { isIframe: boolean; finalUrl: string } {
   if (!url) return { isIframe: false, finalUrl: "" };
@@ -54,6 +54,13 @@ function getFormatVideoUrl(url: string): { isIframe: boolean; finalUrl: string }
   // Generic iframe
   if (cleanUrl.includes("iframe")) {
     return { isIframe: true, finalUrl: cleanUrl.startsWith("http") ? cleanUrl : `https://${cleanUrl}` };
+  }
+
+  // Handle uploaded relative backend paths
+  if (cleanUrl.startsWith("/uploads") || cleanUrl.startsWith("uploads/")) {
+    const backendRoot = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+    const relativePath = cleanUrl.startsWith("/") ? cleanUrl : `/${cleanUrl}`;
+    cleanUrl = `${backendRoot}${relativePath}`;
   }
 
   // Direct MP4 / Cloudinary video URL
@@ -126,16 +133,19 @@ export default function CourseView() {
     formData.append("image", file);
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") : null;
-      const res = await fetch(ENDPOINTS.UPLOAD_IMAGE, {
+      const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token") : null;
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const uploadEndpoint = `${apiBase}/upload/image`;
+      const res = await fetch(uploadEndpoint, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
       const data = await res.json();
-      if (data.status === "success" && data.data?.url) {
-        setCoverImageUrl(data.data.url);
+      const imageUrl = data.data?.url || data.data?.directUrl || data.data?.secure_url || "";
+      if (data.status === "success" && imageUrl) {
+        setCoverImageUrl(imageUrl);
         openThemeSuccess("Course cover image uploaded successfully!", "Image Uploaded");
       } else {
         alert(data.message || "Failed to upload image.");
@@ -158,16 +168,19 @@ export default function CourseView() {
     formData.append("video", file);
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") : null;
-      const res = await fetch(ENDPOINTS.UPLOAD_VIDEO, {
+      const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token") : null;
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const uploadEndpoint = `${apiBase}/upload/video`;
+      const res = await fetch(uploadEndpoint, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
       const data = await res.json();
-      if (data.status === "success" && data.data?.iframeUrl) {
-        setNewCourseVideoUrl(data.data.iframeUrl);
+      const videoUrl = data.data?.url || data.data?.iframeUrl || data.data?.directUrl || data.data?.secure_url || "";
+      if (data.status === "success" && videoUrl) {
+        setNewCourseVideoUrl(videoUrl);
         openThemeSuccess("Video file uploaded successfully!", "Video Uploaded");
       } else {
         alert(data.message || "Failed to upload video.");

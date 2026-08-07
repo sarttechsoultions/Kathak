@@ -43,6 +43,18 @@ const getTodayDateString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const getMaxDobDate = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear() - 3;
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getMinDobDate = () => {
+  return "1920-01-01";
+};
+
 const isValidPhone = (value: string | undefined) =>
   !!value && isValidPhoneNumber(value);
 
@@ -175,13 +187,13 @@ export default function StudentEnrollPage() {
 
   // Load states when country changes
 
-  // Fetch dynamic courses from PostgreSQL DB on mount
+  // Fetch dynamic courses & batches from PostgreSQL DB on mount
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         const res = await apiRequest<{
-          data: {
-            courses: Array<{
+          data?: {
+            courses?: Array<{
               id: string;
               title: string;
               groupFeeINR?: number;
@@ -196,9 +208,12 @@ export default function StudentEnrollPage() {
         }>(ENDPOINTS.PUBLIC_COURSES);
         if (res.data?.courses && res.data.courses.length > 0) {
           setDbCourses(res.data.courses);
-          setCourseId(res.data.courses[0].id);
-          const firstBatch = res.data.courses[0].batches?.[0];
-          setBatchId(firstBatch?.id || "");
+          const firstCourse = res.data.courses[0];
+          setCourseId(firstCourse.id);
+          const firstBatch = firstCourse.batches?.[0];
+          if (firstBatch) {
+            setBatchId(firstBatch.id);
+          }
         }
       } catch (err: unknown) {
         console.error("Failed to fetch dynamic courses:", err);
@@ -630,14 +645,33 @@ if (user) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                        Date of Birth
+                      <label className="block text-xs font-semibold text-stone-700 mb-1.5 flex items-center justify-between">
+                        <span>Date of Birth</span>
+                        <span className="text-[10px] text-[#C10F3A] font-extrabold">Min 3 Years Old</span>
                       </label>
                       <input
                         type="date"
                         required
+                        min={getMinDobDate()}
+                        max={getMaxDobDate()}
                         value={dob}
-                        onChange={(e) => setDob(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            const birthDate = new Date(val);
+                            const today = new Date();
+                            let age = today.getFullYear() - birthDate.getFullYear();
+                            const m = today.getMonth() - birthDate.getMonth();
+                            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                              age--;
+                            }
+                            if (age < 3) {
+                              alert("Student must be at least 3 years old to enroll. Future dates and age under 3 years are not allowed.");
+                              return;
+                            }
+                          }
+                          setDob(val);
+                        }}
                         className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs cursor-pointer"
                       />
                     </div>

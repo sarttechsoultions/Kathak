@@ -28,9 +28,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${playfair.variable} ${jakarta.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-white text-stone-900">
+      <body suppressHydrationWarning className="min-h-full flex flex-col font-sans bg-white text-stone-900">
         <ThemeDialogProvider />
         {children}
       </body>

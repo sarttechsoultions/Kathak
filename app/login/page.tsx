@@ -261,8 +261,25 @@ export default function CombinedLoginPage() {
               {!isSubmitting && <ArrowRight className="w-4 h-4" />}
             </button>
 
-            {/* Contact Admin Footer Note */}
-            <div className="pt-2 text-center text-xs text-stone-500 flex items-center justify-center gap-1.5 font-medium">
+            {/* New Student Enrollment / Registration Banner */}
+            {authMode === "STUDENT" && (
+              <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200/80 text-center space-y-2">
+                <p className="text-xs font-semibold text-stone-700">
+                  Don&apos;t have a student account yet?
+                </p>
+                <Link
+                  href="/student/enroll"
+                  className="w-full py-2.5 px-4 rounded-xl bg-white border border-[#C10F3A] text-[#C10F3A] font-extrabold text-xs hover:bg-[#C10F3A] hover:text-white transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  <span>New Student Registration / Enroll Form</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+
+            {/* Contact Admin Note */}
+            <div className="pt-1 text-center text-xs text-stone-500 flex items-center justify-center gap-1.5 font-medium">
               <span>Having trouble signing in?</span>
               <Link href="/admin/support" className="text-emerald-700 font-bold hover:underline flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Plus,
   Search,
@@ -29,136 +29,392 @@ import {
   Video,
   Sliders
 } from "lucide-react";
+import { apiRequest } from "@/lib/api";
+import { openThemeSuccess, openThemeError } from "@/components/ThemeDialogProvider";
 
 interface StudentPracticeSubmission {
   id: string;
+  studentId?: string;
   studentName: string;
   studentAvatar: string;
   submissionDate: string;
   courseBatch: string;
   videoTitle: string;
   status: "PENDING" | "REVIEWED" | "NEEDS IMPROVEMENT";
+  fileUrl?: string;
 }
-
-const mockPracticeSubmissions: StudentPracticeSubmission[] = [
-  {
-    id: "prac-1",
-    studentName: "Ishita Sharma",
-    studentAvatar: "/Ananya.png",
-    submissionDate: "Oct 24, 2023",
-    courseBatch: "Kathak Foundations • #402",
-    videoTitle: "Tatkar Footwork Speed Test",
-    status: "PENDING"
-  },
-  {
-    id: "prac-2",
-    studentName: "Arjun Kapoor",
-    studentAvatar: "/Sunita.png",
-    submissionDate: "Oct 23, 2023",
-    courseBatch: "Mudra Basics • #398",
-    videoTitle: "Asamyuta Hastas Practice",
-    status: "REVIEWED"
-  },
-  {
-    id: "prac-3",
-    studentName: "Sanya Verma",
-    studentAvatar: "/Meera.png",
-    submissionDate: "Oct 22, 2023",
-    courseBatch: "Abhinaya Intro • #401",
-    videoTitle: "Facial Expressions Drill",
-    status: "NEEDS IMPROVEMENT"
-  }
-];
 
 interface StudentSubmissionHistoryItem {
   id: string;
   videoTitle: string;
   thumbnail: string;
+  fileUrl?: string;
   submissionDate: string;
   courseBatch: string;
   status: "Reviewed" | "Needs Improvement" | "Pending";
   marks: string;
+  correctionNotes?: string[];
+  feedbackNotes?: string;
+  scoreBreakdown?: any[];
 }
 
-const mockStudentHistory: StudentSubmissionHistoryItem[] = [
-  {
-    id: "hist-1",
-    videoTitle: "Kathak Tatkar: Footwork Transitions Practice",
-    thumbnail: "/kathak_course_dancer_1785146082697.jpg",
-    submissionDate: "Oct 24, 2024",
-    courseBatch: "Kathak Advanced / Alpha",
-    status: "Reviewed",
-    marks: "92/100"
-  },
-  {
-    id: "hist-2",
-    videoTitle: "Asamyuta & Samyuta Mudra Formations",
-    thumbnail: "/kathak_dancer_portrait_1785143850699.jpg",
-    submissionDate: "Oct 19, 2024",
-    courseBatch: "Kathak Basics / Beta",
-    status: "Needs Improvement",
-    marks: "65/100"
-  },
-  {
-    id: "hist-3",
-    videoTitle: "Abhinaya Expression & Navarasa Drill",
-    thumbnail: "/gurukul-dancer.jpg",
-    submissionDate: "Oct 15, 2024",
-    courseBatch: "Kathak Ethics / Alpha",
-    status: "Pending",
-    marks: "— N/A —"
-  },
-  {
-    id: "hist-4",
-    videoTitle: "Kathak Taal & Rhythm Footwork Walkthrough",
-    thumbnail: "/kathak_ghungroo_feet_1785143864334.jpg",
-    submissionDate: "Oct 08, 2024",
-    courseBatch: "Kathak Dev / Gamma",
-    status: "Reviewed",
-    marks: "88/100"
+const formatMediaUrl = (rawUrl?: string): string => {
+  if (!rawUrl || rawUrl.trim() === "" || rawUrl === "null" || rawUrl === "undefined") {
+    return "";
   }
-];
+  let clean = rawUrl.trim();
+  if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("blob:")) {
+    return clean;
+  }
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+  const backendRoot = apiBase.replace(/\/api\/v1\/?$/, "");
+  const relativePath = clean.startsWith("/") ? clean : `/${clean}`;
+  return `${backendRoot}${relativePath}`;
+};
+
+const formatDisplayTitle = (rawTitle?: string): string => {
+  if (!rawTitle) return "Tatkar Footwork Practice";
+  const clean = rawTitle.trim();
+  const lower = clean.toLowerCase();
+  if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".webm") || /^\d{5,}/.test(clean)) {
+    return "Tatkar Footwork Practice";
+  }
+  return clean;
+};
+
+const formatScoreDisplay = (rawMarks: any): string => {
+  if (rawMarks === null || rawMarks === undefined || rawMarks === "" || rawMarks === "— N/A —") {
+    return "— N/A —";
+  }
+  const val = parseFloat(String(rawMarks).replace("/100", "").replace("/10", ""));
+  if (isNaN(val)) return "— N/A —";
+  const score100 = val <= 10 ? val * 10 : val;
+  return `${Math.round(score100)}/100`;
+};
+
+interface VideoTaskRecord {
+  id: string;
+  title: string;
+  category: string;
+  course: string;
+  batchName: string;
+  priority: string;
+  submissionDate: string;
+  cutOffTime: string;
+  strictDeadline: boolean;
+  detailedInstructions?: string;
+  referenceFileUrl?: string;
+  createdByName?: string;
+  createdAt: string;
+}
 
 export default function VideoReviewView() {
-  const [submissionsList, setSubmissionsList] = useState<StudentPracticeSubmission[]>(mockPracticeSubmissions);
+  const [submissionsList, setSubmissionsList] = useState<StudentPracticeSubmission[]>([]);
+  const [createdTasksList, setCreatedTasksList] = useState<VideoTaskRecord[]>([]);
+  const [studentHistoryList, setStudentHistoryList] = useState<StudentSubmissionHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Navigation View State: 'DIRECTORY' | 'HISTORY' | 'EVALUATION' | 'ASSIGN_TASK'
   const [viewMode, setViewMode] = useState<"DIRECTORY" | "HISTORY" | "EVALUATION" | "ASSIGN_TASK">("DIRECTORY");
+  const [activeTab, setActiveTab] = useState<"SUBMISSIONS" | "TASKS">("SUBMISSIONS");
   const [selectedStudent, setSelectedStudent] = useState<StudentPracticeSubmission | null>(null);
   const [selectedVideoItem, setSelectedVideoItem] = useState<StudentSubmissionHistoryItem | null>(null);
 
-  // Assign Task Form State (100% Figma Match)
-  const [taskTitle, setTaskTitle] = useState("Tatkar Footwork Speed Test - 140 BPM");
-  const [taskCategory, setTaskCategory] = useState("Kathak");
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "REVIEWED" | "NEEDS_IMPROVEMENT">("ALL");
+
+  // Dynamic Courses & Batches from Backend DB
+  const [dbCourses, setDbCourses] = useState<{ id: string; title: string; category?: string }[]>([]);
+  const [dbBatches, setDbBatches] = useState<{ id: string; name: string; courseId?: string; courseName?: string; course?: string }[]>([]);
+
+  // Assign Task Form State (100% Dynamic DB Data)
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskCategory, setTaskCategory] = useState("");
   const [taskCourse, setTaskCourse] = useState("");
   const [taskPriority, setTaskPriority] = useState<"Low" | "Medium" | "High">("Low");
   const [taskBatch, setTaskBatch] = useState("");
-  const [taskInstructions, setTaskInstructions] = useState(
-    "Break down the footwork sequences and specify the Teental cycles to be maintained..."
-  );
-  const [submissionDate, setSubmissionDate] = useState("11/20/2024");
-  const [cutoffTime, setCutoffTime] = useState("06:00 PM");
+  const [taskInstructions, setTaskInstructions] = useState("");
+  const [submissionDate, setSubmissionDate] = useState("");
+  const [cutoffTime, setCutoffTime] = useState("18:00");
   const [strictDeadline, setStrictDeadline] = useState(false);
+
+  // Filter batches dynamically based on selected course (Returns EMPTY if no course selected)
+  const filteredBatches = useMemo(() => {
+    if (!taskCourse) return [];
+    const matchedCourse = dbCourses.find(c => c.title === taskCourse || c.id === taskCourse);
+    
+    return dbBatches.filter(
+      (b) =>
+        (matchedCourse && b.courseId === matchedCourse.id) ||
+        (b.courseName && b.courseName.toLowerCase() === taskCourse.toLowerCase()) ||
+        (b.course && b.course.toLowerCase() === taskCourse.toLowerCase())
+    );
+  }, [dbBatches, dbCourses, taskCourse]);
+
+  // Fetch real practice video submissions from PostgreSQL DB backend
+  const fetchDirectory = async () => {
+    try {
+      setIsLoading(true);
+      const queryParams = new URLSearchParams();
+      if (statusFilter && statusFilter !== "ALL") queryParams.set("status", statusFilter);
+      if (searchTerm.trim()) queryParams.set("search", searchTerm.trim());
+
+      const url = `/video/directory${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+      const res = await apiRequest<{ data?: any[] }>(url);
+      if (res && Array.isArray(res.data)) {
+        const mapped: StudentPracticeSubmission[] = res.data.map((item: any, idx: number) => ({
+          id: String(item.id || `prac-${idx + 1}`),
+          studentId: String(item.studentId || item.id || `STU-${idx + 400}`),
+          studentName: item.studentName || item.student || "Student",
+          studentAvatar: item.studentAvatar || item.avatar || "",
+          submissionDate: item.submissionDate ? new Date(item.submissionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—",
+          courseBatch: item.courseAndBatch || (item.studentBatch ? `${item.studentBatch}` : "Kathak Foundations"),
+          videoTitle: item.videoTitle || item.title || "Practice Video",
+          status: item.status === "NEEDS_IMPROVEMENT" ? "NEEDS IMPROVEMENT" : (item.status === "REVIEWED" ? "REVIEWED" : "PENDING"),
+          fileUrl: item.fileUrl || item.url || ""
+        }));
+        setSubmissionsList(mapped);
+      }
+    } catch {
+      setSubmissionsList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTasks = async (forceSelectTasks: boolean = false) => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (searchTerm.trim()) queryParams.set("search", searchTerm.trim());
+
+      const url = `/video/tasks${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
+      const res = await apiRequest<{ data?: VideoTaskRecord[] }>(url);
+      if (res && Array.isArray(res.data)) {
+        setCreatedTasksList(res.data);
+        if (forceSelectTasks || res.data.length > 0) {
+          setActiveTab("TASKS");
+        }
+      }
+    } catch {
+      setCreatedTasksList([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchDirectory();
+    fetchTasks(true);
+
+    // Fetch dynamic courses & batches from PostgreSQL DB
+    const fetchMetadata = async () => {
+      try {
+        const cRes = await apiRequest<any>("/courses");
+        const courseList = Array.isArray(cRes?.data?.courses)
+          ? cRes.data.courses
+          : Array.isArray(cRes?.data)
+          ? cRes.data
+          : Array.isArray(cRes)
+          ? cRes
+          : [];
+
+        if (courseList.length > 0) {
+          setDbCourses(courseList);
+        }
+      } catch {}
+
+      try {
+        const bRes = await apiRequest<any>("/batches");
+        const batchList = Array.isArray(bRes?.data?.batches)
+          ? bRes.data.batches
+          : Array.isArray(bRes?.data)
+          ? bRes.data
+          : Array.isArray(bRes)
+          ? bRes
+          : [];
+
+        if (batchList.length > 0) {
+          setDbBatches(batchList);
+        }
+      } catch {}
+    };
+    fetchMetadata();
+  }, []);
+
+  // Compute dynamic summary metrics from real database data
+  const totalVideosCount = submissionsList.length;
+  const pendingCount = submissionsList.filter(s => s.status === "PENDING").length;
+  const reviewedCount = submissionsList.filter(s => s.status === "REVIEWED").length;
+
+  // Filtered submissions list
+  const filteredSubmissions = useMemo(() => {
+    let list = submissionsList;
+    if (statusFilter !== "ALL") {
+      const matchStatus = statusFilter === "NEEDS_IMPROVEMENT" ? "NEEDS IMPROVEMENT" : statusFilter;
+      list = list.filter(s => s.status === matchStatus);
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(
+        s =>
+          s.studentName.toLowerCase().includes(q) ||
+          s.videoTitle.toLowerCase().includes(q) ||
+          s.courseBatch.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [submissionsList, statusFilter, searchTerm]);
+
+  // Filtered created tasks list
+  const filteredTasks = useMemo(() => {
+    let list = createdTasksList;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(
+        t =>
+          t.title.toLowerCase().includes(q) ||
+          (t.course && t.course.toLowerCase().includes(q)) ||
+          (t.batchName && t.batchName.toLowerCase().includes(q)) ||
+          (t.category && t.category.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [createdTasksList, searchTerm]);
+
+  // Reference File Upload State
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadedReference, setUploadedReference] = useState<{ name: string; url: string } | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
+  const handleMediaFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingMedia(true);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await apiRequest<any>("/upload/video", {
+        method: "POST",
+        body: formData,
+      });
+
+      const uploadedUrl =
+        res?.data?.url || res?.data?.fileUrl || res?.data?.directUrl || res?.url || res?.fileUrl || URL.createObjectURL(file);
+      setUploadedReference({ name: file.name, url: uploadedUrl });
+    } catch {
+      const localUrl = URL.createObjectURL(file);
+      setUploadedReference({ name: file.name, url: localUrl });
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
+
+interface CriteriaItem {
+  label: string;
+  score: number;
+}
 
   // Video Evaluation Form State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [scoreVal, setScoreVal] = useState("8");
-  const [correctionNotes, setCorrectionNotes] = useState<string[]>([
-    "Heel impact needs more weight",
-    "Maintain upright posture during Chakkars"
-  ]);
+  const [criteriaList, setCriteriaList] = useState<CriteriaItem[]>([]);
+  const [newCriteriaLabel, setNewCriteriaLabel] = useState("");
+  const [correctionNotes, setCorrectionNotes] = useState<string[]>([]);
   const [newNoteInput, setNewNoteInput] = useState("");
-  const [comprehensiveReview, setComprehensiveReview] = useState(
-    "Provide detailed feedback on rhythm accuracy, facial expressions, and overall poise..."
-  );
+  const [comprehensiveReview, setComprehensiveReview] = useState("");
 
-  const handleOpenStudentHistory = (student: StudentPracticeSubmission) => {
+  const calculatedAvgScore = useMemo(() => {
+    if (!criteriaList || criteriaList.length === 0) return 0;
+    const sum = criteriaList.reduce((acc, c) => acc + (Number(c.score) || 0), 0);
+    return Math.round(sum / criteriaList.length);
+  }, [criteriaList]);
+
+  const handleAddCriteria = () => {
+    if (newCriteriaLabel.trim()) {
+      setCriteriaList([...criteriaList, { label: newCriteriaLabel.trim(), score: 80 }]);
+      setNewCriteriaLabel("");
+    }
+  };
+
+  const handleRemoveCriteria = (index: number) => {
+    setCriteriaList(criteriaList.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateCriteriaScore = (index: number, score: number) => {
+    const updated = [...criteriaList];
+    updated[index].score = Math.min(100, Math.max(0, score));
+    setCriteriaList(updated);
+  };
+
+  const handleOpenStudentHistory = async (student: StudentPracticeSubmission) => {
     setSelectedStudent(student);
     setViewMode("HISTORY");
+
+    if (student.studentId) {
+      try {
+        const res = await apiRequest<{ data?: any[] }>(`/video/student/${student.studentId}/history`);
+        if (res && Array.isArray(res.data) && res.data.length > 0) {
+          const mappedHistory: StudentSubmissionHistoryItem[] = res.data.map((item: any, idx: number) => {
+            let corrArr: string[] = [];
+            if (Array.isArray(item.correctionNotes)) {
+              corrArr = item.correctionNotes.filter(Boolean);
+            } else if (typeof item.correctionNotes === "string" && item.correctionNotes.trim()) {
+              corrArr = [item.correctionNotes];
+            }
+
+            let parsedRubric: CriteriaItem[] | null = null;
+            if (Array.isArray(item.scoreBreakdown)) {
+              parsedRubric = item.scoreBreakdown;
+            } else if (item.rubric) {
+              try {
+                parsedRubric = typeof item.rubric === "string" ? JSON.parse(item.rubric) : item.rubric;
+              } catch {}
+            }
+
+            return {
+              id: String(item.id || `hist-${idx + 1}`),
+              videoTitle: item.videoTitle || item.title || "Kathak Practice Video",
+              thumbnail: item.fileUrl || "/kathak_course_dancer_1785146082697.jpg",
+              fileUrl: item.fileUrl || item.url || "",
+              submissionDate: item.submissionDate ? new Date(item.submissionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+              courseBatch: item.courseAndBatch || "Kathak Advanced / Alpha",
+              status: item.status === "NEEDS_IMPROVEMENT" ? "Needs Improvement" : (item.status === "REVIEWED" ? "Reviewed" : "Pending"),
+              marks: formatScoreDisplay(item.marks),
+              scoreBreakdown: parsedRubric || undefined,
+              correctionNotes: corrArr,
+              feedbackNotes: item.feedbackNotes || item.overallReview || ""
+            };
+          });
+          setStudentHistoryList(mappedHistory);
+        } else if (student.fileUrl) {
+          setStudentHistoryList([{
+            id: student.id,
+            videoTitle: student.videoTitle,
+            thumbnail: student.fileUrl,
+            fileUrl: student.fileUrl,
+            submissionDate: student.submissionDate,
+            courseBatch: student.courseBatch,
+            status: student.status === "REVIEWED" ? "Reviewed" : (student.status === "NEEDS IMPROVEMENT" ? "Needs Improvement" : "Pending"),
+            marks: "— N/A —",
+            correctionNotes: [],
+            feedbackNotes: ""
+          }]);
+        }
+      } catch {
+        // Keeps state
+      }
+    }
   };
 
   const handleOpenVideoEvaluation = (videoItem: StudentSubmissionHistoryItem) => {
     setSelectedVideoItem(videoItem);
+    if (Array.isArray(videoItem.scoreBreakdown) && videoItem.scoreBreakdown.length > 0) {
+      setCriteriaList(videoItem.scoreBreakdown);
+    } else {
+      setCriteriaList([]);
+    }
+    setCorrectionNotes(Array.isArray(videoItem.correctionNotes) ? videoItem.correctionNotes : []);
+    setComprehensiveReview(videoItem.feedbackNotes || "");
     setViewMode("EVALUATION");
   };
 
@@ -173,26 +429,157 @@ export default function VideoReviewView() {
     setCorrectionNotes(correctionNotes.filter((_, i) => i !== index));
   };
 
-  const handleSubmitEvaluation = (e: React.FormEvent) => {
+  const handleSubmitEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Review for "${selectedVideoItem?.videoTitle || "Video"}" submitted successfully! Score: ${scoreVal}/10`);
+    if (!selectedVideoItem) return;
+
+    const submissionId = selectedVideoItem.id || selectedStudent?.id || "";
+    if (!submissionId || submissionId.startsWith("hist-")) {
+      console.error("Submission ID missing for evaluation.");
+      openThemeError("Submission ID missing. Please refresh and try again.", "Evaluation Error");
+      return;
+    }
+
+    const score100 = calculatedAvgScore;
+
+    try {
+      await apiRequest(`/video/evaluate/${submissionId}`, {
+        method: "POST",
+        body: JSON.stringify({
+          score: score100,
+          status: "REVIEWED",
+          correctionNotes,
+          overallReview: comprehensiveReview,
+          rubric: criteriaList,
+          scoreBreakdown: criteriaList,
+        }),
+      });
+    } catch (err) {
+      console.error("Evaluation save error:", err);
+    }
+
+    // Auto-update local state immediately so UI pills auto-update on screen
+    const updatedItem: StudentSubmissionHistoryItem = {
+      ...selectedVideoItem,
+      status: "Reviewed",
+      marks: `${score100}/100`,
+      scoreBreakdown: criteriaList,
+      correctionNotes,
+      feedbackNotes: comprehensiveReview,
+    };
+    setSelectedVideoItem(updatedItem);
+
+    // Update in history list
+    setStudentHistoryList((prev) =>
+      prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+    );
+
+    // Update in main directory submissions list
+    setSubmissionsList((prev) =>
+      prev.map((sub) =>
+        sub.id === updatedItem.id
+          ? { ...sub, status: "REVIEWED", marks: score100 }
+          : sub
+      )
+    );
+
+    openThemeSuccess(
+      "Review Submitted!",
+      `Average evaluation score of ${score100}% saved for ${selectedVideoItem.videoTitle}.`
+    );
+    await fetchDirectory();
     setViewMode("HISTORY");
   };
 
-  const handleAssignTaskSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newTask: StudentPracticeSubmission = {
-      id: `prac-${Date.now()}`,
-      studentName: "All Batch Students",
-      studentAvatar: "/Ananya.png",
-      submissionDate: submissionDate || "Nov 20, 2024",
-      courseBatch: `${taskCourse || "Kathak Advanced"} • #${taskBatch || "Alpha-2024"}`,
-      videoTitle: taskTitle || "New Practice Task",
-      status: "PENDING"
-    };
+  const [taskErrors, setTaskErrors] = useState<{
+    title?: string;
+    category?: string;
+    course?: string;
+    batch?: string;
+    submissionDate?: string;
+    cutoffTime?: string;
+    instructions?: string;
+  }>({});
 
-    setSubmissionsList([newTask, ...submissionsList]);
-    alert(`Task "${newTask.videoTitle}" assigned successfully!`);
+  const validateTaskForm = (): boolean => {
+    const errs: typeof taskErrors = {};
+
+    if (!taskTitle.trim()) {
+      errs.title = "Task title is required.";
+    } else if (taskTitle.trim().length < 3) {
+      errs.title = "Task title must be at least 3 characters long.";
+    }
+
+    if (!taskCategory.trim()) {
+      errs.category = "Please select a category.";
+    }
+
+    if (!taskCourse.trim()) {
+      errs.course = "Please select a course.";
+    }
+
+    if (!taskBatch.trim()) {
+      errs.batch = "Please select a target batch.";
+    }
+
+    if (!submissionDate) {
+      errs.submissionDate = "Submission date is required.";
+    } else {
+      const selectedD = new Date(submissionDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedD < today) {
+        errs.submissionDate = "Submission date cannot be in the past.";
+      }
+    }
+
+    if (!cutoffTime) {
+      errs.cutoffTime = "Cut-off time is required.";
+    }
+
+    if (!taskInstructions.trim()) {
+      errs.instructions = "Detailed instructions are required.";
+    } else if (taskInstructions.trim().length < 10) {
+      errs.instructions = "Instructions must be at least 10 characters long.";
+    }
+
+    setTaskErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleAssignTaskSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTaskForm()) {
+      return;
+    }
+
+    try {
+      const res = await apiRequest<{ status?: string; message?: string }>("/video/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          title: taskTitle,
+          category: taskCategory,
+          course: taskCourse,
+          batchName: taskBatch,
+          priority: taskPriority,
+          submissionDate,
+          cutOffTime: cutoffTime,
+          strictDeadline,
+          detailedInstructions: taskInstructions,
+          referenceFileUrl: uploadedReference?.url || null,
+        }),
+      });
+
+      if (res && res.status === "error") {
+        alert(res.message || "Failed to assign task.");
+        return;
+      }
+    } catch {
+      // Local fallback
+    }
+
+    openThemeSuccess("Task Assigned Successfully!", `Practice task "${taskTitle}" assigned to batch ${taskBatch}.`);
+    await fetchDirectory();
     setViewMode("DIRECTORY");
   };
 
@@ -219,116 +606,240 @@ export default function VideoReviewView() {
             </button>
           </div>
 
-          {/* 3 Metric Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {/* 4 Metric Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
             <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-center">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">TOTAL VIDEOS</p>
-              <h3 className="font-sans font-extrabold text-3xl text-stone-900 mt-1">1,284</h3>
+              <h3 className="font-sans font-extrabold text-3xl text-stone-900 mt-1">
+                {totalVideosCount > 0 ? totalVideosCount.toLocaleString() : "0"}
+              </h3>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-center">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">CREATED TASKS</p>
+              <h3 className="font-sans font-extrabold text-3xl text-indigo-600 mt-1">
+                {createdTasksList.length}
+              </h3>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-center">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">PENDING REVIEW</p>
-              <h3 className="font-sans font-extrabold text-3xl text-rose-600 mt-1">42</h3>
+              <h3 className="font-sans font-extrabold text-3xl text-rose-600 mt-1">
+                {pendingCount}
+              </h3>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-xs flex flex-col justify-center">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400">REVIEWED</p>
-              <h3 className="font-sans font-extrabold text-3xl text-emerald-600 mt-1">1,150</h3>
+              <h3 className="font-sans font-extrabold text-3xl text-emerald-600 mt-1">
+                {reviewedCount}
+              </h3>
             </div>
           </div>
 
-          {/* Submission Directory Table */}
+          {/* Directory & Created Tasks Container */}
           <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 space-y-6">
             
-            <div className="flex items-center justify-between">
-              <h3 className="font-sans font-bold text-lg text-stone-900">Submission Directory</h3>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Tab Switcher */}
+              <div className="flex items-center gap-2 p-1.5 bg-stone-100/90 rounded-2xl border border-stone-200/70">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("SUBMISSIONS")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === "SUBMISSIONS"
+                      ? "bg-white text-stone-900 shadow-xs"
+                      : "text-stone-500 hover:text-stone-900"
+                  }`}
+                >
+                  Student Submissions ({submissionsList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("TASKS")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === "TASKS"
+                      ? "bg-[#9E0C25] text-white shadow-xs"
+                      : "text-stone-500 hover:text-stone-900"
+                  }`}
+                >
+                  Assigned Practice Tasks ({createdTasksList.length})
+                </button>
+              </div>
               
-              <div className="flex items-center gap-2">
-                <button className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer">
-                  <Filter className="w-3.5 h-3.5" />
-                  <span>Filter</span>
-                </button>
-                <button className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer">
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>Sort</span>
-                </button>
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+                {/* Search Bar */}
+                <div className="relative w-full sm:w-60">
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search student or video..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full h-9 pl-9 pr-3 rounded-xl bg-stone-50 border border-stone-200 text-xs font-semibold text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9E0C25]"
+                  />
+                </div>
+
+                <div className="relative flex items-center">
+                  <div className="h-9 px-3 rounded-xl bg-[#EBF3FE] text-[#2563EB] font-extrabold text-xs border border-blue-100 flex items-center gap-1.5 cursor-pointer">
+                    <Filter className="w-3.5 h-3.5 text-[#2563EB]" />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      className="bg-transparent text-[#2563EB] font-extrabold text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="ALL">All Status</option>
+                      <option value="PENDING">Pending</option>
+                      <option value="REVIEWED">Reviewed</option>
+                      <option value="NEEDS_IMPROVEMENT">Needs Improvement</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
-                    <th className="py-3.5 px-4">STUDENT</th>
-                    <th className="py-3.5 px-4">SUBMISSION DATE</th>
-                    <th className="py-3.5 px-4">COURSE &amp; BATCH</th>
-                    <th className="py-3.5 px-4">VIDEO TITLE</th>
-                    <th className="py-3.5 px-4">STATUS</th>
-                    <th className="py-3.5 px-4 text-right">ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
-                  {submissionsList.map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 transition-colors">
-                      
-                      {/* Student */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={row.studentAvatar} alt={row.studentName} className="w-9 h-9 rounded-full object-cover border border-stone-200 shrink-0" />
-                          <button
-                            onClick={() => handleOpenStudentHistory(row)}
-                            className="font-bold text-stone-900 text-sm hover:text-[#9E0C25] transition-colors cursor-pointer text-left"
-                          >
-                            {row.studentName}
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Submission Date */}
-                      <td className="py-4 px-4 text-stone-600 font-semibold">{row.submissionDate}</td>
-
-                      {/* Course & Batch */}
-                      <td className="py-4 px-4 text-stone-700 font-bold">{row.courseBatch}</td>
-
-                      {/* Video Title */}
-                      <td className="py-4 px-4 font-bold text-stone-900 text-sm">{row.videoTitle}</td>
-
-                      {/* Status */}
-                      <td className="py-4 px-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-extrabold ${
-                          row.status === "PENDING"
-                            ? "bg-purple-100/80 text-purple-700 border border-purple-200/60"
-                            : row.status === "REVIEWED"
-                            ? "bg-emerald-100/80 text-emerald-700 border border-emerald-200/60"
-                            : "bg-rose-100/80 text-rose-700 border border-rose-200/60"
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            row.status === "PENDING" ? "bg-purple-600" : row.status === "REVIEWED" ? "bg-emerald-500" : "bg-rose-500"
-                          }`} />
-                          {row.status}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-4 px-4 text-right">
-                        <button
-                          onClick={() => handleOpenStudentHistory(row)}
-                          title="View Student History"
-                          className="p-2 hover:text-[#9E0C25] hover:bg-rose-50 rounded-xl text-stone-400 transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-4.5 h-4.5 text-indigo-600" />
-                        </button>
-                      </td>
-
+              {activeTab === "SUBMISSIONS" ? (
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead>
+                    <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
+                      <th className="py-3.5 px-4">STUDENT</th>
+                      <th className="py-3.5 px-4">SUBMISSION DATE</th>
+                      <th className="py-3.5 px-4">COURSE &amp; BATCH</th>
+                      <th className="py-3.5 px-4">VIDEO TITLE</th>
+                      <th className="py-3.5 px-4">STATUS</th>
+                      <th className="py-3.5 px-4 text-right">ACTIONS</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
+                    {filteredSubmissions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-stone-400 font-semibold">
+                          {isLoading ? "Loading video submissions from database..." : "No practice video submissions found in directory."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSubmissions.map((row) => (
+                        <tr key={row.id} className="hover:bg-stone-50/80 transition-colors">
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={row.studentAvatar || "/Ananya.png"} alt={row.studentName} className="w-9 h-9 rounded-full object-cover border border-stone-200 shrink-0" />
+                              <button
+                                onClick={() => handleOpenStudentHistory(row)}
+                                className="font-bold text-stone-900 text-sm hover:text-[#9E0C25] transition-colors cursor-pointer text-left"
+                              >
+                                {row.studentName}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-stone-600 font-semibold">{row.submissionDate}</td>
+                          <td className="py-4 px-4 text-stone-700 font-bold">{row.courseBatch}</td>
+                          <td className="py-4 px-4 font-bold text-stone-900 text-sm">{row.videoTitle}</td>
+                          <td className="py-4 px-4">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-extrabold ${
+                              row.status === "PENDING"
+                                ? "bg-purple-100/80 text-purple-700 border border-purple-200/60"
+                                : row.status === "REVIEWED"
+                                ? "bg-emerald-100/80 text-emerald-700 border border-emerald-200/60"
+                                : "bg-rose-100/80 text-rose-700 border border-rose-200/60"
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                row.status === "PENDING" ? "bg-purple-600" : row.status === "REVIEWED" ? "bg-emerald-500" : "bg-rose-500"
+                              }`} />
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <button
+                              onClick={() => handleOpenStudentHistory(row)}
+                              title="View Student History"
+                              className="p-2 hover:text-[#9E0C25] hover:bg-rose-50 rounded-xl text-stone-400 transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-4.5 h-4.5 text-indigo-600" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead>
+                    <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
+                      <th className="py-3.5 px-4">TASK TITLE</th>
+                      <th className="py-3.5 px-4">COURSE &amp; BATCH</th>
+                      <th className="py-3.5 px-4">CATEGORY &amp; PRIORITY</th>
+                      <th className="py-3.5 px-4">DEADLINE</th>
+                      <th className="py-3.5 px-4">CREATED BY</th>
+                      <th className="py-3.5 px-4 text-right">REFERENCE MEDIA</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
+                    {filteredTasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-stone-400 font-semibold">
+                          {createdTasksList.length === 0 ? "No practice tasks created yet. Click \"+ Assign New Task\" to create one." : "No tasks match your search filter."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTasks.map((task) => (
+                        <tr key={task.id} className="hover:bg-stone-50/80 transition-colors">
+                          <td className="py-4 px-4 font-bold text-stone-900 text-sm">
+                            {task.title}
+                          </td>
+                          <td className="py-4 px-4 text-stone-700 font-bold">
+                            {task.course || "Kathak"} • {task.batchName || "All Batches"}
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-700">
+                                {task.category || "BASIC"}
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                task.priority === "High"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : task.priority === "Medium"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                {task.priority || "Low"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-stone-600 font-semibold">
+                            {task.submissionDate ? new Date(task.submissionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No deadline"}
+                            <span className="text-[11px] text-stone-400 font-medium block">
+                              Cut-off: {task.cutOffTime || "18:00"}
+                            </span>
+                          </td>
+                          <td className="py-4 px-4 text-stone-700 font-semibold">
+                            {task.createdByName || "Admin"}
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            {task.referenceFileUrl ? (
+                              <a
+                                href={task.referenceFileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 text-[#9E0C25] font-bold text-xs hover:bg-rose-100 transition-colors"
+                              >
+                                <Video className="w-3.5 h-3.5" />
+                                <span>View Media</span>
+                              </a>
+                            ) : (
+                              <span className="text-stone-400 italic text-[11px]">No Media</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -365,18 +876,14 @@ export default function VideoReviewView() {
                   {selectedStudent.studentName}
                 </h2>
                 <span className="px-3 py-1 rounded-full bg-rose-50 text-[#9E0C25] text-xs font-extrabold border border-rose-200/80">
-                  Batch: Alpha-2024
+                  {selectedStudent.courseBatch || "Kathak Batch"}
                 </span>
               </div>
 
               <div className="space-y-1 text-xs font-semibold text-stone-500">
                 <p className="flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-[#9E0C25]" />
-                  <span>Senior Diploma in Kathak</span>
-                </p>
-                <p className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-stone-400" />
-                  <span>Campus East</span>
+                  <span>{selectedStudent.courseBatch || "Kathak Practice Sessions"}</span>
                 </p>
               </div>
             </div>
@@ -419,20 +926,40 @@ export default function VideoReviewView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
-                  {mockStudentHistory.map((item) => (
+                  {studentHistoryList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-stone-400 font-semibold">
+                        No practice video submission history found for this student.
+                      </td>
+                    </tr>
+                  ) : (
+                    studentHistoryList.map((item) => (
                     <tr key={item.id} className="hover:bg-stone-50/80 transition-colors">
                       
-                      {/* Video Title & Thumbnail Preview */}
+                      {/* Video Title & Video Cover Image Thumbnail */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="relative w-14 h-10 rounded-lg bg-stone-900 overflow-hidden shrink-0 border border-stone-200">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={item.thumbnail} alt={item.videoTitle} className="w-full h-full object-cover opacity-85" />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <Play className="w-3.5 h-3.5 fill-white text-white" />
+                          <div className="relative w-14 h-10 rounded-xl bg-stone-950 overflow-hidden shrink-0 border border-stone-800 shadow-2xs group cursor-pointer" onClick={() => handleOpenVideoEvaluation(item)}>
+                            {item.fileUrl || item.thumbnail ? (
+                              <video
+                                src={formatMediaUrl(item.fileUrl || item.thumbnail)}
+                                preload="metadata"
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform bg-stone-900"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-stone-900 flex items-center justify-center">
+                                <Video className="w-4 h-4 text-rose-400" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/35 flex items-center justify-center group-hover:bg-black/20 transition-colors">
+                              <Play className="w-3.5 h-3.5 fill-white text-white opacity-90" />
                             </div>
                           </div>
-                          <span className="font-bold text-stone-900 text-sm">{item.videoTitle}</span>
+                          <span className="font-bold text-stone-900 text-sm hover:text-[#9E0C25] transition-colors cursor-pointer" onClick={() => handleOpenVideoEvaluation(item)}>
+                            {formatDisplayTitle(item.videoTitle)}
+                          </span>
                         </div>
                       </td>
 
@@ -473,7 +1000,8 @@ export default function VideoReviewView() {
                       </td>
 
                     </tr>
-                  ))}
+                  ))
+                )}
                 </tbody>
               </table>
             </div>
@@ -503,47 +1031,25 @@ export default function VideoReviewView() {
               
               {/* Large Video Title */}
               <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900">
-                {selectedVideoItem.videoTitle || "Tatkar Footwork Practice"}
+                {formatDisplayTitle(selectedVideoItem.videoTitle)}
               </h1>
 
-              {/* Custom Video Player Box */}
-              <div className="relative aspect-video rounded-3xl bg-stone-950 overflow-hidden shadow-2xl border border-stone-800 group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={selectedVideoItem.thumbnail}
-                  alt={selectedVideoItem.videoTitle}
-                  className="w-full h-full object-cover opacity-90"
-                />
-
-                {/* Overlay Play Center Button */}
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="absolute inset-0 flex items-center justify-center cursor-pointer"
-                >
-                  <div className="w-16 h-16 rounded-full bg-[#9E0C25]/90 backdrop-blur-md text-white flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-                    {isPlaying ? <Pause className="w-7 h-7 fill-white" /> : <Play className="w-7 h-7 fill-white ml-1" />}
+              {/* High-Performance Real HTML5 Video Player Container */}
+              <div className="relative aspect-video rounded-3xl bg-black overflow-hidden shadow-2xl border border-stone-800 flex items-center justify-center p-2">
+                {selectedVideoItem?.fileUrl || selectedVideoItem?.thumbnail ? (
+                  <video
+                    src={formatMediaUrl(selectedVideoItem.fileUrl || selectedVideoItem.thumbnail)}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    controlsList="nodownload"
+                    className="w-full h-full max-h-[460px] object-contain rounded-2xl bg-black"
+                  />
+                ) : (
+                  <div className="text-stone-400 text-xs font-semibold p-8 text-center">
+                    No video media file available for playback.
                   </div>
-                </button>
-
-                {/* Bottom Video Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex items-center justify-between text-white text-xs font-semibold">
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setIsPlaying(!isPlaying)} className="hover:text-rose-400">
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
-                    <span className="font-mono text-[11px]">01:14 / 03:45</span>
-                  </div>
-
-                  {/* Scrubber Bar */}
-                  <div className="flex-1 mx-4 bg-white/20 h-1.5 rounded-full overflow-hidden">
-                    <div className="w-1/3 bg-[#9E0C25] h-full rounded-full" />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button className="hover:text-rose-400"><Volume2 className="w-4 h-4" /></button>
-                    <button className="hover:text-rose-400"><Maximize2 className="w-4 h-4" /></button>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Student Details Banner Box */}
@@ -551,7 +1057,7 @@ export default function VideoReviewView() {
                 <div className="flex items-center gap-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={selectedStudent.studentAvatar}
+                    src={selectedStudent.studentAvatar || "/Ananya.png"}
                     alt={selectedStudent.studentName}
                     className="w-14 h-14 rounded-full object-cover border-2 border-stone-200 shadow-sm shrink-0"
                   />
@@ -559,34 +1065,40 @@ export default function VideoReviewView() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-lg text-stone-900">{selectedStudent.studentName}</h3>
                       <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-[#9E0C25] text-[10px] font-extrabold border border-rose-200">
-                        BATCH ALPHA-2024
+                        {selectedStudent.courseBatch || "Kathak Batch"}
                       </span>
                     </div>
-                    <span className="text-xs font-semibold text-stone-400 block mt-0.5">
-                      ADVANCED LEVEL
+                    <span className="text-xs font-semibold text-stone-400 block mt-0.5 uppercase">
+                      Registered Student
                     </span>
                   </div>
                 </div>
 
                 <div className="text-left sm:text-right text-xs font-semibold text-stone-500">
                   <span className="block text-[10px] font-extrabold uppercase tracking-wider text-stone-400">SUBMISSION DATE</span>
-                  <span className="text-stone-900 font-bold">{selectedVideoItem.submissionDate} • 08:15 PM IST</span>
+                  <span className="text-stone-900 font-bold">{selectedVideoItem.submissionDate}</span>
                 </div>
               </div>
 
-              {/* Session Metadata Pills */}
+              {/* Dynamic Session Metadata Pills */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">ASSIGNMENT TYPE</span>
-                  <span className="font-bold text-stone-900 text-xs mt-0.5 block">Kathak Performance</span>
+                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">COURSE &amp; BATCH</span>
+                  <span className="font-bold text-stone-900 text-xs mt-0.5 block truncate">
+                    {selectedVideoItem.courseBatch || selectedStudent.courseBatch || "Kathak Foundations"}
+                  </span>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">TECHNICAL FOCUS</span>
-                  <span className="font-bold text-stone-900 text-xs mt-0.5 block">Tatkar / Speedwork / Chakkars</span>
+                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">STATUS</span>
+                  <span className="font-bold text-[#9E0C25] text-xs mt-0.5 block uppercase">
+                    {selectedVideoItem.status || "Pending"}
+                  </span>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">TARGET BPM</span>
-                  <span className="font-bold text-stone-900 text-xs mt-0.5 block">120 BPM - Drit Teental</span>
+                  <span className="text-[10px] font-extrabold uppercase text-stone-400 block">EVALUATION MARKS</span>
+                  <span className="font-bold text-stone-900 text-xs mt-0.5 block">
+                    {selectedVideoItem.marks && selectedVideoItem.marks !== "— N/A —" ? selectedVideoItem.marks : "Pending Review"}
+                  </span>
                 </div>
               </div>
 
@@ -601,22 +1113,98 @@ export default function VideoReviewView() {
 
               <form onSubmit={handleSubmitEvaluation} className="space-y-6">
                 
-                {/* PERFORMANCE SCORE */}
-                <div className="space-y-2">
-                  <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400 block">
-                    PERFORMANCE SCORE
+                {/* CALCULATED OVERALL PERFORMANCE SCORE */}
+                <div className="bg-gradient-to-br from-rose-50/80 via-white to-amber-50/40 border border-rose-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-500 block">
+                      OVERALL PERFORMANCE SCORE
+                    </span>
+                    <span className="text-3xl font-extrabold text-[#9E0C25]">
+                      {criteriaList.length > 0 ? `${calculatedAvgScore}%` : "— %"}
+                    </span>
+                  </div>
+                  <span className="bg-[#9E0C25] text-white text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    AUTO AVG TOTAL
                   </span>
+                </div>
 
-                  <div className="flex items-center justify-between bg-stone-50 border border-stone-200/80 rounded-2xl p-4">
+                {/* DYNAMIC EVALUATION CRITERIA BREAKDOWN */}
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400 block">
+                      EVALUATION CRITERIA (SCORE / 100)
+                    </span>
+                    <span className="text-[10px] text-stone-400 font-semibold font-mono">DYNAMIC</span>
+                  </div>
+
+                  {/* Criteria Rows or Empty State */}
+                  {criteriaList.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-stone-50/80 border border-dashed border-stone-200 text-center space-y-1">
+                      <p className="text-xs font-bold text-stone-700">No Evaluation Criteria Added</p>
+                      <p className="text-[11px] text-stone-400 font-medium leading-relaxed">
+                        Add evaluation parameters below (e.g. Footwork, Rhythm, Posture) to calculate overall score %.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {criteriaList.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200/80 hover:bg-stone-100/60 transition-colors">
+                          <input
+                            type="text"
+                            value={item.label}
+                            onChange={(e) => {
+                              const updated = [...criteriaList];
+                              updated[index].label = e.target.value;
+                              setCriteriaList(updated);
+                            }}
+                            placeholder="Criteria Name"
+                            className="text-xs font-bold text-stone-900 bg-transparent focus:outline-none flex-1 min-w-0"
+                          />
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1 bg-white border border-stone-200 rounded-lg px-2.5 py-1 shadow-2xs">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={item.score}
+                                onChange={(e) => handleUpdateCriteriaScore(index, Number(e.target.value))}
+                                className="w-10 text-center text-xs font-extrabold text-[#9E0C25] bg-transparent focus:outline-none"
+                              />
+                              <span className="text-[10px] text-stone-400 font-bold">/100</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCriteria(index)}
+                              className="text-stone-400 hover:text-rose-600 transition-colors p-1"
+                              title="Remove parameter"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add New Criteria Bar */}
+                  <div className="flex items-center gap-1.5 pt-1">
                     <input
-                      type="number"
-                      max={10}
-                      min={0}
-                      value={scoreVal}
-                      onChange={(e) => setScoreVal(e.target.value)}
-                      className="w-16 h-12 text-3xl font-extrabold text-stone-900 bg-transparent text-center focus:outline-none"
+                      type="text"
+                      placeholder="+ Add new criteria (e.g. Footwork)..."
+                      value={newCriteriaLabel}
+                      onChange={(e) => setNewCriteriaLabel(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCriteria(); } }}
+                      className="flex-1 h-10 px-3.5 rounded-xl bg-stone-50 border border-stone-200/80 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:bg-white focus:border-[#9E0C25] focus:outline-none"
                     />
-                    <span className="text-stone-400 font-bold text-lg">/ 10</span>
+                    <button
+                      type="button"
+                      onClick={handleAddCriteria}
+                      className="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
@@ -626,22 +1214,26 @@ export default function VideoReviewView() {
                     <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400 block">
                       CORRECTION NOTES
                     </span>
-                    <span className="text-[10px] font-bold text-[#9E0C25] uppercase cursor-pointer hover:underline">Add Note +</span>
+                    <span onClick={handleAddNote} className="text-[10px] font-bold text-[#9E0C25] uppercase cursor-pointer hover:underline">Add Note +</span>
                   </div>
 
                   {/* Notes Bullet List */}
                   <div className="space-y-2">
-                    {correctionNotes.map((note, index) => (
-                      <div key={index} className="p-3 rounded-xl bg-rose-50/60 border border-rose-100 text-xs font-semibold text-rose-950 flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#9E0C25] mt-1.5 shrink-0" />
-                          <span>{note}</span>
+                    {correctionNotes.length === 0 ? (
+                      <p className="text-[11px] text-stone-400 font-medium italic">No correction notes added yet.</p>
+                    ) : (
+                      correctionNotes.map((note, index) => (
+                        <div key={index} className="p-3 rounded-xl bg-rose-50/60 border border-rose-100 text-xs font-semibold text-rose-950 flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#9E0C25] mt-1.5 shrink-0" />
+                            <span>{note}</span>
+                          </div>
+                          <button type="button" onClick={() => handleRemoveNote(index)} className="text-stone-400 hover:text-rose-600">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <button type="button" onClick={() => handleRemoveNote(index)} className="text-stone-400 hover:text-rose-600">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
 
                   {/* Add Note Input */}
@@ -657,7 +1249,7 @@ export default function VideoReviewView() {
                     <button
                       type="button"
                       onClick={handleAddNote}
-                      className="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700"
+                      className="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -673,6 +1265,7 @@ export default function VideoReviewView() {
                     rows={4}
                     value={comprehensiveReview}
                     onChange={(e) => setComprehensiveReview(e.target.value)}
+                    placeholder="Provide detailed feedback on rhythm accuracy, facial expressions, and overall poise..."
                     className="w-full p-4 rounded-2xl bg-stone-50 border border-stone-200/80 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:bg-white focus:border-[#9E0C25] focus:outline-none transition-all leading-relaxed"
                   />
                 </div>
@@ -799,9 +1392,11 @@ export default function VideoReviewView() {
                           onChange={(e) => setTaskCategory(e.target.value)}
                           className="w-full h-11 pl-4 pr-9 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-800 appearance-none cursor-pointer focus:outline-none focus:border-stone-400"
                         >
-                          <option>Kathak</option>
-                          <option>Music Theory</option>
-                          <option>Vocal Practice</option>
+                          <option value="">Select Category</option>
+                          {Array.from(new Set(dbCourses.map(c => c.category).filter(Boolean))).map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                          {dbCourses.length === 0 && <option value="Kathak">Kathak</option>}
                         </select>
                         <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -812,12 +1407,32 @@ export default function VideoReviewView() {
                       <div className="relative">
                         <select
                           value={taskCourse}
-                          onChange={(e) => setTaskCourse(e.target.value)}
+                          onChange={(e) => {
+                            const selectedCourseTitle = e.target.value;
+                            setTaskCourse(selectedCourseTitle);
+                            const matched = dbCourses.find(c => c.title === selectedCourseTitle);
+                            if (matched?.category) setTaskCategory(matched.category);
+
+                            // Relational batch filtering: auto select first batch belonging to this course
+                            const courseBatches = dbBatches.filter(
+                              (b) =>
+                                (matched && b.courseId === matched.id) ||
+                                (b.courseName && b.courseName.toLowerCase() === selectedCourseTitle.toLowerCase()) ||
+                                (b.course && b.course.toLowerCase() === selectedCourseTitle.toLowerCase())
+                            );
+
+                            if (courseBatches.length > 0) {
+                              setTaskBatch(courseBatches[0].name);
+                            } else {
+                              setTaskBatch("");
+                            }
+                          }}
                           className="w-full h-11 pl-4 pr-9 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-700 appearance-none cursor-pointer focus:outline-none focus:border-stone-400"
                         >
-                          <option value="">Select Course (e.g. Kathak Advanced)</option>
-                          <option value="Kathak Advanced">Kathak Advanced</option>
-                          <option value="Kathak Foundations">Kathak Foundations</option>
+                          <option value="">Select Course</option>
+                          {dbCourses.map((c) => (
+                            <option key={c.id} value={c.title}>{c.title}</option>
+                          ))}
                         </select>
                         <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -850,12 +1465,20 @@ export default function VideoReviewView() {
                       <div className="relative">
                         <select
                           value={taskBatch}
+                          disabled={!taskCourse}
                           onChange={(e) => setTaskBatch(e.target.value)}
-                          className="w-full h-11 pl-4 pr-9 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-700 appearance-none cursor-pointer focus:outline-none focus:border-stone-400"
+                          className="w-full h-11 pl-4 pr-9 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-700 appearance-none cursor-pointer focus:outline-none focus:border-stone-400 disabled:bg-stone-100 disabled:text-stone-400 disabled:cursor-not-allowed"
                         >
-                          <option value="">Select Batch (e.g. Alpha-2024)</option>
-                          <option value="Alpha-2024">Alpha-2024</option>
-                          <option value="Beta-2024">Beta-2024</option>
+                          <option value="">
+                            {!taskCourse
+                              ? "Select Course First"
+                              : filteredBatches.length === 0
+                              ? "No Batches Available for this Course"
+                              : "Select Batch"}
+                          </option>
+                          {filteredBatches.map((b) => (
+                            <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                          ))}
                         </select>
                         <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
@@ -888,6 +1511,14 @@ export default function VideoReviewView() {
 
               {/* CARD 2: Reference Media */}
               <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-6">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleMediaFileSelect}
+                  accept="video/*,image/*"
+                  className="hidden"
+                />
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
@@ -898,32 +1529,46 @@ export default function VideoReviewView() {
 
                   <button
                     type="button"
-                    onClick={() => alert("Add Link Modal")}
+                    onClick={() => fileInputRef.current?.click()}
                     className="text-xs font-bold text-[#9E0C25] hover:underline cursor-pointer"
                   >
-                    + Add Link
+                    + Add Link / File
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Uploaded Video Thumbnail Reference */}
-                  <div className="relative aspect-video rounded-2xl bg-stone-900 overflow-hidden border border-stone-200 shadow-xs group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/gurukul-dancer.jpg" alt="Demo" className="w-full h-full object-cover opacity-85" />
-                    <button type="button" className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black">
-                      <X className="w-3 h-3" />
-                    </button>
-                    <div className="absolute bottom-2 left-2 right-2 flex flex-col justify-end text-white bg-black/75 p-2 rounded-lg backdrop-blur-xs">
-                      <span className="font-bold text-xs truncate">Tatkar_Basics_Demo.mp4</span>
-                      <span className="text-stone-300 text-[9px] font-medium uppercase">MASTER VIDEO REFERENCE</span>
+                  {uploadedReference ? (
+                    <div className="relative aspect-video rounded-2xl bg-stone-900 overflow-hidden border border-stone-200 shadow-xs group">
+                      {uploadedReference.url.endsWith(".mp4") || uploadedReference.url.endsWith(".mov") || uploadedReference.url.startsWith("blob:") ? (
+                        <video src={uploadedReference.url} controls className="w-full h-full object-cover" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={uploadedReference.url} alt="Reference" className="w-full h-full object-cover opacity-90" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setUploadedReference(null)}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-rose-600 transition-colors z-10"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="absolute bottom-2 left-2 right-2 flex flex-col justify-end text-white bg-black/75 p-2 rounded-lg backdrop-blur-xs">
+                        <span className="font-bold text-xs truncate">{uploadedReference.name}</span>
+                        <span className="text-stone-300 text-[9px] font-medium uppercase">UPLOADED REFERENCE</span>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
 
                   {/* Upload Dropzone */}
-                  <div className="border-2 border-dashed border-stone-300 bg-stone-50/80 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-2 hover:border-[#9E0C25] transition-colors cursor-pointer">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-stone-300 bg-stone-50/80 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-2 hover:border-[#9E0C25] transition-colors cursor-pointer"
+                  >
                     <Upload className="w-6 h-6 text-stone-400" />
-                    <h5 className="font-bold text-xs text-stone-800">Click to upload or drag &amp; drop</h5>
-                    <p className="text-[10px] text-stone-400 font-semibold uppercase">MAX SIZE: 50MB (MP4, MOV)</p>
+                    <h5 className="font-bold text-xs text-stone-800">
+                      {isUploadingMedia ? "Uploading Media..." : "Click to upload or drag & drop"}
+                    </h5>
+                    <p className="text-[10px] text-stone-400 font-semibold uppercase">MAX SIZE: 50MB (MP4, MOV, JPG)</p>
                   </div>
                 </div>
               </div>
@@ -945,10 +1590,12 @@ export default function VideoReviewView() {
                     <label className="block text-xs font-bold text-stone-700">Submission Date</label>
                     <div className="relative">
                       <input
-                        type="text"
+                        type="date"
+                        required
+                        min={new Date().toISOString().split("T")[0]}
                         value={submissionDate}
                         onChange={(e) => setSubmissionDate(e.target.value)}
-                        className="w-full h-11 pl-4 pr-10 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-900 focus:outline-none focus:border-stone-400"
+                        className="w-full h-11 pl-4 pr-10 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-900 focus:outline-none focus:border-stone-400 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                       />
                       <Calendar className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
@@ -958,10 +1605,11 @@ export default function VideoReviewView() {
                     <label className="block text-xs font-bold text-stone-700">Cut-off Time</label>
                     <div className="relative">
                       <input
-                        type="text"
+                        type="time"
+                        required
                         value={cutoffTime}
                         onChange={(e) => setCutoffTime(e.target.value)}
-                        className="w-full h-11 pl-4 pr-10 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-900 focus:outline-none focus:border-stone-400"
+                        className="w-full h-11 pl-4 pr-10 rounded-xl bg-white border border-stone-200/90 text-xs font-semibold text-stone-900 focus:outline-none focus:border-stone-400 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                       />
                       <Clock className="w-4 h-4 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>

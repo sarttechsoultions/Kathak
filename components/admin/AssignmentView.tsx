@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { apiRequest } from "@/lib/api";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 import {
@@ -226,7 +226,7 @@ export default function AssignmentView() {
   // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [uploadedFileName, setUploadedFileName] = useState("");
-  const [uploadingFile, setUploadingFile] = useState(true);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFileType, setUploadedFileType] = useState<"image" | "video" | "other">("other");
 
@@ -466,9 +466,13 @@ export default function AssignmentView() {
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
+            const pct = Math.round((e.loaded / e.total) * 85);
             setUploadProgress(pct);
           }
+        };
+
+        xhr.upload.onload = () => {
+          setUploadProgress(92);
         };
 
         xhr.onload = () => {
@@ -482,7 +486,10 @@ export default function AssignmentView() {
                 json?.data?.secure_url ||
                 "";
               if (!u) reject(new Error("No URL returned"));
-              else resolve(u);
+              else {
+                setUploadProgress(100);
+                resolve(u);
+              }
             } else {
               reject(new Error(json?.message || `Upload failed (${xhr.status})`));
             }
@@ -1260,13 +1267,25 @@ export default function AssignmentView() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 space-y-6">
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs">
-                <h4 className="text-[10.5px] font-extrabold uppercase text-slate-400 tracking-wider">
-                  STUDENT MESSAGE
-                </h4>
-                <p className="text-sm italic text-slate-700 mt-2">
-                  &ldquo;{selectedVideoReview.message}&rdquo;
-                </p>
+              <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10.5px] font-black uppercase text-slate-400 tracking-wider">
+                    STUDENT SUBMISSION MESSAGE
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-400">Scrollable</span>
+                </div>
+                <div className="max-h-[160px] overflow-y-auto pr-2 text-xs italic text-slate-700 font-medium leading-relaxed space-y-2 font-sans">
+                  {selectedVideoReview.message ? (
+                    selectedVideoReview.message.split("\n\n").map((para, i, arr) => (
+                      <p key={i} className="whitespace-pre-line leading-relaxed">
+                        {i === 0 ? `“${para}` : para}
+                        {i === arr.length - 1 ? `”` : ""}
+                      </p>
+                    ))
+                  ) : (
+                    <p className="text-slate-400 font-normal">No submission message attached.</p>
+                  )}
+                </div>
               </div>
 
               {/* ENHANCED DYNAMIC VIDEO PLAYER WITH IFRAME & DIRECT VIDEO SUPPORT */}
@@ -1700,13 +1719,50 @@ export default function AssignmentView() {
                     <label className="block text-xs font-bold text-slate-700">
                       Assignment Instructions
                     </label>
-                    <textarea
-                      rows={5}
-                      placeholder="Provide detailed steps for the students..."
-                      value={newAssignmentInstructions}
-                      onChange={(e) => setNewAssignmentInstructions(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:bg-white focus:border-[#8C2329] focus:outline-none"
-                    />
+                    <div className="rounded-2xl border border-stone-200 overflow-hidden">
+                      <div className="bg-slate-50 border-b border-stone-200 px-4 py-2 flex items-center gap-3 text-xs font-bold text-stone-600 select-none">
+                        <button
+                          type="button"
+                          onClick={() => applyAdminInstructionsFormat("bold")}
+                          className="px-2.5 py-1 rounded hover:bg-stone-200 text-stone-800 font-black cursor-pointer transition-colors"
+                          title="Bold text (**text**)"
+                        >
+                          B
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyAdminInstructionsFormat("italic")}
+                          className="px-2.5 py-1 rounded hover:bg-stone-200 text-stone-800 italic font-black cursor-pointer transition-colors"
+                          title="Italic text (_text_)"
+                        >
+                          I
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyAdminInstructionsFormat("list")}
+                          className="px-2.5 py-1 rounded hover:bg-stone-200 text-stone-800 font-extrabold cursor-pointer transition-colors"
+                          title="Bullet List (• item)"
+                        >
+                          ≡
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyAdminInstructionsFormat("link")}
+                          className="px-2.5 py-1 rounded hover:bg-stone-200 text-stone-800 font-extrabold cursor-pointer transition-colors"
+                          title="Insert Link ([title](url))"
+                        >
+                          🔗
+                        </button>
+                      </div>
+                      <textarea
+                        ref={adminInstructionsTextareaRef}
+                        rows={5}
+                        placeholder="Provide detailed steps for the students..."
+                        value={newAssignmentInstructions}
+                        onChange={(e) => setNewAssignmentInstructions(e.target.value)}
+                        className="w-full p-4 text-xs font-medium text-stone-800 placeholder:text-stone-400 focus:outline-none bg-white"
+                      />
+                    </div>
                   </div>
 
                   {/* Reference Materials */}
@@ -1732,10 +1788,16 @@ export default function AssignmentView() {
                     >
                       {uploadingFile && (
                         <div className="w-full max-w-xs space-y-2">
-                          <p className="text-xs font-bold text-slate-700">Uploading… {uploadProgress}%</p>
+                          <p className="text-xs font-bold text-slate-700">
+                            {uploadProgress < 85
+                              ? `Uploading file (${uploadProgress}%)...`
+                              : uploadProgress < 100
+                              ? `Processing & saving to Cloud storage (${uploadProgress}%)...`
+                              : `Upload Complete (100%)`}
+                          </p>
                           <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
                             <div
-                              className="h-full bg-[#8C2329] transition-all duration-200"
+                              className="h-full bg-[#8C2329] transition-all duration-300"
                               style={{ width: `${uploadProgress}%` }}
                             />
                           </div>

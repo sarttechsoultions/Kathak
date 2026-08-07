@@ -120,26 +120,41 @@ export default function StudentAssignmentViewPage() {
   const numericScore = parseInt(rawScore, 10) || 0;
 
   // Pure dynamic data extraction from JSON feedback
-  let displayComment = data?.feedback || data?.notes || "";
+  let displayComment = "";
   let displayPointers: string[] = [];
   let displayParts: { name: string; score: number }[] = [];
 
-  if (data?.feedback && data.feedback.startsWith("{")) {
-    try {
-      const obj = JSON.parse(data.feedback);
-      if (obj.comment) displayComment = obj.comment;
-      if (Array.isArray(obj.pointers)) {
-        displayPointers = obj.pointers.filter((p: string) => p && p.trim() !== "");
-      }
-      if (Array.isArray(obj.criteriaParts)) {
-        displayParts = obj.criteriaParts.map((cp: any) => ({
-          name: cp.name || "Criterion",
-          score: typeof cp.score === "number" ? cp.score : parseInt(cp.score || "0", 10) || 0,
-        }));
-      }
-    } catch {
-      // ignore
+  if (data?.feedback) {
+    let raw = data.feedback.trim();
+    if (raw.startsWith('"') && raw.endsWith('"')) {
+      try {
+        raw = JSON.parse(raw);
+      } catch {}
     }
+
+    if (raw.startsWith("{")) {
+      try {
+        const obj = JSON.parse(raw);
+        displayComment = obj.comment || "";
+        if (Array.isArray(obj.pointers)) {
+          displayPointers = obj.pointers.filter((p: string) => p && typeof p === "string" && p.trim() !== "");
+        }
+        if (Array.isArray(obj.criteriaParts)) {
+          displayParts = obj.criteriaParts.map((cp: any) => ({
+            name: cp.name || "Criterion",
+            score: typeof cp.score === "number" ? cp.score : parseInt(cp.score || "0", 10) || 0,
+          }));
+        }
+      } catch {
+        displayComment = raw;
+      }
+    } else {
+      displayComment = raw;
+    }
+  }
+
+  if (!displayComment && data?.notes) {
+    displayComment = data.notes;
   }
 
   const performanceLevel =
@@ -280,12 +295,22 @@ export default function StudentAssignmentViewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT BOX: Guru's Comprehensive Review (7 cols) */}
         <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-2xs space-y-6">
-          <h3 className="text-base font-extrabold text-slate-900">
-            Guru&apos;s Comprehensive Review &amp; Feedback
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-extrabold text-slate-900">
+              Guru&apos;s Comprehensive Review &amp; Feedback
+            </h3>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ✓ {data?.status}
+            </span>
+          </div>
 
-          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs sm:text-sm text-slate-700 leading-relaxed italic">
-            &ldquo;{displayComment || "No comment provided."}&rdquo;
+          {/* Teacher / Admin Feedback Box */}
+          <div className="p-5 rounded-2xl bg-rose-50/40 border border-rose-100/80 text-xs sm:text-sm text-slate-800 leading-relaxed font-medium">
+            {displayComment && displayComment.trim() !== "" ? (
+              <p className="italic text-slate-700">&ldquo;{displayComment}&rdquo;</p>
+            ) : (
+              <p className="text-slate-500 font-medium italic">No additional written feedback provided by teacher/admin.</p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 font-medium pt-2 border-t border-slate-100 gap-2">

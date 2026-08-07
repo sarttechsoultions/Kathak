@@ -32,11 +32,12 @@ interface BatchRecord {
   name: string;
   code: string;
   course: string;
+  courseName?: string;
   level: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
   teacher: string;
   schedule: string;
   totalStudents: number;
-  status: "Active" | "Completed" | "Upcoming";
+  status: "Active" | "Completed" | "Upcoming" | "ACTIVE" | "COMPLETED" | "UPCOMING";
 }
 
 interface CohortStudent {
@@ -100,6 +101,33 @@ const formatScheduleDisplay = (rawSchedule?: string) => {
     return `${days} (${time})`;
   }
   return rawSchedule;
+};
+
+const formatTimeTo12Hour = (time24: string) => {
+  if (!time24) return "";
+  if (time24.includes("AM") || time24.includes("PM")) return time24;
+  const [hStr, mStr] = time24.split(":");
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) return time24;
+  const m = mStr || "00";
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  const formattedH = h < 10 ? `0${h}` : `${h}`;
+  return `${formattedH}:${m} ${ampm}`;
+};
+
+const convert12HourTo24 = (time12: string) => {
+  if (!time12) return "";
+  const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return time12;
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const ampm = match[3].toUpperCase();
+  if (ampm === "PM" && h < 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  const hStr = h < 10 ? `0${h}` : `${h}`;
+  return `${hStr}:${m}`;
 };
 
 export default function BatchView() {
@@ -235,7 +263,12 @@ export default function BatchView() {
 
   // Auto-calculate batch status dynamically based on Start Date & End Date
   useEffect(() => {
-    if (!startDate) return;
+    if (!startDate) {
+      if (viewMode === "CREATE_FORM") {
+        setBatchStatus("UPCOMING");
+      }
+      return;
+    }
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
@@ -257,7 +290,7 @@ export default function BatchView() {
     }
 
     setBatchStatus("ACTIVE");
-  }, [startDate, endDate]);
+  }, [startDate, endDate, viewMode]);
 
   // Open Batch Student Directory
   const handleOpenBatchDirectory = async (batch: BatchRecord) => {
@@ -391,15 +424,17 @@ export default function BatchView() {
   const handleOpenCreateForm = () => {
     setEditingBatchId(null);
     setBatchName("");
-    setCourse("Classical Kathak");
-    setLevel("INTERMEDIATE");
+    setCourse((dbCourses.length > 0 && dbCourses[0]?.title) ? dbCourses[0].title : "Kathak Beginners Course");
+    setLevel("BEGINNER");
     setBatchDescription("");
+    setAssignedTeacher(teacherList.length > 0 ? teacherList[0] : "");
+    setStudentCapacity("25");
     setEnrolledStudents([]);
-    setBatchStatus("ACTIVE");
-    setStartDate(new Date().toISOString().split("T")[0]);
-    setEndDate(new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().split("T")[0]);
-    setClassTime("06:30 PM");
-    setSelectedDays(["Mon", "Wed", "Fri"]);
+    setBatchStatus("UPCOMING");
+    setStartDate("");
+    setEndDate("");
+    setClassTime("");
+    setSelectedDays([]);
     setViewMode("CREATE_FORM");
   };
 
@@ -691,11 +726,12 @@ export default function BatchView() {
                             <td className="py-4 px-6">
                               <div className="space-y-1">
                                   <h5 className="font-bold text-stone-900 text-sm leading-tight">
-                                    {typeof batch.course === "object"
-                                      ? (batch.course as unknown as { title?: string; name?: string })?.title ||
-                                        (batch.course as unknown as { title?: string; name?: string })?.name ||
-                                        "Kathak Foundations"
-                                      : String(batch.course || "Kathak Foundations")}
+                                    {batch.courseName ||
+                                      (typeof batch.course === "string"
+                                        ? batch.course
+                                        : (batch.course as unknown as { title?: string; name?: string })?.title ||
+                                          (batch.course as unknown as { title?: string; name?: string })?.name) ||
+                                      "Kathak Foundations"}
                                   </h5>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[11px] font-bold text-[#9E0C25]">{batch.name}</span>
@@ -1034,33 +1070,25 @@ export default function BatchView() {
 
               <div className="lg:col-span-5 space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-stone-700 font-bold uppercase text-[10.5px]">CLASS TIME</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={classTime}
-                      onChange={(e) => setClassTime(e.target.value)}
-                      placeholder="06:30 PM"
-                      className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25]"
-                    />
-                    <select
-                      value={["08:00 AM", "09:30 AM", "10:00 AM", "11:30 AM", "04:00 PM", "05:30 PM", "06:30 PM", "07:30 PM", "08:30 PM"].includes(classTime) ? classTime : ""}
-                      onChange={(e) => {
-                        if (e.target.value) setClassTime(e.target.value);
-                      }}
-                      className="h-11 px-3 rounded-xl bg-stone-100 border border-stone-200 text-stone-700 text-xs font-extrabold focus:outline-none cursor-pointer shrink-0"
-                    >
-                      <option value="">Presets ▼</option>
-                      <option value="08:00 AM">08:00 AM</option>
-                      <option value="09:30 AM">09:30 AM</option>
-                      <option value="10:00 AM">10:00 AM</option>
-                      <option value="11:30 AM">11:30 AM</option>
-                      <option value="04:00 PM">04:00 PM</option>
-                      <option value="05:30 PM">05:30 PM</option>
-                      <option value="06:30 PM">06:30 PM</option>
-                      <option value="07:30 PM">07:30 PM</option>
-                      <option value="08:30 PM">08:30 PM</option>
-                    </select>
+                  <label className="block text-stone-700 font-bold uppercase text-[10.5px]">CLASS TIME *</label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type="time"
+                        required
+                        value={convert12HourTo24(classTime)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setClassTime(formatTimeTo12Hour(val));
+                        }}
+                        className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-bold focus:bg-white focus:outline-none focus:border-[#9E0C25] cursor-pointer"
+                      />
+                    </div>
+                    {classTime && (
+                      <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200/80 text-[#9E0C25] font-extrabold text-xs shrink-0 shadow-2xs">
+                        ⏰ {classTime}
+                      </div>
+                    )}
                   </div>
                 </div>
 

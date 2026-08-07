@@ -25,14 +25,15 @@ interface TeacherBatch {
   id: string;
   name: string;
   code: string;
-  course: string;
+  course?: string;
+  courseId?: string;
   courseName?: string;
   teacherId?: string;
   teacherName?: string;
-  level: string;
-  schedule: string;
-  status: "ACTIVE" | "COMPLETED" | "UPCOMING";
-  totalStudents: number;
+  level?: string;
+  schedule?: string;
+  status?: "ACTIVE" | "COMPLETED" | "UPCOMING";
+  totalStudents?: number;
   maxStudents?: number;
   students?: Array<{
     id: string;
@@ -86,33 +87,36 @@ export default function TeacherBatchesView() {
             if (parsed.id) {
               currentTeacherId = parsed.id;
             }
-          } catch {
-            // Fallback
-          }
+          } catch {}
         }
 
-        const res = await apiRequest<{
-          status: string;
-          data?: TeacherBatch[] | { batches?: TeacherBatch[] };
-        }>(ENDPOINTS.ADMIN_BATCHES);
+        const assignedRes = await apiRequest<{
+          data?: {
+            courses?: Array<{
+              id: string;
+              title: string;
+              batches?: Array<{ id: string; name: string; code?: string; courseId: string; courseName: string }>;
+            }>;
+          };
+        }>("/video/teacher/assigned-courses-batches");
 
         if (!isMounted) return;
 
-        const rawBatches: TeacherBatch[] = Array.isArray(res.data)
-          ? res.data
-          : Array.isArray((res.data as { batches?: TeacherBatch[] })?.batches)
-          ? (res.data as { batches: TeacherBatch[] }).batches
-          : [];
+        const teacherCourses = assignedRes?.data?.courses || [];
+        const teacherOnlyBatches: TeacherBatch[] = [];
 
-        // Filter ONLY batches assigned to this logged-in teacher strictly
-        const teacherOnlyBatches = rawBatches.filter((b) => {
-          if (!b.teacherName && !b.teacherId) return false;
-          const matchesName =
-            Boolean(b.teacherName) &&
-            (b.teacherName?.toLowerCase().includes(currentTeacherName.toLowerCase()) ||
-              currentTeacherName.toLowerCase().includes(b.teacherName?.toLowerCase() || ""));
-          const matchesId = Boolean(currentTeacherId) && b.teacherId === currentTeacherId;
-          return matchesName || matchesId;
+        teacherCourses.forEach((c) => {
+          if (Array.isArray(c.batches)) {
+            c.batches.forEach((b) => {
+              teacherOnlyBatches.push({
+                id: String(b.id),
+                name: b.name,
+                code: b.code || "",
+                courseId: String(b.courseId || c.id),
+                courseName: b.courseName || c.title,
+              });
+            });
+          }
         });
 
         setBatches(teacherOnlyBatches);
@@ -141,8 +145,8 @@ export default function TeacherBatchesView() {
         (b) =>
           b.name.toLowerCase().includes(term) ||
           b.code.toLowerCase().includes(term) ||
-          b.course.toLowerCase().includes(term) ||
-          b.level.toLowerCase().includes(term)
+          (b.course || b.courseName || "").toLowerCase().includes(term) ||
+          (b.level || "").toLowerCase().includes(term)
       );
     }
 

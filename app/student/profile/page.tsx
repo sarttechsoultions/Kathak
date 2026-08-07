@@ -664,7 +664,7 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
                 <div>
                   <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
-                    BATCH TIMING
+                    BATCH 
                   </span>
                   <span className="font-semibold text-[#1B1B24] text-[14px]">
                     {profile.batch ?? "—"}
