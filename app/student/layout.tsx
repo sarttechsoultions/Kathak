@@ -39,7 +39,7 @@ const sidebarMenuItems = [
   { label: "Progress", href: "/student/progress", icon: TrendingUp },
   { label: "Certificates", href: "/student/certificates", icon: Award },
   { label: "Fee Management", href: "/student/finance", icon: CreditCard },
-  { label: "Communication", href: "/student/communication", icon: MessageSquare },
+  { label: "Notifications", href: "/student/notifications", icon: Bell },
   { label: "Events & Workshops", href: "/student/events", icon: Sparkles },
   { label: "Exam", href: "/student/exam", icon: FileCheck },
   { label: "Settings", href: "/student/settings", icon: Settings },
@@ -108,55 +108,35 @@ useEffect(() => {
       return;
     }
 
-    const studentToken = localStorage.getItem("kathak_student_token");
-    const hasCookie =
-      typeof document !== "undefined" &&
-      document.cookie.includes("kathak_student_session=");
-
-    // No token + no cookie → login
-    if (!studentToken && !hasCookie) {
-      clearAllStudentTokens();
-      router.replace("/student/login");
-      return;
-    }
-
     // Local user load
-    const studentSaved = localStorage.getItem("kathak_student_user");
+    const studentSaved = localStorage.getItem("kathak_student_user") || localStorage.getItem("kathak_session_user");
+    let currentUser: any = null;
     if (studentSaved) {
       try {
-        const parsed = JSON.parse(studentSaved);
-        if (parsed && (parsed.role === "STUDENT" || !parsed.role)) {
-          if (!cancelled) setStudentUser(parsed);
+        currentUser = JSON.parse(studentSaved);
+        if (currentUser && (currentUser.role === "STUDENT" || !currentUser.role)) {
+          if (!cancelled) setStudentUser(currentUser);
         }
       } catch {}
-    } else {
-      const sessionSaved = localStorage.getItem("kathak_session_user");
-      if (sessionSaved) {
-        try {
-          const parsed = JSON.parse(sessionSaved);
-          if (parsed && parsed.role === "STUDENT") {
-            if (!cancelled) setStudentUser(parsed);
-          }
-        } catch {}
-      }
     }
 
-    // Fresh profile fetch
-    if (studentToken) {
-      try {
-        const { apiRequest, ENDPOINTS } = await import("@/lib/api");
-        const res = await apiRequest<AuthMeResponse>(
-          ENDPOINTS.AUTH_ME,
-          { headers: { Authorization: `Bearer ${studentToken}` } }
-        );
-        const u = res.data?.user || res.data?.profile;
-        if (u && !cancelled) {
-          setStudentUser(u);
-          localStorage.setItem("kathak_student_user", JSON.stringify(u));
-        }
-      } catch {
+    // Fresh profile fetch via HttpOnly cookie
+    try {
+      const { apiRequest, ENDPOINTS } = await import("@/lib/api");
+      const res = await apiRequest<AuthMeResponse>(ENDPOINTS.AUTH_ME);
+      const u = res.data?.user || res.data?.profile;
+      if (u && !cancelled) {
+        setStudentUser(u);
+        localStorage.setItem("kathak_student_user", JSON.stringify(u));
+      } else if (!u && !currentUser) {
         clearAllStudentTokens();
-        router.replace("/student/login");
+        router.replace("/login");
+        return;
+      }
+    } catch {
+      if (!currentUser) {
+        clearAllStudentTokens();
+        router.replace("/login");
         return;
       }
     }

@@ -17,12 +17,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // 1. Direct API Authentication Check via GET /api/v1/auth/me
   useEffect(() => {
     if (pathname === "/admin/login") {
-      const existingToken = localStorage.getItem("kathak_admin_token");
       const savedUserStr = localStorage.getItem("kathak_session_user");
-      if (existingToken && savedUserStr) {
+      if (savedUserStr) {
         try {
           const user = JSON.parse(savedUserStr);
-          const destination = getDefaultAccessibleRoute(user) || "/admin/class-management";
+          const destination = getDefaultAccessibleRoute(user) || "/admin/dashboard";
           router.replace(destination);
         } catch {
           router.replace("/admin/dashboard");
@@ -33,15 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    const token = localStorage.getItem("kathak_admin_token");
     const savedUser = localStorage.getItem("kathak_session_user");
-
-    if (!token) {
-      setIsAuthenticated(false);
-      router.replace("/admin/login");
-      return;
-    }
-
     let isMounted = true;
 
     // 1. Instant optimistic check using saved user session if available
@@ -61,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace(destination || "/admin/login");
     }
 
-    // 2. Validate session directly against PostgreSQL Database via GET /api/v1/auth/me API
+    // 2. Validate session directly against PostgreSQL Database via GET /api/v1/auth/me API (HttpOnly Cookie)
     async function verifyAuthWithApi() {
       try {
         const res = await apiRequest<{ data?: { user?: AuthSessionUser } }>(ENDPOINTS.AUTH_ME);
@@ -75,23 +66,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const destination = getDefaultAccessibleRoute(user);
             router.replace(destination || "/admin/login");
           }
+        } else if (!user && !currentUser && isMounted) {
+          setIsAuthenticated(false);
+          router.replace("/admin/login");
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn("API Auth check:", msg);
-        // Only kick out if explicitly Unauthorized (401 / 403) from API
-        if (msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized") || msg.includes("expired")) {
-          localStorage.removeItem("kathak_admin_token");
-          localStorage.removeItem("kathak_admin_token_expiry");
+        // If explicitly Unauthorized (401 / 403) from API, clear session and redirect
+        if (msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized") || msg.includes("expired") || !currentUser) {
           localStorage.removeItem("kathak_session_user");
-          document.cookie = "kathak_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           if (isMounted) {
             setIsAuthenticated(false);
             router.replace("/admin/login");
           }
-        } else if (!currentUser) {
-          // If no local session user exists and API fails, allow access for ADMIN token
-          setIsAuthenticated(true);
         }
       }
     }

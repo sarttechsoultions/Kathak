@@ -39,8 +39,8 @@ const teacherSidebarItems: SidebarItem[] = [
   { label: "Attendance", icon: CalendarCheck, href: "/teacher/attendance" },
   { label: "Exam", icon: FileSpreadsheet, href: "/teacher/exam" },
   { label: "Progress", icon: TrendingUp, href: "/teacher/progress" },
-  { label: "Communication", icon: MessageSquare, href: "/teacher/communication" },
-  { label: "Certificates", icon: Award, href: "/teacher/certificates" },
+  // { label: "Communication", icon: MessageSquare, href: "/teacher/communication" },
+  // { label: "Certificates", icon: Award, href: "/teacher/certificates" },
   { label: "Settings", icon: Settings, href: "/teacher/settings" },
   { label: "Support", icon: HelpCircle, href: "/teacher/support" },
 ];

@@ -1,6 +1,3 @@
-/**
- * Centralized API Client & Base URL Configuration for Kathak Next
- */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
 
@@ -56,10 +53,15 @@ export async function apiRequest<T = any>(
     },
   });
 
-  const data = await response.json();
+let data;
 
+try {
+  data = await response.json();
+} catch {
+  data = null;
+}
   if (!response.ok) {
-    throw new Error(data.message || `API Request failed with status ${response.status}`);
+    throw new Error(data?.message || `API Request failed with status ${response.status}`);
   }
 
   return data;

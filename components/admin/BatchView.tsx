@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users,
   Plus,
@@ -64,9 +64,14 @@ interface EnrolledStudentItem {
 interface AvailableStudent {
   id: string;
   name: string;
+  fullName?: string;
   email: string;
   avatar: string;
+  avatarUrl?: string;
   status: string;
+  course?: string | null;
+  courses?: { id: string; title: string; active?: boolean }[];
+  batch?: string | null;
 }
 
 interface BatchStudentResponse {
@@ -187,6 +192,46 @@ export default function BatchView() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  const activeTargetCourseTitle = useMemo(() => {
+    if (viewMode === "CREATE_FORM") {
+      return course;
+    }
+    if (viewMode === "STUDENT_DIRECTORY" && selectedBatch) {
+      return (
+        selectedBatch.courseName ||
+        (typeof selectedBatch.course === "string"
+          ? selectedBatch.course
+          : (selectedBatch.course as unknown as { title?: string; name?: string })?.title ||
+            (selectedBatch.course as unknown as { title?: string; name?: string })?.name) ||
+        ""
+      );
+    }
+    return "";
+  }, [viewMode, course, selectedBatch]);
+
+  const courseEnrolledAvailableStudents = useMemo(() => {
+    if (!activeTargetCourseTitle || activeTargetCourseTitle.trim() === "" || activeTargetCourseTitle === "Course Type") {
+      return availableStudents;
+    }
+    const cleanTarget = activeTargetCourseTitle.toLowerCase().trim();
+    return availableStudents.filter((stu) => {
+      // 1. Direct course string match
+      if (stu.course) {
+        const c = stu.course.toLowerCase().trim();
+        if (c === cleanTarget || c.includes(cleanTarget) || cleanTarget.includes(c)) return true;
+      }
+      // 2. Enrolled courses array match
+      if (Array.isArray(stu.courses)) {
+        const match = stu.courses.some((c) => {
+          const title = (c.title || "").toLowerCase().trim();
+          return title === cleanTarget || title.includes(cleanTarget) || cleanTarget.includes(title);
+        });
+        if (match) return true;
+      }
+      return false;
+    });
+  }, [availableStudents, activeTargetCourseTitle]);
 
   // Fetch Live Batches, Teachers & Registered Students from Express Backend API
   const fetchBatchesData = useCallback(async () => {
@@ -878,7 +923,12 @@ export default function BatchView() {
                     <label className="block text-stone-700 font-bold uppercase text-[10.5px]">COURSE *</label>
                     <select
                       value={course}
-                      onChange={(e) => setCourse(e.target.value)}
+                      onChange={(e) => {
+                        const newCourse = e.target.value;
+                        setCourse(newCourse);
+                        setSelectedStudentIds([]);
+                        setEnrolledStudents([]);
+                      }}
                       className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-900 font-semibold focus:bg-white focus:outline-none focus:border-[#9E0C25] cursor-pointer"
                     >
                       {dbCourses.length > 0 ? (
@@ -1412,7 +1462,9 @@ export default function BatchView() {
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
                 <h3 className="font-extrabold text-xl text-[#0B1C30] tracking-tight">Select Students to Enroll</h3>
-                <p className="text-xs text-stone-400 font-medium">Choose registered students from academy directory.</p>
+                <p className="text-xs text-stone-500 font-medium">
+                  Showing enrolled students for: <span className="font-bold text-[#9E0C25]">{activeTargetCourseTitle || "Selected Course"}</span>
+                </p>
               </div>
               <button
                 onClick={() => setIsStudentPickerOpen(false)}
@@ -1427,7 +1479,7 @@ export default function BatchView() {
               <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search by student name or email..."
+                placeholder={`Search students enrolled in ${activeTargetCourseTitle || "this course"}...`}
                 value={studentPickerSearch}
                 onChange={(e) => setStudentPickerSearch(e.target.value)}
                 className="w-full h-10 pl-9 pr-3 rounded-xl bg-stone-50 border border-stone-200 text-stone-900 font-semibold text-xs focus:bg-white focus:outline-none focus:border-[#9E0C25]"
@@ -1436,12 +1488,17 @@ export default function BatchView() {
 
             {/* Students List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
-              {availableStudents.length === 0 ? (
-                <div className="p-8 text-center text-stone-400 font-semibold text-xs">
-                  No registered students found.
+              {courseEnrolledAvailableStudents.length === 0 ? (
+                <div className="p-8 text-center text-stone-400 font-semibold text-xs space-y-1.5">
+                  <p className="text-stone-700 font-bold">
+                    No students currently enrolled in &quot;{activeTargetCourseTitle || "this course"}&quot;.
+                  </p>
+                  <p className="text-[11px] text-stone-400 font-normal">
+                    Only students registered and enrolled in this specific course will appear here to be added to this batch.
+                  </p>
                 </div>
               ) : (
-                availableStudents
+                courseEnrolledAvailableStudents
                   .filter((s) => studentPickerSearch === "" || s.name.toLowerCase().includes(studentPickerSearch.toLowerCase()) || s.email.toLowerCase().includes(studentPickerSearch.toLowerCase()))
                   .map((stu) => {
                     const isSelected = selectedStudentIds.includes(stu.id);
@@ -1461,6 +1518,11 @@ export default function BatchView() {
                           <div>
                             <h5 className="font-bold text-stone-900 text-xs">{stu.name}</h5>
                             <p className="text-[10.5px] font-semibold text-stone-400">{stu.email}</p>
+                            {stu.course && (
+                              <span className="text-[10px] text-[#9E0C25] font-bold block pt-0.5">
+                                📚 {stu.course}
+                              </span>
+                            )}
                           </div>
                         </div>
 

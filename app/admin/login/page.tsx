@@ -16,54 +16,73 @@ export default function AdminLoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem("kathak_admin_token");
-    const savedUserStr = localStorage.getItem("kathak_session_user");
-    if (token && savedUserStr) {
-      try {
-        const user = JSON.parse(savedUserStr);
-        const destination = getDefaultAccessibleRoute(user) || "/admin/class-management";
-        router.replace(destination);
-      } catch {
-        router.replace("/admin/dashboard");
-      }
-    }
-  }, [router]);
+  // useEffect(() => {
+  //   const token = localStorage.getItem("kathak_admin_token");
+  //   const savedUserStr = localStorage.getItem("kathak_session_user");
+  //   if (token && savedUserStr) {
+  //     try {
+  //       const user = JSON.parse(savedUserStr);
+  //       const destination = getDefaultAccessibleRoute(user) || "/admin/class-management";
+  //       router.replace(destination);
+  //     } catch {
+  //       router.replace("/admin/dashboard");
+  //     }
+  //   }
+  // }, [router]);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (isLoading) return;
+
     setIsLoading(true);
-    
+    setErrorMessage(null);
+
     try {
-      const res = await apiRequest(ENDPOINTS.AUTH_LOGIN, {
+      const res = await apiRequest<{
+        status: string;
+        message?: string;
+        data?: {
+          token?: string;
+          user?: {
+            id: string;
+            role: "ADMIN" | "TEACHER" | "STUDENT";
+            permissions: string[];
+            fullName?: string;
+            email?: string;
+          };
+        };
+      }>(ENDPOINTS.AUTH_LOGIN, {
         method: "POST",
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, rememberMe }),
       });
 
-      if (res.data?.token) {
-        localStorage.setItem("kathak_admin_token", res.data.token);
+      const user = res?.data?.user;
+
+      if (user || res?.status === "success") {
         let destination = "/admin/dashboard";
-        if (res.data.user) {
-          localStorage.setItem("kathak_session_user", JSON.stringify(res.data.user));
-          destination = getDefaultAccessibleRoute(res.data.user) || "/admin/class-management";
+
+        if (user) {
+          localStorage.setItem(
+            "kathak_session_user",
+            JSON.stringify(user)
+          );
+
+          destination =
+            getDefaultAccessibleRoute(user) ||
+            "/admin/dashboard";
         }
-        localStorage.setItem(
-          "kathak_admin_token_expiry",
-          (Date.now() + 7 * 24 * 60 * 60 * 1000).toString()
-        );
-        document.cookie = `kathak_admin_token=${res.data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        router.push(destination);
+
+        router.replace(destination);
       } else {
-        alert(res.message || "Login failed. Invalid response from server.");
+        setErrorMessage(res?.message || "Invalid credentials or unauthorized access.");
       }
-    }catch (err: unknown) {
-  console.error("Login failed:", err);
-  const message =
-    err instanceof Error
-      ? err.message
-      : "Login failed. Please check your credentials.";
-  alert(message);
-} finally {
+    } catch (err: any) {
+      console.error("Admin Login Error:", err);
+      setErrorMessage(err?.message || "Invalid email or password. Please try again.");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -114,6 +133,13 @@ export default function AdminLoginPage() {
               VERIFY CREDENTIALS TO PROCEED
             </p>
           </div>
+
+          {errorMessage && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-2 animate-in fade-in">
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">

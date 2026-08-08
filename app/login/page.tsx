@@ -29,7 +29,7 @@ export default function CombinedLoginPage() {
         const res = await apiRequest<{
           status: string;
           message?: string;
-          data?: { token: string; user?: Record<string, unknown> };
+          data?: { token?: string; user?: Record<string, unknown> };
         }>("/student/login", {
           method: "POST",
           body: JSON.stringify({
@@ -39,21 +39,22 @@ export default function CombinedLoginPage() {
           })
         });
 
-        if (res.data?.token) {
-          localStorage.setItem("kathak_student_token", res.data.token);
-          localStorage.setItem("kathak_token", res.data.token);
-          if (res.data.user) {
-            localStorage.setItem("kathak_student_user", JSON.stringify(res.data.user));
+        const user = res?.data?.user;
+
+        if (user || res?.status === "success") {
+          if (user) {
+            localStorage.setItem("kathak_student_user", JSON.stringify(user));
+            localStorage.setItem("kathak_session_user", JSON.stringify(user));
           }
-          router.push("/student/dashboard");
+          router.replace("/student/dashboard");
         } else {
-          setError(res.message || "Invalid student credentials. Please check your email/phone and password.");
+          setError(res?.message || "Invalid student credentials. Please check your email/phone and password.");
         }
       } else {
         const res = await apiRequest<{
           status: string;
           message?: string;
-          data?: { token: string; user?: Record<string, unknown> };
+          data?: { token?: string; user?: Record<string, unknown> };
         }>("/auth/login", {
           method: "POST",
           body: JSON.stringify({
@@ -63,17 +64,17 @@ export default function CombinedLoginPage() {
           })
         });
 
-        if (res.data?.token) {
-          localStorage.setItem("kathak_teacher_token", res.data.token);
-          localStorage.setItem("kathak_admin_token", res.data.token);
-          localStorage.setItem("kathak_token", res.data.token);
-          if (res.data.user) {
-            localStorage.setItem("kathak_admin_user", JSON.stringify(res.data.user));
-            localStorage.setItem("kathak_teacher_user", JSON.stringify(res.data.user));
+        const user = res?.data?.user;
+
+        if (user || res?.status === "success") {
+          if (user) {
+            localStorage.setItem("kathak_admin_user", JSON.stringify(user));
+            localStorage.setItem("kathak_teacher_user", JSON.stringify(user));
+            localStorage.setItem("kathak_session_user", JSON.stringify(user));
           }
-          router.push("/teacher/dashboard");
+          router.replace("/teacher/dashboard");
         } else {
-          setError(res.message || "Invalid teacher credentials. Please check your teacher ID/email and password.");
+          setError(res?.message || "Invalid teacher credentials. Please check your teacher ID/email and password.");
         }
       }
     } catch (err: unknown) {
