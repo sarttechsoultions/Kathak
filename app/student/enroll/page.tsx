@@ -34,7 +34,7 @@ import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 const fontJakarta = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 const fontInter = { fontFamily: "'Inter', sans-serif" };
 
-// Returns today's date as yyyy-mm-dd
+// Returns today's date as yyyy-mm-dd (Used for auto-capturing joining date)
 const getTodayDateString = () => {
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -104,7 +104,6 @@ export default function StudentEnrollPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
 
-  // DYNAMIC COURSES FROM DATABASE
   type BatchOption = {
     id: string;
     name: string;
@@ -171,21 +170,16 @@ export default function StudentEnrollPage() {
 
   // STEP 2 FIELDS
   const [courseId, setCourseId] = useState("");
-  const [skillLevel, setSkillLevel] = useState("Beginner (Prathama)");
   const [batchId, setBatchId] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
   const [isUnder18, setIsUnder18] = useState(false);
   const [guardianName, setGuardianName] = useState("");
   const [relationship, setRelationship] = useState("Mother");
   const [emergencyContact, setEmergencyContact] = useState("");
 
-
-
   // STEP 3 FIELDS
   const [paymentMethod, setPaymentMethod] = useState<"upi" | "card">("upi");
   const [isSubmitted, setIsSubmitted] = useState(false);
-
-  // Load states when country changes
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Fetch dynamic courses & batches from PostgreSQL DB on mount
   useEffect(() => {
@@ -193,27 +187,14 @@ export default function StudentEnrollPage() {
       try {
         const res = await apiRequest<{
           data?: {
-            courses?: Array<{
-              id: string;
-              title: string;
-              groupFeeINR?: number;
-              groupFeeUSD?: number;
-              level?: string;
-              feeINR?: number;
-              duration?: string;
-              videoUrl?: string;
-              batches?: BatchOption[];
-            }>;
+            courses?: Course[];
           };
         }>(ENDPOINTS.PUBLIC_COURSES);
+        
         if (res.data?.courses && res.data.courses.length > 0) {
           setDbCourses(res.data.courses);
           const firstCourse = res.data.courses[0];
           setCourseId(firstCourse.id);
-          const firstBatch = firstCourse.batches?.[0];
-          if (firstBatch) {
-            setBatchId(firstBatch.id);
-          }
         }
       } catch (err: unknown) {
         console.error("Failed to fetch dynamic courses:", err);
@@ -222,7 +203,69 @@ export default function StudentEnrollPage() {
     fetchCourses();
   }, []);
 
-  // Screen Recording & Screenshot Protection for Video Modal
+  const selectedCourseObj = useMemo(
+    () => dbCourses.find((c) => c.id === courseId) || dbCourses[0] || null,
+    [courseId, dbCourses]
+  );
+
+  // Filter batches based on 10-days rule, Upcoming status, AND STRICT COURSE MATCH
+  const availableBatches = useMemo(() => {
+    if (!selectedCourseObj?.batches) return [];
+    
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return selectedCourseObj.batches.filter((batch) => {
+      if (batch.courseId && batch.courseId !== selectedCourseObj.id) {
+        return false;
+      }
+
+      if (!batch.schedule || !batch.schedule.includes("|")) return true;
+      
+      const parts = batch.schedule.split("|");
+      const startDateStr = parts[2];
+      const endDateStr = parts[3];
+
+      if (endDateStr) {
+        const endDate = new Date(endDateStr);
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < now) return false; 
+      }
+
+      if (startDateStr) {
+        const startDate = new Date(startDateStr);
+        startDate.setHours(0, 0, 0, 0);
+
+        if (startDate > now) return true; 
+
+        const diffTime = now.getTime() - startDate.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        return diffDays <= 10;
+      }
+
+      return true;
+    });
+  }, [selectedCourseObj]);
+
+  // Auto-select first available batch when course changes
+  useEffect(() => {
+    const autoSelectBatch = async () => {
+      await Promise.resolve();
+      if (availableBatches.length > 0) {
+        setBatchId(availableBatches[0].id);
+      } else {
+        setBatchId("");
+      }
+    };
+    autoSelectBatch();
+  }, [availableBatches]);
+
+  const selectedBatch = useMemo(
+    () => availableBatches.find((item) => item.id === batchId) || availableBatches[0] || null,
+    [batchId, availableBatches]
+  );
+
+  // Screen Recording & Screenshot Protection
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showVideoModal) {
@@ -249,64 +292,47 @@ export default function StudentEnrollPage() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showVideoModal]);
 
-  const selectedCourseObj = useMemo(
-    () => dbCourses.find((c) => c.id === courseId) || dbCourses[0] || null,
-    [courseId, dbCourses]
-  );
 
-  const selectedBatch = useMemo(
-    () =>
-      selectedCourseObj?.batches?.find((item) => item.id === batchId) ||
-      selectedCourseObj?.batches?.[0] ||
-      null,
-    [batchId, selectedCourseObj]
-  );
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-
-
-const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Image size should be less than 2MB");
-    return;
-  }
-
-  setIsUploadingImage(true);
-
-  try {
-    const formData = new FormData();
-    formData.append("image", file);
-
-    // ✅ fallback — undefined mat hone do
-    const base =
-      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-      "http://localhost:5000/api/v1";
-
-    const res = await fetch(`${base}/upload/image/public`, {
-      method: "POST",
-      body: formData,
-      // Authorization mat bhejo — public route
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || data.status === "error") {
-      throw new Error(data.message || "Failed to upload image");
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size should be less than 2MB");
+      return;
     }
 
-    setProfileImage(data.data?.url || data.data?.secure_url);
-  } catch (err: unknown) {
-    console.error(err);
-    const message = err instanceof Error ? err.message : "Image upload failed";
-    alert(message);
-    setProfileImage(null);
-  } finally {
-    setIsUploadingImage(false);
-  }
-};
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const base =
+        process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+        "http://localhost:5000/api/v1";
+
+      const res = await fetch(`${base}/upload/image/public`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.message || "Failed to upload image");
+      }
+
+      setProfileImage(data.data?.url || data.data?.secure_url);
+    } catch (err: unknown) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : "Image upload failed";
+      alert(message);
+      setProfileImage(null);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +394,7 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     }
 
     if (currentStep === 2) {
-      if (selectedCourseObj?.batches?.length && !batchId) {
+      if (availableBatches.length > 0 && !batchId) {
         alert("Please select a batch assignment for this course.");
         return;
       }
@@ -388,12 +414,12 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const handleCompleteEnrollment = async () => {
     setIsSubmitted(true);
     try {
-const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
-  method: "POST",
-  body: JSON.stringify({
-    fullName,
-    email,
-    phone,
+      const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
+        method: "POST",
+        body: JSON.stringify({
+          fullName,
+          email,
+          phone,
           country: selectedCountry?.name || "India",
           countryCode: selectedCountry
             ? `+${selectedCountry.phonecode}`
@@ -410,8 +436,7 @@ const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
           courseId: selectedCourseObj?.id,
           batchId,
           batch: selectedBatch?.name || "",
-          skillLevel,
-          joiningDate,
+          joiningDate: getTodayDateString(), // 🔥 Auto-captured Joining Date
           isUnder18,
           guardianName,
           relationship,
@@ -423,16 +448,16 @@ const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
       });
 
       const token = res?.data?.token;
-const user = res?.data?.user;
+      const user = res?.data?.user;
 
-if (token) {
-  localStorage.setItem("kathak_student_token", token); 
-  localStorage.setItem("kathak_token", token);         
-}
+      if (token) {
+        localStorage.setItem("kathak_student_token", token);
+        localStorage.setItem("kathak_token", token);
+      }
 
-if (user) {
-  localStorage.setItem("kathak_student_user", JSON.stringify(user));
-}
+      if (user) {
+        localStorage.setItem("kathak_student_user", JSON.stringify(user));
+      }
 
       await openThemeSuccess(
         `Congratulations ${fullName}! Your enrollment for "${selectedCourseObj?.title || "your selected course"}" is complete. Redirecting to your Student Portal...`,
@@ -449,7 +474,7 @@ if (user) {
 
   return (
     <div className="min-h-screen relative bg-white text-stone-900 flex flex-col justify-between selection:bg-[#C10F3A] selection:text-white overflow-x-hidden">
-      {/* Background Image Layer with Translucent Vignette */}
+      {/* Background Image Layer */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -460,9 +485,7 @@ if (user) {
         <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/30 to-white/50" />
       </div>
 
-      {/* Main Container */}
       <div className="relative z-10 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-1 flex flex-col justify-center">
-        {/* Back to Login — only on Step 1 */}
         {currentStep === 1 && (
           <Link
             href="/login"
@@ -473,7 +496,6 @@ if (user) {
           </Link>
         )}
 
-        {/* Top Header Title & Subtitle */}
         <div className="mb-8 text-left space-y-1">
           <h1
             className="font-bold text-2xl tracking-tight text-[#C10F3A]"
@@ -489,7 +511,6 @@ if (user) {
           </p>
         </div>
 
-        {/* STEPPER PROGRESS INDICATOR */}
         <div className="mb-10 max-w-2xl mx-auto w-full px-4">
           <div className="relative flex items-center justify-between">
             <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-stone-300 z-0" />
@@ -505,7 +526,6 @@ if (user) {
               }}
             />
 
-            {/* STEP 1 */}
             <div className="relative z-10 flex flex-col items-center gap-2">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all shadow-sm ${
@@ -526,7 +546,6 @@ if (user) {
               </span>
             </div>
 
-            {/* STEP 2 */}
             <div className="relative z-10 flex flex-col items-center gap-2">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
@@ -547,7 +566,6 @@ if (user) {
               </span>
             </div>
 
-            {/* STEP 3 */}
             <div className="relative z-10 flex flex-col items-center gap-2">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
@@ -570,10 +588,9 @@ if (user) {
           </div>
         </div>
 
-        {/* ======================= STEP 1 ======================= */}
+        {/* STEP 1 */}
         {currentStep === 1 && (
           <form onSubmit={handleNext} className="space-y-6 max-w-4xl mx-auto w-full">
-            {/* CARD 1: PERSONAL INFORMATION */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
               <div
                 className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
@@ -584,50 +601,48 @@ if (user) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start pt-2">
-                {/* Photo Upload */}
                 <div className="md:col-span-4 flex flex-col items-center">
                  <div className="relative w-full max-w-[180px] aspect-square rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/40 hover:bg-sky-50/80 transition-colors flex flex-col items-center justify-center p-4 text-center group cursor-pointer overflow-hidden">
-  <input
-    type="file"
-    accept="image/*"
-    onChange={handleImageUpload}
-    disabled={isUploadingImage}
-    className="absolute inset-0 opacity-0 cursor-pointer z-20"
-  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={isUploadingImage}
+                    className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                  />
 
-  {isUploadingImage ? (
-    <div className="flex flex-col items-center justify-center gap-2">
-      <div className="w-8 h-8 border-2 border-[#C10F3A] border-t-transparent rounded-full animate-spin" />
-      <span className="text-[11px] text-stone-500">Uploading...</span>
-    </div>
-  ) : profileImage ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={profileImage}
-      alt="Profile"
-      className="w-full h-full object-cover rounded-lg"
-    />
-  ) : (
-    <>
-      <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 mb-2 group-hover:scale-110 transition-transform">
-        <Upload className="w-5 h-5" />
-      </div>
-      <span className="text-[11px] font-medium text-stone-500 leading-tight">
-        Upload high-res JPG or PNG
-      </span>
-    </>
-  )}
+                  {isUploadingImage ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-8 h-8 border-2 border-[#C10F3A] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[11px] text-stone-500">Uploading...</span>
+                    </div>
+                  ) : profileImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profileImage}
+                      alt="Profile"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-500 mb-2 group-hover:scale-110 transition-transform">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-medium text-stone-500 leading-tight">
+                        Upload high-res JPG or PNG
+                      </span>
+                    </>
+                  )}
 
-  <div className="absolute bottom-2 right-2 z-10 bg-[#C10F3A] text-white p-1 rounded-md shadow-xs">
-    <Lock className="w-3 h-3" />
-  </div>
-</div>
+                  <div className="absolute bottom-2 right-2 z-10 bg-[#C10F3A] text-white p-1 rounded-md shadow-xs">
+                    <Lock className="w-3 h-3" />
+                  </div>
+                </div>
                   <span className="text-[10px] text-stone-400 mt-2">
                     Profile Photo
                   </span>
                 </div>
 
-                {/* Form Inputs */}
                 <div className="md:col-span-8 space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
@@ -700,7 +715,6 @@ if (user) {
               </div>
             </div>
 
-            {/* CARD 2: CONTACT DETAILS */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
               <div
                 className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
@@ -711,7 +725,6 @@ if (user) {
               </div>
 
               <div className="space-y-4 pt-2">
-                {/* Email + Phone */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
@@ -764,9 +777,7 @@ if (user) {
                   </div>
                 </div>
 
-                {/* Country / State / City */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Country */}
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                       Country
@@ -793,7 +804,6 @@ if (user) {
                     </div>
                   </div>
 
-                  {/* State */}
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                       State / Region
@@ -826,7 +836,6 @@ if (user) {
                     )}
                   </div>
 
-                  {/* City */}
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                       City
@@ -860,7 +869,6 @@ if (user) {
                   </div>
                 </div>
 
-                {/* Street Address + Postal Code */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
@@ -903,7 +911,6 @@ if (user) {
               </div>
             </div>
 
-            {/* CARD 3: ACCOUNT SECURITY */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
               <div
                 className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
@@ -984,7 +991,6 @@ if (user) {
               </div>
             </div>
 
-            {/* ACTION BUTTON */}
             <div className="flex items-center justify-end pt-2">
               <button
                 type="submit"
@@ -997,10 +1003,9 @@ if (user) {
           </form>
         )}
 
-        {/* ======================= STEP 2 ======================= */}
+        {/* STEP 2 */}
         {currentStep === 2 && (
           <form onSubmit={handleNext} className="space-y-6 max-w-4xl mx-auto w-full">
-            {/* CARD 1: ENROLLMENT DETAILS */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
               <div
                 className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
@@ -1011,20 +1016,14 @@ if (user) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                {/* Dynamic Course Selection */}
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    Course Selection (100% Dynamic from Database)
+                    Course Selection
                   </label>
                   <div className="relative">
                     <select
                       value={courseId}
-                      onChange={(e) => {
-                        const newCourseId = e.target.value;
-                        setCourseId(newCourseId);
-                        const newSelected = dbCourses.find((c) => c.id === newCourseId);
-                        setBatchId(newSelected?.batches?.[0]?.id || "");
-                      }}
+                      onChange={(e) => setCourseId(e.target.value)}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs font-bold text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
                     >
                       {dbCourses.length > 0 ? (
@@ -1041,7 +1040,6 @@ if (user) {
                   </div>
                 </div>
 
-                {/* Selected Course Banner */}
                 {selectedCourseObj && (
                   <div className="sm:col-span-2 p-4 rounded-2xl bg-[#FDF2F4] border border-rose-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -1085,31 +1083,7 @@ if (user) {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    Skill Level
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={skillLevel}
-                      onChange={(e) => setSkillLevel(e.target.value)}
-                      className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
-                    >
-                      <option value="Beginner (Prathama)">
-                        Beginner (Prathama)
-                      </option>
-                      <option value="Intermediate (Praveshika)">
-                        Intermediate (Praveshika)
-                      </option>
-                      <option value="Advanced (Madhyama)">
-                        Advanced (Madhyama)
-                      </option>
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-stone-700 mb-1.5">
                     Batch Assignment
                   </label>
@@ -1119,16 +1093,16 @@ if (user) {
                       onChange={(e) => setBatchId(e.target.value)}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none appearance-none cursor-pointer shadow-2xs"
                     >
-                      {selectedCourseObj?.batches && selectedCourseObj.batches.length > 0 ? (
-                        selectedCourseObj.batches.map((batchOption) => (
+                      {availableBatches.length > 0 ? (
+                        availableBatches.map((batchOption) => (
                           <option key={batchOption.id} value={batchOption.id}>
                             {batchOption.name}
-                            {batchOption.schedule ? ` • ${batchOption.schedule}` : ""}
+                            {batchOption.schedule ? ` • ${batchOption.schedule.split('|').slice(0,2).join(' ')}` : ""}
                           </option>
                         ))
                       ) : (
                         <option value="" disabled>
-                          No batch options available for this course
+                          No active or upcoming batches available
                         </option>
                       )}
                     </select>
@@ -1136,23 +1110,9 @@ if (user) {
                   </div>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                    Joining Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    min={getTodayDateString()}
-                    value={joiningDate}
-                    onChange={(e) => setJoiningDate(e.target.value)}
-                    className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs cursor-pointer"
-                  />
-                </div>
               </div>
             </div>
 
-            {/* CARD 2: PARENT / GUARDIAN INFO */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
               <div
                 className="inline-flex items-center gap-2 bg-[#FDF2F4] text-[#C10F3A] px-3.5 py-1.5 rounded-full text-lg font-semibold tracking-wide"
@@ -1221,7 +1181,6 @@ if (user) {
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div className="flex items-center justify-between pt-2">
               <button
                 type="button"
@@ -1243,7 +1202,7 @@ if (user) {
           </form>
         )}
 
-        {/* ======================= STEP 3 ======================= */}
+        {/* STEP 3 */}
         {currentStep === 3 && (
           <div className="space-y-6 max-w-4xl mx-auto w-full">
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-sm border border-white/40 space-y-6 relative">
@@ -1255,7 +1214,6 @@ if (user) {
                 <span>Payment Setup</span>
               </div>
 
-              {/* ENROLLMENT SUMMARY */}
               <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
                 <h4 className="font-bold text-sm text-stone-900">
                   Enrollment Summary
@@ -1286,7 +1244,6 @@ if (user) {
                 </div>
               </div>
 
-              {/* PAYMENT METHOD */}
               <div className="space-y-3">
                 <label className="block text-xs font-semibold text-stone-700">
                   Select Payment Method
@@ -1352,7 +1309,6 @@ if (user) {
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             <div className="flex items-center justify-between pt-2">
               <button
                 type="button"
@@ -1381,7 +1337,6 @@ if (user) {
         )}
       </div>
 
-      {/* PROMOTIONAL VIDEO MODAL */}
       {showVideoModal && selectedCourseObj?.videoUrl && (
         <div className="fixed inset-0 z-[999999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div
@@ -1460,7 +1415,6 @@ if (user) {
         </div>
       )}
 
-      {/* Page Footer */}
       <footer className="relative z-10 text-center py-4 text-stone-500 text-xs">
         © {new Date().getFullYear()} Kathak by Harshita. All rights reserved.
       </footer>

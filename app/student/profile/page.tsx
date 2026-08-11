@@ -41,8 +41,12 @@ interface StudentProfile {
   level?: string;
   guru?: string;
   father?: string;
+  schedule?: string;
   mother?: string;
   emergencyContact?: string;
+  city?: string;
+  region?: string; 
+  postalCode?: string;
 }
 
 interface FinanceTransaction {
@@ -100,7 +104,6 @@ interface DashboardData {
   };
 }
 
-
 const formatDob = (dob: string | Date | null | undefined) => {
   if (!dob) return null;
   return new Date(dob).toLocaleDateString("en-IN", {
@@ -128,12 +131,16 @@ export default function StudentProfilePage() {
   const [bgSrc, setBgSrc] = useState("/student/background.png");
   const [avatarSrc, setAvatarSrc] = useState<string>("/Ananya.png");
 
+  // 🔥 FIX: Added address, father, and emergencyContact to editForm
   const [editForm, setEditForm] = useState({
     fullName: "",
     phone: "",
     country: "",
     avatarUrl: "",
     gender: "",
+    address: "",
+    father: "",
+    emergencyContact: "",
   });
 
   const [emailNotifs, setEmailNotifs] = useState(true);
@@ -153,113 +160,118 @@ export default function StudentProfilePage() {
   // ─────────────────────────────────────────────
   // Fetch data
   // ─────────────────────────────────────────────
-const fetchAll = useCallback(async () => {
-  setLoading(true);
-  setError(null);
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  try {
-    const [profileRes, financeRes, assignmentRes, examRes, dashboardRes] =
-      await Promise.all([
-        apiRequest("/student/profile"),
-        apiRequest("/student/finance").catch(() => null),
-        apiRequest("/student/assignments").catch(() => ({ assignments: [] })),
-        apiRequest("/student/exams").catch(() => ({ exams: [] })),
-        apiRequest("/student/dashboard").catch(() => null),
-      ]);
+    try {
+      const [profileRes, financeRes, assignmentRes, examRes, dashboardRes] =
+        await Promise.all([
+          apiRequest("/student/profile"),
+          apiRequest("/student/finance").catch(() => null),
+          apiRequest("/student/assignments").catch(() => ({ assignments: [] })),
+          apiRequest("/student/exams").catch(() => ({ exams: [] })),
+          apiRequest("/student/dashboard").catch(() => null),
+        ]);
 
-    // DOB format karo
-    const data = profileRes?.data ?? null;
-    if (data) {
-      data.dob = formatDob(data.dob);
+      const data = profileRes?.data ?? null;
+      if (data) {
+        data.dob = formatDob(data.dob);
+      }
+
+      setProfile(data);
+      setFinance(financeRes?.data ?? null);
+      setAssignments(assignmentRes?.data?.assignments || []);
+      setExams(examRes?.data?.exams || []);
+      setDashboard(dashboardRes?.data ?? null);
+
+      if (data?.avatarUrl) {
+        setAvatarSrc(data.avatarUrl);
+      } else {
+        setAvatarSrc("/Ananya.png");
+      }
+
+      // 🔥 FIX: Initialize new fields
+      setEditForm({
+        fullName: data?.fullName || "",
+        phone: data?.phone || "",
+        country: data?.country || "",
+        avatarUrl: data?.avatarUrl || "",
+        gender: data?.gender || "",
+        address: data?.address || "",
+        father: data?.father || "",
+        emergencyContact: data?.emergencyContact || "",
+      });
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load profile";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    setProfile(data);
-    setFinance(financeRes?.data ?? null);
-    setAssignments(assignmentRes?.data?.assignments || []);
-    setExams(examRes?.data?.exams || []);
-    setDashboard(dashboardRes?.data ?? null);
-
-    if (data?.avatarUrl) {
-      setAvatarSrc(data.avatarUrl);
-    } else {
-      setAvatarSrc("/Ananya.png");
-    }
-
-    setEditForm({
-      fullName: data?.fullName || "",
-      phone: data?.phone || "",
-      country: data?.country || "",
-      avatarUrl: data?.avatarUrl || "",
-      gender: data?.gender || "",
-    });
-  } catch (err) {
-    const errorMessage =
-      err instanceof Error ? err.message : "Failed to load profile";
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
     const initialize = async () => {
       await fetchAll();
     };
-
     void initialize();
   }, [fetchAll]);
 
   // ─────────────────────────────────────────────
   // Handlers
   // ─────────────────────────────────────────────
-const handleSaveProfile = async () => {
-  if (!profile) return;
-  setSaving(true);
-  try {
-    const updated = await apiRequest("/student/profile", {
-      method: "PUT",
-      body: JSON.stringify({
-        fullName: editForm.fullName.trim(),
-        phone: editForm.phone.trim(),
-        country: editForm.country.trim(),
-        avatarUrl: editForm.avatarUrl || null,
-        gender: editForm.gender || null,
-      }),
-    });
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+    setSaving(true);
+    try {
+      // 🔥 FIX: Sending newly added fields to backend
+      const updated = await apiRequest("/student/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          fullName: editForm.fullName.trim(),
+          phone: editForm.phone.trim(),
+          country: editForm.country.trim(),
+          avatarUrl: editForm.avatarUrl || null,
+          gender: editForm.gender || null,
+          address: editForm.address.trim() || null,
+          guardianName: editForm.father.trim() || null, 
+          emergencyContact: editForm.emergencyContact.trim() || null,
+        }),
+      });
 
-    setProfile((prev) => {
-      if (!prev) return updated.data;
+      setProfile((prev) => {
+        if (!prev) return updated.data;
 
-      return {
-        ...prev,
-        ...updated.data,
-        // Format dob
-        dob: formatDob(updated.data?.dob) || prev.dob,
-        batch: updated.data?.batch ?? prev.batch,
-        guru: updated.data?.guru ?? prev.guru,
-        level: updated.data?.level ?? updated.data?.skillLevel ?? prev.level,
-        father: updated.data?.father ?? prev.father,
-        mother: updated.data?.mother ?? prev.mother,
-        emergencyContact:
-          updated.data?.emergencyContact ?? prev.emergencyContact,
-        gender: updated.data?.gender ?? editForm.gender ?? prev.gender,
-      };
-    });
+        return {
+          ...prev,
+          ...updated.data,
+          dob: formatDob(updated.data?.dob) || prev.dob,
+          batch: updated.data?.batch ?? prev.batch,
+          guru: updated.data?.guru ?? prev.guru,
+          level: updated.data?.level ?? updated.data?.skillLevel ?? prev.level,
+          father: updated.data?.father ?? editForm.father ?? prev.father,
+          mother: updated.data?.mother ?? prev.mother,
+          emergencyContact: updated.data?.emergencyContact ?? editForm.emergencyContact ?? prev.emergencyContact,
+          address: updated.data?.address ?? editForm.address ?? prev.address,
+          gender: updated.data?.gender ?? editForm.gender ?? prev.gender,
+        };
+      });
 
-    if (updated.data?.avatarUrl) {
-      setAvatarSrc(updated.data.avatarUrl);
+      if (updated.data?.avatarUrl) {
+        setAvatarSrc(updated.data.avatarUrl);
+      }
+
+      setIsEditing(false);
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 2500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(message || "Failed to update profile");
+    } finally {
+      setSaving(false);
     }
-
-    setIsEditing(false);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2500);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    alert(message || "Failed to update profile");
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   const handleChangePassword = async () => {
     setPasswordError("");
@@ -292,66 +304,62 @@ const handleSaveProfile = async () => {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be less than 5MB");
+      return;
+    }
 
-  if (!file.type.startsWith("image/")) {
-    alert("Please select an image file");
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    alert("Image must be less than 5MB");
-    return;
-  }
+    setUploadingAvatar(true);
 
-  setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file); 
 
-  try {
-    const formData = new FormData();
-    formData.append("image", file); // backend expects "image"
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/upload/image`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include", 
+        }
+      );
 
-    // Direct fetch – Content-Type mat set karo
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}/upload/image`,
-      {
-        method: "POST",
-        body: formData,
-        credentials: "include", // cookie auth ke liye
-        // Authorization header agar Bearer token use karte ho to yahan add karo
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Upload failed");
       }
-    );
 
-    const data = await res.json();
+      const imageUrl =
+        data?.data?.url ||
+        data?.data?.secure_url ||
+        data?.url ||
+        data?.data;
 
-    if (!res.ok) {
-      throw new Error(data?.message || "Upload failed");
+      if (imageUrl && typeof imageUrl === "string") {
+        setAvatarSrc(imageUrl);
+        setEditForm((prev) => ({
+          ...prev,
+          avatarUrl: imageUrl,
+        }));
+      } else {
+        throw new Error("No image URL returned from server");
+      }
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      alert(err instanceof Error ? err.message : "Failed to upload image");
+    } finally {
+      setUploadingAvatar(false);
     }
-
-    // Response structure ke hisaab se URL nikaalo
-    const imageUrl =
-      data?.data?.url ||
-      data?.data?.secure_url ||
-      data?.url ||
-      data?.data;
-
-    if (imageUrl && typeof imageUrl === "string") {
-      setAvatarSrc(imageUrl);
-      setEditForm((prev) => ({
-        ...prev,
-        avatarUrl: imageUrl,
-      }));
-    } else {
-      throw new Error("No image URL returned from server");
-    }
-  } catch (err) {
-    console.error("Avatar upload failed:", err);
-    alert(err instanceof Error ? err.message : "Failed to upload image");
-  } finally {
-    setUploadingAvatar(false);
-  }
-};
+  };
 
   // ─────────────────────────────────────────────
   // Derived values
@@ -432,42 +440,41 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         <div className="px-6 sm:px-8 pb-6 pt-0 relative flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-12 sm:-mt-14 relative z-10 text-center sm:text-left">
            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-4 border-white bg-stone-100 shadow-md overflow-hidden shrink-0 relative group">
-  {avatarSrc ? (
-    <Image
-      src={avatarSrc}
-      alt={profile.fullName}
-      width={112}
-      height={112}
-      style={{ objectFit: "cover" }}
-      className="w-full h-full"
-      onError={() => {
-        if (avatarSrc !== "/Ananya.png") setAvatarSrc("/Ananya.png");
-        else setAvatarSrc("");
-      }}
-    />
-  ) : null}
+              {avatarSrc ? (
+                <Image
+                  src={avatarSrc}
+                  alt={profile.fullName}
+                  width={112}
+                  height={112}
+                  style={{ objectFit: "cover" }}
+                  className="w-full h-full"
+                  onError={() => {
+                    if (avatarSrc !== "/Ananya.png") setAvatarSrc("/Ananya.png");
+                    else setAvatarSrc("");
+                  }}
+                />
+              ) : null}
 
-  {/* Edit mode mein camera overlay dikhao */}
-  {isEditing && (
-    <label className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-      {uploadingAvatar ? (
-        <Loader2 className="w-6 h-6 text-white animate-spin" />
-      ) : (
-        <div className="text-white text-center">
-          <Edit className="w-5 h-5 mx-auto mb-0.5" />
-          <span className="text-[10px] font-semibold">Change</span>
-        </div>
-      )}
-      <input
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleAvatarChange}
-        disabled={uploadingAvatar}
-      />
-    </label>
-  )}
-</div>
+              {isEditing && (
+                <label className="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                  {uploadingAvatar ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <div className="text-white text-center">
+                      <Edit className="w-5 h-5 mx-auto mb-0.5" />
+                      <span className="text-[10px] font-semibold">Change</span>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                    disabled={uploadingAvatar}
+                  />
+                </label>
+              )}
+            </div>
 
             <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-[#1B1B24]">
@@ -544,28 +551,28 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
               </div>
 
               <div>
-  <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
-    GENDER
-  </span>
-  {isEditing ? (
-    <select
-      value={editForm.gender}
-      onChange={(e) =>
-        setEditForm({ ...editForm, gender: e.target.value })
-      }
-      className="mt-1 w-full border border-stone-200 rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#900C27]/30 bg-white"
-    >
-      <option value="">Select Gender</option>
-      <option value="Male">Male</option>
-      <option value="Female">Female</option>
-      <option value="Other">Other</option>
-    </select>
-  ) : (
-    <span className="font-semibold text-[#1B1B24] text-[14px]">
-      {profile.gender ?? "—"}
-    </span>
-  )}
-</div>
+                <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
+                  GENDER
+                </span>
+                {isEditing ? (
+                  <select
+                    value={editForm.gender}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, gender: e.target.value })
+                    }
+                    className="mt-1 w-full border border-stone-200 rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#900C27]/30 bg-white"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                ) : (
+                  <span className="font-semibold text-[#1B1B24] text-[14px]">
+                    {profile.gender ?? "—"}
+                  </span>
+                )}
+              </div>
 
               <div>
                 <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
@@ -623,9 +630,32 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
                   RESIDENTIAL ADDRESS
                 </span>
+                {isEditing ? (
+                  <textarea
+                    value={editForm.address}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, address: e.target.value })
+                    }
+                    rows={2}
+                    className="mt-1 w-full border border-stone-200 rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#900C27]/30 resize-none"
+                  />
+                ) : (
                 <span className="font-semibold text-[#1B1B24] leading-relaxed block text-[14px]">
-                  {profile.address ?? "—"}
-                </span>
+  {profile.address ? (
+    <>
+      {profile.address}
+      {profile.city && `, ${profile.city}`}
+      {profile.region && `, ${profile.region}`}
+      <br />
+      <span className="text-stone-500 text-xs mt-0.5 block">
+        {profile.country || "India"} {profile.postalCode && `- ${profile.postalCode}`}
+      </span>
+    </>
+  ) : (
+    "—"
+  )}
+</span>
+                )}
               </div>
             </div>
           </div>
@@ -653,12 +683,12 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   </span>
                 </div>
 
-                <div>
+               <div>
                   <span className="text-[12px] text-stone-400 font-bold uppercase tracking-wider block">
-                    CURRENT LEVEL
+                    CLASS SCHEDULE
                   </span>
-                  <span className="inline-flex items-center justify-center rounded-full bg-rose-50 text-[#900C27] px-3 py-1 text-[12px] font-bold">
-                    {profile.level ?? "—"}
+                  <span className="font-semibold text-[#1B1B24] text-[14px]">
+                    {profile.schedule ?? "Not Scheduled"}
                   </span>
                 </div>
 
@@ -677,15 +707,6 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   </span>
                   <span className="font-semibold text-[#1B1B24] text-[14px] flex items-center gap-2">
                     {profile.guru ?? "—"}
-                    {/* <span className="w-6 h-6 rounded-full border border-stone-200 overflow-hidden">
-                      <Image
-                        // src={profile.avatarUrl || "/Sunita.png"}/
-                        alt={profile.guru ?? "Guru"}
-                        width={24}
-                        height={24}
-                        className="object-cover"
-                      />
-                    </span> */}
                   </span>
                 </div>
               </div>
@@ -704,29 +725,40 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             <div className="grid grid-cols-1 gap-3 text-xs">
               <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
                 <span className="block text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                  FATHER
+                  FATHER / GUARDIAN
                 </span>
-                <span className="font-bold text-sm text-[#1B1B24] block mt-1">
-                  {profile.father ?? "—"}
-                </span>
+                {isEditing ? (
+                  <input
+                    value={editForm.father}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, father: e.target.value })
+                    }
+                    className="mt-1 w-full border border-stone-200 rounded-lg px-2 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#900C27]/30 bg-white"
+                  />
+                ) : (
+                  <span className="font-bold text-sm text-[#1B1B24] block mt-1">
+                    {profile.father ?? "—"}
+                  </span>
+                )}
               </div>
-
-              {/* <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                <span className="block text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                  MOTHER
-                </span>
-                <span className="font-bold text-sm text-[#1B1B24] block mt-1">
-                  {profile.mother ?? "—"}
-                </span>
-              </div> */}
 
               <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-100">
                 <span className="block text-[10px] text-[#900C27] font-bold uppercase tracking-wider">
                   EMERGENCY CONTACT
                 </span>
-                <span className="font-extrabold text-sm text-[#900C27] block mt-1">
-                  {profile.emergencyContact ?? "—"}
-                </span>
+                {isEditing ? (
+                  <input
+                    value={editForm.emergencyContact}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, emergencyContact: e.target.value })
+                    }
+                    className="mt-1 w-full border border-rose-200 rounded-lg px-2 py-1.5 text-sm font-semibold text-[#900C27] focus:outline-none focus:ring-2 focus:ring-[#900C27]/30 bg-white"
+                  />
+                ) : (
+                  <span className="font-extrabold text-sm text-[#900C27] block mt-1">
+                    {profile.emergencyContact ?? "—"}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -775,7 +807,7 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             </div>
           </div>
 
-          {/* Financial Summary */}
+        {/* Financial Summary  */}
           <div className="space-y-1">
             <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block">
               FINANCIAL SUMMARY
@@ -788,17 +820,27 @@ const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 </span>
               </div>
               <div className="text-right">
+                {/* Dynamic Status Badge */}
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded font-bold block ${
-                    (finance?.pendingAmount || 0) > 0
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-emerald-100 text-emerald-800"
+                  className={`text-[10px] px-2 py-0.5 rounded font-bold block uppercase tracking-wider ${
+                    (finance?.pendingAmount ?? 0) <= 0
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
                   }`}
                 >
-                  {(finance?.pendingAmount || 0) > 0 ? "Pending" : "Cleared"}
+                  {(finance?.pendingAmount ?? 0) <= 0 ? "Cleared" : "Pending"}
                 </span>
-                <span className="text-lg font-bold text-[#900C27]">
-                  ₹{(finance?.pendingAmount || 0).toLocaleString("en-IN")}
+
+                {/* Dynamic Paid / Pending Amount */}
+                <span
+                  className={`text-lg font-bold ${
+                    (finance?.pendingAmount ?? 0) <= 0 ? "text-emerald-600" : "text-[#900C27]"
+                  }`}
+                >
+                  ₹{((finance?.pendingAmount ?? 0) <= 0 
+                    ? (finance?.paidAmount || finance?.totalFee || 0) 
+                    : (finance?.pendingAmount || 0)
+                  ).toLocaleString("en-IN")}
                 </span>
               </div>
             </div>

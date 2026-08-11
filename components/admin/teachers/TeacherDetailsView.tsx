@@ -121,7 +121,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
       </div>
 
       {/* 3 Metric Cards for this Teacher */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
@@ -154,7 +154,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs flex items-center justify-between">
+        {/* <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
               ACTIVE PERMISSIONS
@@ -169,7 +169,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
             <ShieldCheck className="w-6 h-6" />
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* 2-Column Info Grid */}
@@ -191,7 +191,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                   FULL NAME
                 </span>
                 <span className="font-bold text-stone-900 text-sm mt-0.5 block">
-                  {teacher.name}
+                  {teacher.name || "—"}
                 </span>
               </div>
 
@@ -200,7 +200,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                   NATIONALITY
                 </span>
                 <span className="font-bold text-stone-900 text-sm mt-0.5 block">
-                  {teacher.nationality || "Indian"}
+                  {teacher.nationality || "—"}
                 </span>
               </div>
 
@@ -218,7 +218,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                   LANGUAGES KNOWN
                 </span>
                 <span className="font-bold text-stone-900 text-sm mt-0.5 block">
-                  {teacher.languagesKnown || "Hindi, English"}
+                  {teacher.languagesKnown || "—"}
                 </span>
               </div>
             </div>
@@ -240,7 +240,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                     EMAIL ADDRESS
                   </span>
                   <span className="font-bold text-stone-900 break-all mt-0.5 block">
-                    {teacher.email}
+                    {teacher.email || "—"}
                   </span>
                 </div>
 
@@ -259,7 +259,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                   RESIDENTIAL ADDRESS
                 </span>
                 <span className="font-bold text-stone-900 mt-0.5 block">
-                  {teacher.address || "Academy Faculty Quarters / Jaipur"}
+                  {teacher.address || "—"}
                 </span>
               </div>
 
@@ -345,7 +345,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
           </div>
 
           {/* Granular Permissions Summary */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
+          {/* <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
             <div className="flex items-center gap-2 text-[#9E0C25] pb-3 border-b border-stone-100">
               <ShieldCheck className="w-4 h-4" />
               <h3 className="font-sans font-bold text-xs uppercase tracking-wider">
@@ -367,7 +367,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                 <span className="text-stone-400 text-xs font-normal">Standard Faculty Permissions</span>
               )}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

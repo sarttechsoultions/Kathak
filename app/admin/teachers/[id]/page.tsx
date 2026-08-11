@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 import { openThemeConfirm, openThemeSuccess } from "@/components/ThemeDialogProvider";
+
+// Make sure ye paths aapke project structure se exactly match karein
 import { TeacherDetailsView } from "@/components/admin/teachers/TeacherDetailsView";
 import { TeacherRecord } from "@/components/admin/teachers/types";
 
@@ -15,52 +17,51 @@ export default function TeacherDetailsPage() {
   const [teacher, setTeacher] = useState<TeacherRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchTeacher = useCallback(async () => {
-    if (!teacherId) return;
+ useEffect(() => {
+  if (!teacherId) return;
+
+  const fetchTeacher = async () => {
     setIsLoading(true);
     try {
-      const res = await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}`);
-      // Find the teacher from the list (matching original logic)
-      const teachersList: TeacherRecord[] = res?.data?.teachers || [];
-      
-      let match = teachersList.find((t: any) => t.id === teacherId) as any;
-      
-      if (!match) {
-        // Try direct fetch if not found in list
-        const directRes = await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${teacherId}`);
-        match = directRes.data?.teacher || directRes.data;
-      }
+      const res = await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${teacherId}`);
+      const match = res.data?.teacher || res.data;
 
       if (match) {
-        // Map to TeacherRecord format
-        const mappedTeacher: TeacherRecord = {
-          id: match.id,
-          name: match.name || match.fullName,
-          title: match.designation || "Kathak Instructor",
-          email: match.email,
-          phone: match.phone,
-          emergency_contact: match.emergency_contact || match.emergencyContact || [],
-          id_proof: match.id_proof || match.idProofUrl || "",
-          qualifications: match.qualifications || [],
-          bank_details: match.bank_details || match.bankDetails || [],
-          avatar: match.avatar || match.avatarUrl || "/Ananya.png",
-          batches: match.assignedBatches || match.batches || ["Beginners Morning Zen"],
-          status: match.status === "Active" || match.isActive ? "Active" : "Disabled",
-          actionType: "Edit Profile",
-          category: "Kathak",
-          expertise: match.designation || "Senior Instructor",
-          permissions: match.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"],
-          maritalStatus: match.maritalStatus || "",
-          nationality: match.nationality || "Indian",
-          languagesKnown: match.languagesKnown || "",
-          idProofType: match.idProofType || "",
-          address: match.address || "",
-          salaryRate: match.salaryRate || "₹ 0.00",
-          joiningDate: match.joiningDate || "",
-          createdAt: match.createdAt || "",
-        };
-        setTeacher(mappedTeacher);
-      } else {
+  const rawEmergencyContact = match.emergency_contact || match.emergencyContact;
+  const emergencyContactArray = !rawEmergencyContact
+    ? []
+    : Array.isArray(rawEmergencyContact)
+    ? rawEmergencyContact
+    : [rawEmergencyContact];
+
+  const mappedTeacher: TeacherRecord = {
+    id: match.id,
+    name: match.name || match.fullName,
+    title: match.designation || "Kathak Instructor",
+    email: match.email,
+    phone: match.phone,
+    emergency_contact: emergencyContactArray,
+    id_proof: match.id_proof || match.idProofUrl || "",
+    qualifications: match.qualifications || [],
+    bank_details: match.bank_details || match.bankDetails || [],
+    avatar: match.avatar || match.avatarUrl || "/Ananya.png",
+    batches: match.assignedBatches || match.batches || [],
+    status: match.status === "Active" || match.isActive ? "Active" : "Disabled",
+    actionType: "Edit Profile",
+    category: "Kathak",
+    expertise: match.designation || "Senior Instructor",
+    permissions: [],
+    maritalStatus: match.maritalStatus || "",
+    nationality: match.nationality || "Indian",
+    languagesKnown: match.languagesKnown || "",
+    idProofType: match.idProofType || "",
+    address: match.address || "",
+    salaryRate: match.salaryRate || "₹ 0.00",
+    joiningDate: match.joiningDate || "",
+    createdAt: match.createdAt || "",
+  };
+  setTeacher(mappedTeacher);
+} else {
         alert("Teacher not found.");
         router.push("/admin/teachers");
       }
@@ -71,11 +72,10 @@ export default function TeacherDetailsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [teacherId, router]);
+  };
 
-  useEffect(() => {
-    fetchTeacher();
-  }, [fetchTeacher]);
+  fetchTeacher();
+}, [teacherId, router]);
 
   const handleToggleStatus = async (id: string, name: string, currentStatus: string) => {
     const newStatus = currentStatus === "Active" ? "Disabled" : "Active";
@@ -84,13 +84,18 @@ export default function TeacherDetailsPage() {
         method: "PUT",
         body: JSON.stringify({ isActive: newStatus === "Active" }),
       });
+      
       await openThemeSuccess(
         `Teacher ${name} status updated to ${newStatus}!`,
         "Faculty Status Updated"
       );
-      await fetchTeacher();
-    } catch (err: any) {
-      alert(err.message || "Failed to update teacher status.");
+      
+      // Optimistic Update: Refresh UI immediately without another API call
+      setTeacher((prev) => (prev ? { ...prev, status: newStatus as "Active" | "Disabled" } : null));
+
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to update teacher status.";
+      alert(errorMsg);
     }
   };
 
@@ -100,14 +105,15 @@ export default function TeacherDetailsPage() {
         await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${id}`, { method: "DELETE" });
         await openThemeSuccess(`Teacher "${name}" deleted successfully from Database!`, "Teacher Deleted");
         router.push("/admin/teachers");
-      } catch (err: any) {
-        alert(err.message || "Failed to delete teacher account.");
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : "Failed to delete teacher account.";
+        alert(errorMsg);
       }
     }
   };
 
   if (isLoading || !teacher) {
-    return <div className="p-8 text-stone-500">Loading...</div>;
+    return <div className="p-8 text-stone-500 font-bold text-sm animate-pulse">Loading Details...</div>;
   }
 
   return (

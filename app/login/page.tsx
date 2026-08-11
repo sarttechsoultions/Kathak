@@ -42,6 +42,10 @@ export default function CombinedLoginPage() {
         const user = res?.data?.user;
 
         if (user || res?.status === "success") {
+          // 🔥 FIX: Clear old Teacher/Admin data completely
+          localStorage.removeItem("kathak_admin_user");
+          localStorage.removeItem("kathak_teacher_user");
+
           if (user) {
             localStorage.setItem("kathak_student_user", JSON.stringify(user));
             localStorage.setItem("kathak_session_user", JSON.stringify(user));
@@ -67,6 +71,9 @@ export default function CombinedLoginPage() {
         const user = res?.data?.user;
 
         if (user || res?.status === "success") {
+          // 🔥 FIX: Clear old Student data completely
+          localStorage.removeItem("kathak_student_user");
+
           if (user) {
             localStorage.setItem("kathak_admin_user", JSON.stringify(user));
             localStorage.setItem("kathak_teacher_user", JSON.stringify(user));

@@ -85,7 +85,10 @@ export const ENDPOINTS = {
   STUDENT_ENROLL: "/student/enroll",
   PUBLIC_COURSES: "/student/public/courses",
   INQUIRIES: "/inquiries",
+  ADMIN_COURSES: "/admin/courses",
+  ADMIN_COURSE_BY_ID: "/admin/courses/:id",
   COURSES: "/courses",
+  COURSE_BY_ID: "/courses/:id",
   AUTH_ME: "/auth/me",
   AUTH_CHANGE_PASSWORD: "/auth/change-password",
   AUTH_PROFILE: "/auth/profile",
@@ -93,4 +96,6 @@ export const ENDPOINTS = {
   UPLOAD_IMAGE: "/upload/image",
   UPLOAD_VIDEO: "/upload/video",
   UPLOAD_FILE: "/upload/file",
+  ADMIN_RECORDED_CLASSES: "/admin/recorded-classes",
+  STUDENT_RECORDED_CLASSES: "/student/recorded-classes",
 };

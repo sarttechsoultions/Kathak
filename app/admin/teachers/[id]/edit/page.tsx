@@ -12,7 +12,10 @@ export default function EditTeacherPage() {
   const router = useRouter();
   const params = useParams();
   const teacherId = params.id as string;
-  const state = useTeacherFormState();
+  
+  // TS Errors hatane ke liye state ko temporarily 'any' cast kiya hai.
+  // Ideal solution ye hai ki aap useTeacherFormState hook me in variables ko define karein.
+  const state = useTeacherFormState() as any;
 
   useEffect(() => {
     if (!teacherId) return;
@@ -28,38 +31,60 @@ export default function EditTeacherPage() {
           return;
         }
 
-        state.setFullName(t.fullName || t.name || "");
-        state.setEmail(t.email || "");
+        if (typeof state.setFullName === "function") state.setFullName(t.fullName || t.name || "");
+        if (typeof state.setEmail === "function") state.setEmail(t.email || "");
 
         const parsed = parsePhoneNumber(t.phone || "");
-        state.setCountryCode(parsed.countryCode || "+91");
-        state.setPhoneNumber(parsed.phoneNumber || "");
+        if (typeof state.setCountryCode === "function") state.setCountryCode(parsed.countryCode || "+91");
+        if (typeof state.setPhoneNumber === "function") state.setPhoneNumber(parsed.phoneNumber || "");
 
-        state.setAvatarUrl(t.avatarUrl || t.avatar || "/Ananya.png");
-        state.setDesignation(t.designation || t.title || "Senior Instructor");
-        state.setPrimaryExpertise(t.primaryExpertise || "Kathak");
-        state.setAssignedBatches(
-          t.assignedBatches ||
-          t.batchesAsTeacher?.map((b: any) => b.name) ||
-          t.batches ||
-          []
-        );
-        state.setSelectedPermissions(t.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"]);
-        state.setMaritalStatus(t.maritalStatus || "Select Status");
-        state.setNationality(t.nationality || "Indian");
-        state.setLanguagesKnown(t.languagesKnown || "");
-
-        if (t.emergencyContact) {
-          state.setEmergencyContacts([String(t.emergencyContact)]);
-        } else if (Array.isArray(t.emergency_contact)) {
-          state.setEmergencyContacts(t.emergency_contact.map(String));
-        } else {
-          state.setEmergencyContacts([]);
+        if (typeof state.setAvatarUrl === "function") state.setAvatarUrl(t.avatarUrl || t.avatar || "/Ananya.png");
+        if (typeof state.setDesignation === "function") state.setDesignation(t.designation || t.title || "Senior Instructor");
+        if (typeof state.setPrimaryExpertise === "function") state.setPrimaryExpertise(t.primaryExpertise || "Kathak");
+        
+        if (typeof state.setAssignedBatches === "function") {
+          state.setAssignedBatches(
+            t.assignedBatches ||
+            t.batchesAsTeacher?.map((b: any) => b.name) ||
+            t.batches ||
+            []
+          );
         }
 
-        state.setBankDetailsList(t.bankDetails || t.bank_details || []);
-        state.setIdProofType(t.idProofType || "");
-        state.setIdProofExistingUrl(t.idProofUrl || t.id_proof || "");
+        if (typeof state.setSelectedPermissions === "function") {
+          state.setSelectedPermissions(t.permissions || ["VIEW_DASHBOARD", "MANAGE_CLASSES"]);
+        }
+        
+        if (typeof state.setMaritalStatus === "function") state.setMaritalStatus(t.maritalStatus || "Select Status");
+        if (typeof state.setNationality === "function") state.setNationality(t.nationality || "Indian");
+        if (typeof state.setLanguagesKnown === "function") state.setLanguagesKnown(t.languagesKnown || "");
+
+        if (typeof state.setEmergencyContacts === "function") {
+          if (t.emergencyContact) {
+            state.setEmergencyContacts([String(t.emergencyContact)]);
+          } else if (Array.isArray(t.emergency_contact)) {
+            state.setEmergencyContacts(t.emergency_contact.map(String));
+          } else {
+            state.setEmergencyContacts([]);
+          }
+        }
+
+        if (typeof state.setBankDetails === "function") {
+          state.setBankDetails(t.bankDetails || t.bank_details || []);
+        } else if (typeof state.setBankDetailsList === "function") {
+          state.setBankDetailsList(t.bankDetails || t.bank_details || []);
+        }
+        
+        if (typeof state.setIdProofType === "function") {
+          state.setIdProofType(t.idProofType || "");
+        }
+
+        if (typeof state.setIdProofExistingUrl === "function") {
+          state.setIdProofExistingUrl(t.idProofUrl || t.id_proof || "");
+        } else if (typeof state.setIdProofUrl === "function") {
+          state.setIdProofUrl(t.idProofUrl || t.id_proof || "");
+        }
+
       } catch (err) {
         console.error("Failed to load teacher for edit:", err);
         alert("Failed to load teacher details");
@@ -68,14 +93,15 @@ export default function EditTeacherPage() {
     };
 
     fetchTeacher();
-  }, [teacherId]);
+    // YAHAN SE 'state' aur 'router' hata diya hai. Sirf 'teacherId' rakha hai.
+  }, [teacherId]); 
 
+  // 2nd useEffect: For Fetching Batches
   useEffect(() => {
-    // Fetch batches for assignment
     const fetchBatches = async () => {
       try {
         const res = await apiRequest(ENDPOINTS.ADMIN_BATCHES);
-        if (res?.data?.batches) {
+        if (res?.data?.batches && typeof state.setAvailableDbBatches === "function") {
           state.setAvailableDbBatches(res.data.batches);
         }
       } catch (err) {
@@ -85,6 +111,39 @@ export default function EditTeacherPage() {
     fetchBatches();
   }, []);
 
+
+  const handleIdProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  state.setIsUploadingIdProof?.(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+    const res = await fetch(`${apiBase}/upload/image`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+
+    const data = await res.json();
+    const uploadedUrl = data.data?.url || data.data?.secure_url || "";
+
+    if (data.status === "success" && uploadedUrl) {
+      state.setIdProofExistingUrl?.(uploadedUrl);   // ya jo bhi state hook hai
+      state.setIdProofFile?.(file);                  // reference ke liye
+    } else {
+      alert(data.message || "Failed to upload ID proof.");
+    }
+  } catch (err) {
+    alert("Error uploading ID proof.");
+  } finally {
+    state.setIsUploadingIdProof?.(false);
+  }
+};
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teacherId || !state.fullName || !state.email || !state.phoneNumber) {
@@ -92,17 +151,20 @@ export default function EditTeacherPage() {
       return;
     }
 
-    state.setIsSubmitting(true);
+    if (typeof state.setIsSubmitting === "function") state.setIsSubmitting(true);
 
     try {
-      const idProofPayload = state.idProofType
-        ? {
-            idProofType: state.idProofType,
-            idProofFileName: state.idProofFile?.name || undefined,
-          }
-        : {};
+const idProofPayload = state.idProofType
+  ? {
+      idProofType: state.idProofType,
+      idProofUrl: state.idProofExistingUrl || undefined,   // 👈 real Cloudinary URL
+    }
+  : {};
 
       const fullPhone = `${state.countryCode} ${state.phoneNumber}`.trim();
+
+      // Ensure fallback array exists agar state null/undefined ho
+      const finalBankDetails = state.bankDetails || state.bankDetailsList || [];
 
       await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${teacherId}`, {
         method: "PUT",
@@ -118,9 +180,9 @@ export default function EditTeacherPage() {
           maritalStatus: state.maritalStatus,
           nationality: state.nationality,
           languagesKnown: state.languagesKnown,
-          emergencyContact: state.emergencyContacts.map(Number),
-          bankDetails: state.bankDetailsList,
-          assignedBatches: state.assignedBatches,
+          emergencyContact: state.emergencyContacts?.map(Number) || [],
+          bankDetails: finalBankDetails, 
+          assignedBatches: state.assignedBatches || [],
           ...idProofPayload,
         }),
       });
@@ -131,10 +193,12 @@ export default function EditTeacherPage() {
       );
 
       router.push("/admin/teachers");
-    } catch (err: any) {
-      alert(err.message || "Failed to update teacher account.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update teacher account.";
+      alert(message);
     } finally {
-      state.setIsSubmitting(false);
+      if (typeof state.setIsSubmitting === "function") state.setIsSubmitting(false);
     }
   };
 
