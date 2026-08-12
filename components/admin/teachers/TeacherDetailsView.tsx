@@ -20,7 +20,7 @@ import {
 import { TeacherRecord, renderTeacherAvatar } from "./types";
 
 interface TeacherDetailsViewProps {
-  teacher: TeacherRecord;
+  teacher: TeacherRecord & { dob?: string; gender?: string };
   onBack: () => void;
   onEdit: (teacher: TeacherRecord) => void;
   onDelete: (id: string, name: string) => Promise<void>;
@@ -99,7 +99,7 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
               )}
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                Joined: {teacher.joiningDate || (teacher.createdAt ? new Date(teacher.createdAt).toLocaleDateString() : "Active")}
+                Joined: {teacher.joiningDate ? teacher.joiningDate.split('T')[0] : (teacher.createdAt ? new Date(teacher.createdAt).toLocaleDateString() : "Active")}
               </span>
             </div>
           </div>
@@ -215,6 +215,15 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
 
               <div>
                 <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block">
+                  DOB / GENDER
+                </span>
+                <span className="font-bold text-stone-900 text-sm mt-0.5 block">
+                  {teacher.dob ? teacher.dob.split("T")[0] : "—"} / {teacher.gender || "—"}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block">
                   LANGUAGES KNOWN
                 </span>
                 <span className="font-bold text-stone-900 text-sm mt-0.5 block">
@@ -290,8 +299,22 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
                 <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block mb-1.5">
                   BANK DETAILS
                 </span>
-                <div className="space-y-1">
-                  {teacher.bank_details && teacher.bank_details.length > 0 ? (
+                <div className="space-y-2">
+                  {teacher.bankAccounts && teacher.bankAccounts.length > 0 ? (
+                    teacher.bankAccounts.map((b, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-stone-50 border border-stone-200 text-stone-800 text-xs flex flex-col gap-1 relative"
+                      >
+                        <span className="font-extrabold text-[#9E0C25] text-sm">{b.bankName}</span>
+                        <div className="grid grid-cols-2 gap-x-2 gap-y-1 font-semibold text-stone-700 mt-1">
+                          <span>A/C: <span className="font-bold">{b.accountNumber}</span></span>
+                          <span>IFSC: <span className="font-bold">{b.ifsc}</span></span>
+                          <span className="col-span-2">Holder: <span className="font-bold">{b.accountHolderName || "N/A"}</span></span>
+                        </div>
+                      </div>
+                    ))
+                  ) : teacher.bank_details && teacher.bank_details.length > 0 ? (
                     teacher.bank_details.map((b, idx) => (
                       <div
                         key={idx}
@@ -368,6 +391,66 @@ export const TeacherDetailsView: React.FC<TeacherDetailsViewProps> = ({
               )}
             </div>
           </div> */}
+          {/* Professional Details & Documents */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/80 shadow-xs space-y-5">
+            <div className="flex items-center gap-2 text-[#9E0C25] pb-3 border-b border-stone-100">
+              <FileText className="w-4 h-4" />
+              <h3 className="font-sans font-bold text-xs uppercase tracking-wider">
+                Professional Details &amp; Documents
+              </h3>
+            </div>
+
+            <div className="space-y-4 text-xs font-semibold">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block">
+                    SALARY RATE
+                  </span>
+                  <span className="font-bold text-stone-900 mt-0.5 block">
+                    {teacher.salaryRate || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block">
+                    ID PROOF TYPE
+                  </span>
+                  <span className="font-bold text-stone-900 mt-0.5 block">
+                    {teacher.idProofType || "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] text-stone-400 font-bold uppercase tracking-wider block mb-1.5">
+                  DOCUMENTS
+                </span>
+                <div className="space-y-2">
+                  {teacher.documents && teacher.documents.length > 0 ? (
+                    teacher.documents.map((doc, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl border border-stone-200 bg-stone-50 text-xs">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center shrink-0 text-stone-400">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col truncate">
+                            <span className="font-bold text-stone-900 truncate">{doc.title}</span>
+                            <span className="text-[10px] text-stone-500 font-medium uppercase tracking-wider">{doc.type}</span>
+                          </div>
+                        </div>
+                        {doc.url && (
+                          <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#9E0C25] hover:underline">
+                            View
+                          </a>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-stone-400 font-normal">No documents uploaded.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

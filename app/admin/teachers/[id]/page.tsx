@@ -34,7 +34,7 @@ export default function TeacherDetailsPage() {
     ? rawEmergencyContact
     : [rawEmergencyContact];
 
-  const mappedTeacher: TeacherRecord = {
+  const mappedTeacher: TeacherRecord & { dob?: string; gender?: string } = {
     id: match.id,
     name: match.name || match.fullName,
     title: match.designation || "Kathak Instructor",
@@ -44,12 +44,14 @@ export default function TeacherDetailsPage() {
     id_proof: match.id_proof || match.idProofUrl || "",
     qualifications: match.qualifications || [],
     bank_details: match.bank_details || match.bankDetails || [],
+    bankAccounts: match.bankAccounts || [],
+    documents: match.documents || [],
     avatar: match.avatar || match.avatarUrl || "/Ananya.png",
     batches: match.assignedBatches || match.batches || [],
     status: match.status === "Active" || match.isActive ? "Active" : "Disabled",
     actionType: "Edit Profile",
     category: "Kathak",
-    expertise: match.designation || "Senior Instructor",
+    expertise: match.designation || match.primaryExpertise || "Senior Instructor",
     permissions: [],
     maritalStatus: match.maritalStatus || "",
     nationality: match.nationality || "Indian",
@@ -59,6 +61,8 @@ export default function TeacherDetailsPage() {
     salaryRate: match.salaryRate || "₹ 0.00",
     joiningDate: match.joiningDate || "",
     createdAt: match.createdAt || "",
+    dob: match.dob || "",
+    gender: match.gender || "",
   };
   setTeacher(mappedTeacher);
 } else {

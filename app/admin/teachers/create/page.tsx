@@ -36,35 +36,13 @@ export default function CreateTeacherPage() {
     state.setIsSubmitting(true);
 
     try {
-      const uploadToCloudinary = async (file: File) => {
-        const formData = new FormData();
-        formData.append("image", file);
-        const token = localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token");
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
-        const res = await fetch(`${apiBase}/upload/image`, {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        });
-        const data = await res.json();
-        return data.data?.url || data.data?.secure_url || data.data?.directUrl || "";
-      };
+      const finalAvatarUrl = state.avatarUrl;
 
-      let finalAvatarUrl = state.avatarUrl;
-      if (state.avatarFile) {
-        const uploadedUrl = await uploadToCloudinary(state.avatarFile);
-        if (uploadedUrl) finalAvatarUrl = uploadedUrl;
-      }
-
-      const finalDocuments = await Promise.all(
-        state.documents.map(async (doc) => {
-          if (doc.file) {
-            const uploadedUrl = await uploadToCloudinary(doc.file);
-            return { title: doc.title, type: doc.type, url: uploadedUrl || doc.url };
-          }
-          return { title: doc.title, type: doc.type, url: doc.url };
-        })
-      );
+      const finalDocuments = state.documents.map((doc) => ({
+        title: doc.title,
+        type: doc.type,
+        url: doc.url
+      }));
 
       const fullPhone = `${state.countryCode} ${state.phoneNumber}`.trim();
 
@@ -88,6 +66,13 @@ export default function CreateTeacherPage() {
           bankAccounts: state.bankAccounts,
           assignedBatches: state.assignedBatches,
           documents: finalDocuments,
+          dob: state.dob,
+          gender: state.gender,
+          address: state.address,
+          joiningDate: state.joiningDate,
+          salaryRate: state.salaryRate,
+          designation: state.designation,
+          primaryExpertise: state.primaryExpertise,
         }),
       });
 

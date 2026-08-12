@@ -98,4 +98,5 @@ export const ENDPOINTS = {
   UPLOAD_FILE: "/upload/file",
   ADMIN_RECORDED_CLASSES: "/admin/recorded-classes",
   STUDENT_RECORDED_CLASSES: "/student/recorded-classes",
+  
 };

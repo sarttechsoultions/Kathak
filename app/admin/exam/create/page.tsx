@@ -1,0 +1,762 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+    Plus,
+    ArrowLeft,
+    Clock,
+    ChevronDown,
+    Info,
+    Settings,
+    Image as ImageIcon,
+    Video as VideoIcon,
+    Trash2,
+    AlignLeft,
+    Edit,
+    Check
+} from "lucide-react";
+import { apiRequest } from "@/lib/api";
+
+interface BatchItem {
+    id: string;
+    name: string;
+    courseId?: string;
+    courseTitle?: string;
+}
+
+interface QuestionOption {
+    id: string;
+    text: string;
+    isCorrect: boolean;
+}
+
+interface QuestionItem {
+    id: string;
+    questionText: string;
+    questionType: "Multiple Choice" | "Long Text";
+    marks: number;
+    options: QuestionOption[];
+    mediaType?: "image" | "video" | null;
+    mediaUrl?: string | null;
+}
+
+interface CourseItem {
+    id: string;
+    title: string;
+}
+const COMMON_TIMEZONES = [
+    { label: "India Standard Time (IST, UTC+5:30)", value: "Asia/Kolkata" },
+    { label: "Pacific Time (PT, UTC-8/-7)", value: "America/Los_Angeles" },
+    { label: "Eastern Time (ET, UTC-5/-4)", value: "America/New_York" },
+    { label: "Greenwich Mean Time (GMT, UTC+0)", value: "Europe/London" },
+    { label: "Central European Time (CET, UTC+1/+2)", value: "Europe/Paris" },
+    { label: "Gulf Standard Time (GST, UTC+4)", value: "Asia/Dubai" },
+    { label: "Singapore Time (SGT, UTC+8)", value: "Asia/Singapore" },
+    { label: "Japan Standard Time (JST, UTC+9)", value: "Asia/Tokyo" },
+    { label: "Australian Eastern Time (AET, UTC+10/+11)", value: "Australia/Sydney" },
+];
+
+function convertLocalTimeToUTC(dateStr: string, timeStr: string, timeZone: string): string {
+    // Combine date + time
+    const localDateTime = `${dateStr}T${timeStr}:00`;
+
+    // Create a formatter that can give us the correct offset
+    const dtf = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+
+    // Parse the parts of the date as if it were in the target timezone
+    const parts = dtf.formatToParts(new Date(localDateTime));
+    const values: Record<string, string> = {};
+    parts.forEach(({ type, value }) => {
+        if (type !== "literal") values[type] = value;
+    });
+
+    // Build an ISO string in the target timezone and convert to UTC
+    const asUTC = new Date(
+        Date.UTC(
+            Number(values.year),
+            Number(values.month) - 1,
+            Number(values.day),
+            Number(values.hour),
+            Number(values.minute),
+            Number(values.second)
+        )
+    );
+
+    // Now calculate the real offset of the timezone at that moment
+    const offsetFormatter = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        timeZoneName: "longOffset",
+    });
+
+    const offsetPart = offsetFormatter
+        .formatToParts(asUTC)
+        .find((p) => p.type === "timeZoneName")?.value;
+
+    // offsetPart looks like "GMT+5:30" or "GMT-4"
+    let offsetMinutes = 0;
+    if (offsetPart) {
+        const match = offsetPart.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+        if (match) {
+            const sign = match[1] === "+" ? 1 : -1;
+            const hours = parseInt(match[2], 10);
+            const mins = match[3] ? parseInt(match[3], 10) : 0;
+            offsetMinutes = sign * (hours * 60 + mins);
+        }
+    }
+
+    // Subtract the offset to get true UTC
+    return new Date(asUTC.getTime() - offsetMinutes * 60 * 1000).toISOString();
+}
+export default function CreateExamPage() {
+    const router = useRouter();
+
+    // Real Data States
+    const [batches, setBatches] = useState<BatchItem[]>([]);
+    const [courses, setCourses] = useState<CourseItem[]>([]);
+
+    // Form States
+    const [examTitle, setExamTitle] = useState("");
+    const [selectedCourseId, setSelectedCourseId] = useState("");
+    const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+    const [autoGrading, setAutoGrading] = useState(true);
+    const [randomizeQuestions, setRandomizeQuestions] = useState(false);
+    const [passingMark, setPassingMark] = useState("40");
+    const [examDate, setExamDate] = useState("");
+    const [startTime, setStartTime] = useState("");
+    const [durationMins, setDurationMins] = useState("120");
+    const [examTimezone, setExamTimezone] = useState("Asia/Kolkata"); // default IST
+
+    const [questions, setQuestions] = useState<QuestionItem[]>([
+        {
+            id: "q-1",
+            questionText: "",
+            questionType: "Multiple Choice",
+            marks: 5,
+            options: [
+                { id: "opt-1", text: "Option 1", isCorrect: false },
+                { id: "opt-2", text: "Option 2 (Correct Answer)", isCorrect: true },
+                { id: "opt-3", text: "Option 3", isCorrect: false }
+            ]
+        }
+    ]);
+
+    const totalMarks = questions.reduce((acc, q) => acc + (q.marks || 0), 0);
+
+    // Fetch Data from Backend
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [batchesRes, coursesRes] = await Promise.all([
+                    apiRequest("/admin/batches"),
+                    apiRequest("/admin/courses").catch(() => apiRequest("/courses"))
+                ]);
+
+                if (batchesRes?.data?.batches) {
+                    setBatches(batchesRes.data.batches.map((b: { id: string; name?: string; code?: string; courseId?: string; course?: { id: string; title?: string }; courseName?: string }) => ({
+                        id: b.id,
+                        name: b.name || b.code,
+                        courseId: b.courseId || b.course?.id,
+                        courseTitle: b.course?.title || b.courseName
+                    })));
+                }
+
+                const courseList = coursesRes?.data?.courses || coursesRes?.data || [];
+                if (Array.isArray(courseList)) {
+                    setCourses(courseList.map((c: { id: string; title?: string; name?: string }) => ({
+                        id: c.id,
+                        title: c.title || c.name || "Untitled Course"
+                    })));
+                }
+            } catch (err) {
+                console.error("Failed to load initial data:", err);
+            }
+        };
+
+        void loadData();
+    }, []);
+
+    // Filter Batches based on Selected Course
+    const availableBatches = React.useMemo(() => {
+        if (!selectedCourseId) return [];
+        return batches.filter(b => b.courseId === selectedCourseId);
+    }, [batches, selectedCourseId]);
+
+    const handleCourseChange = (courseId: string) => {
+        setSelectedCourseId(courseId);
+        setSelectedBatchIds([]); // Course change hone par batches reset kar do
+    };
+
+    const toggleBatchSelection = (batchId: string) => {
+        setSelectedBatchIds(prev =>
+            prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
+        );
+    };
+
+    // Question Handlers
+    const handleAddQuestion = () => {
+        setQuestions([
+            ...questions,
+            {
+                id: `q-${Date.now()}`,
+                questionText: "",
+                questionType: "Multiple Choice",
+                marks: 5,
+                options: [
+                    { id: `opt-${Date.now()}-1`, text: "Option 1", isCorrect: false },
+                    { id: `opt-${Date.now()}-2`, text: "Option 2 (Correct Answer)", isCorrect: true },
+                    { id: `opt-${Date.now()}-3`, text: "Option 3", isCorrect: false }
+                ]
+            }
+        ]);
+    };
+
+    const updateQuestionText = (index: number, text: string) => {
+        const updated = [...questions];
+        updated[index].questionText = text;
+        setQuestions(updated);
+    };
+
+    const updateQuestionType = (index: number, type: "Multiple Choice" | "Long Text") => {
+        const updated = [...questions];
+        updated[index].questionType = type;
+        setQuestions(updated);
+    };
+
+    const updateQuestionMarks = (index: number, marksVal: string) => {
+        const val = parseInt(marksVal, 10);
+        const updated = [...questions];
+        updated[index].marks = isNaN(val) ? 1 : Math.max(1, Math.min(100, val));
+        setQuestions(updated);
+    };
+
+    const updateOptionText = (qIndex: number, optIndex: number, text: string) => {
+        const updated = [...questions];
+        updated[qIndex].options[optIndex].text = text;
+        setQuestions(updated);
+    };
+
+    const setCorrectOption = (qIndex: number, optIndex: number) => {
+        const updated = [...questions];
+        updated[qIndex].options.forEach((opt, i) => {
+            opt.isCorrect = i === optIndex;
+        });
+        setQuestions(updated);
+    };
+
+    const handleAddOption = (qIndex: number) => {
+        const updated = [...questions];
+        const count = updated[qIndex].options.length + 1;
+        updated[qIndex].options.push({
+            id: `opt-${Date.now()}-${count}`,
+            text: `Option ${count}`,
+            isCorrect: false
+        });
+        setQuestions(updated);
+    };
+
+    const handleDeleteOption = (qIndex: number, optIndex: number) => {
+        const updated = [...questions];
+        if (updated[qIndex].options.length <= 2) {
+            alert("Multiple Choice questions require at least 2 options.");
+            return;
+        }
+        const wasCorrect = updated[qIndex].options[optIndex].isCorrect;
+        updated[qIndex].options = updated[qIndex].options.filter((_, i) => i !== optIndex);
+        if (wasCorrect && updated[qIndex].options.length > 0) {
+            updated[qIndex].options[0].isCorrect = true;
+        }
+        setQuestions(updated);
+    };
+
+    const handleUploadMedia = (qIndex: number, type: "image" | "video") => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = type === "image" ? "image/*" : "video/*";
+        input.onchange = (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            const file = target.files?.[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const result = event.target?.result as string;
+                    const updated = [...questions];
+                    updated[qIndex].mediaType = type;
+                    updated[qIndex].mediaUrl = result;
+                    setQuestions(updated);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        input.click();
+    };
+
+    const handleDeleteQuestion = (qIndex: number) => {
+        if (questions.length <= 1) {
+            alert("An exam must contain at least 1 question.");
+            return;
+        }
+        setQuestions(questions.filter((_, i) => i !== qIndex));
+    };
+
+    const validateExamForm = (): string | null => {
+        if (!examTitle.trim()) return "Exam Title is required.";
+        if (!selectedCourseId) return "Please select a Course.";
+        if (selectedBatchIds.length === 0) return "Please select at least one Batch.";
+        if (!examDate.trim()) return "Exam Date is required.";
+        if (!startTime.trim()) return "Start Time is required.";
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            if (!q.questionText.trim()) return `Please enter Question Text for Question ${i + 1}.`;
+
+            if (q.questionType === "Multiple Choice") {
+                if (q.options.length < 2) return `Question ${i + 1} must have at least 2 options.`;
+                const hasCorrect = q.options.some((opt) => opt.isCorrect);
+                if (!hasCorrect) return `Please select a correct answer for Question ${i + 1}.`;
+                for (let j = 0; j < q.options.length; j++) {
+                    if (!q.options[j].text.trim()) return `Option ${j + 1} text for Question ${i + 1} cannot be empty.`;
+                }
+            }
+        }
+        return null;
+    };
+
+    const saveExamData = async (targetStatus: "SCHEDULED" | "DRAFT") => {
+        const err = validateExamForm();
+        if (err) {
+            alert(err);
+            return;
+        }
+
+        const localDateTime = new Date(`${examDate}T${startTime}:00`);
+        const finalDateStr = localDateTime.toISOString();
+
+        try {
+            await apiRequest("/admin/exams", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: examTitle.trim(),
+                    examCode: `EX-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+                    courseId: selectedCourseId || undefined,
+                    batchId: selectedBatchIds.length > 0 ? selectedBatchIds[0] : undefined, 
+                    date: finalDateStr, // 👈 YAHAN UPDATE KIYA HAI
+                    durationMins: parseInt(durationMins, 10),
+                    passingMarks: parseInt(passingMark, 10) || 40,
+                    totalMarks: totalMarks,
+                    autoGrading,
+                    randomizeQuestions,
+                    questions,
+                    status: targetStatus
+                }),
+            });
+
+            alert(`Exam "${examTitle}" ${targetStatus === "DRAFT" ? "saved as Draft" : "published"} successfully!`);
+            router.push("/admin/exam");
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "Failed to save exam.";
+            alert(message);
+        }
+    };
+
+    return (
+        <div className="font-sans text-[#0B1C30]">
+            <div className="space-y-6 animate-in fade-in duration-300 max-w-[1250px]">
+
+                {/* Header Row */}
+                <div className="flex items-center gap-4 mb-6">
+                    <button
+                        onClick={() => router.push("/admin/exam")}
+                        className="w-10 h-10 flex items-center justify-center rounded-full border border-stone-200 hover:bg-stone-50 transition-colors cursor-pointer shrink-0"
+                    >
+                        <ArrowLeft className="w-5 h-5 text-[#0B1C30]" />
+                    </button>
+                    <div>
+                        <h1 className="font-sans font-bold text-2xl text-[#0B1C30] tracking-tight">Schedule New Exam</h1>
+                        <p className="text-sm text-stone-500">Configure questions, marking and select target batches.</p>
+                    </div>
+                </div>
+
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        saveExamData("SCHEDULED");
+                    }}
+                    className="flex flex-col lg:flex-row items-start gap-6"
+                >
+
+                    {/* LEFT COLUMN FORM CARDS */}
+                    <div className="flex-1 w-full space-y-6">
+
+                        {/* CARD 1: Basic Information & Target Batches */}
+                        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/60 shadow-sm space-y-6">
+                            <div className="flex items-center gap-2">
+                                <Info className="w-5 h-5 text-[#9E0C25]" />
+                                <h3 className="font-sans font-bold text-lg text-[#0B1C30]">Basic Information</h3>
+                            </div>
+
+                            <div className="space-y-5">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-bold text-[#0B1C30]">Exam Title</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Mid-term Assessment: Advanced Quantum Mechanics"
+                                        value={examTitle}
+                                        onChange={(e) => setExamTitle(e.target.value)}
+                                        className="w-full h-12 px-4 rounded-lg bg-white border border-stone-200 text-sm text-[#0B1C30] placeholder:text-stone-400 focus:outline-none focus:border-[#0B1C30]"
+                                    />
+                                </div>
+
+                                <div className="space-y-4 pt-2">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-bold text-[#0B1C30]">Target Course</label>
+                                        <div className="relative">
+                                            <select
+                                                value={selectedCourseId}
+                                                onChange={(e) => handleCourseChange(e.target.value)}
+                                                className="w-full h-12 pl-4 pr-10 rounded-lg bg-white border border-stone-200 text-sm text-stone-600 appearance-none cursor-pointer focus:outline-none focus:border-[#0B1C30]"
+                                            >
+                                                <option value="">Select Course first...</option>
+                                                {courses.map((c) => (
+                                                    <option key={c.id} value={c.id}>
+                                                        {c.title}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="w-5 h-5 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* Multi-Select Batches UI */}
+                                    {selectedCourseId && (
+                                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                            <label className="block text-xs font-bold text-[#0B1C30]">Target Batches (Select Multiple)</label>
+                                            {availableBatches.length > 0 ? (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {availableBatches.map((b) => {
+                                                        const isSelected = selectedBatchIds.includes(b.id);
+                                                        return (
+                                                            <button
+                                                                key={b.id}
+                                                                type="button"
+                                                                onClick={() => toggleBatchSelection(b.id)}
+                                                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${isSelected
+                                                                        ? "bg-rose-50 border-[#9E0C25] text-[#9E0C25]"
+                                                                        : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                                                                    }`}
+                                                            >
+                                                                {isSelected && <Check className="w-3.5 h-3.5" />}
+                                                                {b.name}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-rose-500 font-bold bg-rose-50 p-3 rounded-lg border border-rose-100">
+                                                    No batches found for this course. Please create a batch first.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CARD 2: Exam Settings */}
+                        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/60 shadow-sm space-y-6">
+                            <div className="flex items-center gap-2">
+                                <Settings className="w-5 h-5 text-[#9E0C25]" />
+                                <h3 className="font-sans font-bold text-lg text-[#0B1C30]">Exam Settings</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+                                <div className="flex items-start gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAutoGrading(!autoGrading)}
+                                        className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-0.5 ${autoGrading ? "bg-[#9E0C25]" : "bg-stone-200"
+                                            }`}
+                                    >
+                                        <span className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${autoGrading ? "right-0.5" : "left-0.5"}`} />
+                                    </button>
+                                    <div>
+                                        <span className="block text-sm font-bold text-[#0B1C30]">Auto-grading</span>
+                                        <span className="block text-xs text-stone-500 mt-0.5 leading-snug">Enable instant feedback for objective questions.</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setRandomizeQuestions(!randomizeQuestions)}
+                                        className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 mt-0.5 ${randomizeQuestions ? "bg-[#9E0C25]" : "bg-stone-200"
+                                            }`}
+                                    >
+                                        <span className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${randomizeQuestions ? "right-0.5" : "left-0.5"}`} />
+                                    </button>
+                                    <div>
+                                        <span className="block text-sm font-bold text-[#0B1C30]">Randomize Questions</span>
+                                        <span className="block text-xs text-stone-500 mt-0.5 leading-snug">Shuffle question order for each individual student.</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-[#0B1C30] mb-2">Passing Score (%)</label>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-1.5 bg-stone-100 rounded-full relative overflow-hidden">
+                                            <div className="absolute left-0 top-0 bottom-0 bg-blue-100 w-[40%] rounded-full" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={`${passingMark}%`}
+                                            onChange={(e) => setPassingMark(e.target.value.replace(/\D/g, ''))}
+                                            className="w-16 text-right font-bold text-sm text-[#0B1C30] focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CARD 3: Question Builder */}
+                        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/60 shadow-sm space-y-6 border-t-4 border-t-blue-500">
+                            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                                <div className="flex items-center gap-2">
+                                    <Edit className="w-5 h-5 text-[#9E0C25]" />
+                                    <h3 className="font-sans font-bold text-lg text-[#0B1C30]">Question Builder</h3>
+                                </div>
+                                <span className="text-sm font-bold text-[#9E0C25] bg-rose-50 px-3 py-1 rounded-full">Total Marks: {totalMarks}</span>
+                            </div>
+
+                            {questions.map((q, qIndex) => (
+                                <div key={q.id} className="pt-2">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-[#9E0C25] text-white flex items-center justify-center font-bold text-sm">
+                                                {qIndex + 1}
+                                            </div>
+                                            <span className="text-xs font-bold text-[#0B1C30] uppercase tracking-wider">ACTIVE QUESTION</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteQuestion(qIndex)}
+                                            className="text-stone-400 hover:text-stone-800 cursor-pointer"
+                                        >
+                                            <Trash2 className="w-5 h-5" />
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                        <div className="lg:col-span-8 space-y-6">
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-bold text-[#0B1C30]">Question Text</label>
+                                                <textarea
+                                                    rows={4}
+                                                    placeholder="Enter the question prompt here..."
+                                                    value={q.questionText}
+                                                    onChange={(e) => updateQuestionText(qIndex, e.target.value)}
+                                                    className="w-full p-4 rounded-xl border border-stone-200 text-sm text-[#0B1C30] placeholder:text-stone-400 focus:outline-none focus:border-[#0B1C30] resize-none"
+                                                />
+                                            </div>
+
+                                            {/* Answer Options */}
+                                            {q.questionType === "Multiple Choice" && (
+                                                <div className="space-y-3 pt-2">
+                                                    <label className="block text-xs font-bold text-[#0B1C30]">Answer Choices</label>
+                                                    <div className="space-y-3">
+                                                        {q.options.map((opt, optIndex) => (
+                                                            <div key={opt.id || optIndex} className="flex items-center gap-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setCorrectOption(qIndex, optIndex)}
+                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${opt.isCorrect ? "border-[#9E0C25]" : "border-stone-300"
+                                                                        }`}
+                                                                >
+                                                                    {opt.isCorrect && <div className="w-2.5 h-2.5 rounded-full bg-[#9E0C25]" />}
+                                                                </button>
+                                                                <input
+                                                                    type="text"
+                                                                    value={opt.text}
+                                                                    onChange={(e) => updateOptionText(qIndex, optIndex, e.target.value)}
+                                                                    placeholder={`Option ${optIndex + 1}`}
+                                                                    className={`flex-1 h-12 px-4 rounded-lg text-sm transition-all focus:outline-none ${opt.isCorrect
+                                                                            ? "bg-rose-50/30 border border-[#9E0C25] text-[#9E0C25]"
+                                                                            : "bg-white border border-stone-200 text-[#0B1C30]"
+                                                                        }`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteOption(qIndex, optIndex)}
+                                                                    className="text-stone-400 hover:text-rose-600 shrink-0"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAddOption(qIndex)}
+                                                        className="text-xs font-bold text-[#9E0C25] hover:underline flex items-center gap-1 mt-2"
+                                                    >
+                                                        + Add Option
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="lg:col-span-4 space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="block text-xs font-bold text-[#0B1C30]">Question Type</label>
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQuestionType(qIndex, "Multiple Choice")}
+                                                        className={`py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${q.questionType === "Multiple Choice"
+                                                                ? "bg-[#9E0C25] text-white border border-[#9E0C25]"
+                                                                : "bg-white border border-stone-200 text-stone-500 hover:bg-stone-50"
+                                                            }`}
+                                                    >
+                                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${q.questionType === "Multiple Choice" ? "border-white" : "border-stone-300"}`}>
+                                                            {q.questionType === "Multiple Choice" && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                                        </div>
+                                                        Multiple Choice
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateQuestionType(qIndex, "Long Text")}
+                                                        className={`py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${q.questionType === "Long Text"
+                                                                ? "bg-[#9E0C25] text-white border border-[#9E0C25]"
+                                                                : "bg-white border border-stone-200 text-stone-500 hover:bg-stone-50"
+                                                            }`}
+                                                    >
+                                                        <AlignLeft className="w-4 h-4" />
+                                                        Long Text
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="block text-xs font-bold text-[#0B1C30]">Marks per Question</label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    value={q.marks}
+                                                    onChange={(e) => updateQuestionMarks(qIndex, e.target.value)}
+                                                    className="w-full h-12 px-4 rounded-lg bg-white border border-stone-200 text-sm font-bold text-[#0B1C30] focus:outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            <div className="pt-6 border-t border-stone-100 flex justify-center">
+                                <button
+                                    type="button"
+                                    onClick={handleAddQuestion}
+                                    className="flex flex-col items-center gap-2 text-[#0B1C30] hover:text-[#9E0C25] transition-colors font-bold text-sm"
+                                >
+                                    <div className="w-8 h-8 rounded-full border border-stone-300 flex items-center justify-center">
+                                        <Plus className="w-5 h-5" />
+                                    </div>
+                                    Add New Question
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN CARD: SCHEDULING */}
+                    <div className="w-full lg:w-[320px] shrink-0 lg:sticky lg:top-[88px]">
+                        <div className="bg-[#A41E34] text-white rounded-3xl p-6 shadow-xl space-y-6">
+                            <div className="flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-white" />
+                                <h3 className="font-sans font-bold text-lg text-white">Scheduling</h3>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-white/80 uppercase tracking-wider">EXAM DATE</label>
+                                    <input
+                                        type="date"
+                                        value={examDate}
+                                        onChange={(e) => setExamDate(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-lg bg-black/10 border border-white/10 text-sm font-semibold text-white focus:bg-black/20 focus:border-white/30 focus:outline-none custom-date-input"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-white/80 uppercase tracking-wider">TIMEZONE</label>
+                                    <div className="relative">
+                                        <select
+                                            value={examTimezone}
+                                            onChange={(e) => setExamTimezone(e.target.value)}
+                                            className="w-full h-11 px-4 rounded-lg bg-black/10 border border-white/10 text-sm font-semibold text-white focus:bg-black/20 focus:border-white/30 focus:outline-none appearance-none cursor-pointer"
+                                        >
+                                            {COMMON_TIMEZONES.map((tz) => (
+                                                <option key={tz.value} value={tz.value} className="text-[#0B1C30]">
+                                                    {tz.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="w-4 h-4 text-white/60 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-white/80 uppercase tracking-wider">START TIME</label>
+                                    <input
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-lg bg-black/10 border border-white/10 text-sm font-semibold text-white focus:bg-black/20 focus:border-white/30 focus:outline-none custom-date-input"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="block text-[10px] font-bold text-white/80 uppercase tracking-wider">DURATION (MINUTES)</label>
+                                    <input
+                                        type="number"
+                                        min={5}
+                                        value={durationMins}
+                                        onChange={(e) => setDurationMins(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-lg bg-black/10 border border-white/10 text-sm font-semibold text-white focus:bg-black/20 focus:border-white/30 focus:outline-none"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-3 mt-4 rounded-xl bg-white text-[#A41E34] font-extrabold text-sm hover:bg-stone-100 transition-colors shadow-sm"
+                                >
+                                    Save & Publish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
+        .custom-date-input::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        .custom-date-input::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+      `}} />
+        </div>
+    );
+}

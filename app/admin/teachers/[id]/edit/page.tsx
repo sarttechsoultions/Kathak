@@ -45,7 +45,7 @@ export default function EditTeacherPage() {
         if (typeof state.setAssignedBatches === "function") {
           state.setAssignedBatches(
             t.assignedBatches ||
-            t.batchesAsTeacher?.map((b: any) => b.name) ||
+            t.batchesAsTeacher?.map((b: { name: string }) => b.name) ||
             t.batches ||
             []
           );
@@ -69,12 +69,16 @@ export default function EditTeacherPage() {
           }
         }
 
-        if (typeof state.setBankDetails === "function") {
-          state.setBankDetails(t.bankDetails || t.bank_details || []);
-        } else if (typeof state.setBankDetailsList === "function") {
-          state.setBankDetailsList(t.bankDetails || t.bank_details || []);
+        if (typeof state.setBankAccounts === "function") {
+          state.setBankAccounts(t.bankAccounts || t.bankDetails || []);
         }
-        
+        if (typeof state.setDocuments === "function") state.setDocuments(t.documents || []);
+        if (typeof state.setDob === "function") state.setDob(t.dob || "");
+        if (typeof state.setGender === "function") state.setGender(t.gender || "Select Gender");
+        if (typeof state.setAddress === "function") state.setAddress(t.address || "");
+        if (typeof state.setJoiningDate === "function") state.setJoiningDate(t.joiningDate || "");
+        if (typeof state.setSalaryRate === "function") state.setSalaryRate(t.salaryRate || "₹ 0.00");
+
         if (typeof state.setIdProofType === "function") {
           state.setIdProofType(t.idProofType || "");
         }
@@ -94,7 +98,7 @@ export default function EditTeacherPage() {
 
     fetchTeacher();
     // YAHAN SE 'state' aur 'router' hata diya hai. Sirf 'teacherId' rakha hai.
-  }, [teacherId]); 
+  }, [teacherId, router, state]); 
 
   // 2nd useEffect: For Fetching Batches
   useEffect(() => {
@@ -154,17 +158,23 @@ export default function EditTeacherPage() {
     if (typeof state.setIsSubmitting === "function") state.setIsSubmitting(true);
 
     try {
-const idProofPayload = state.idProofType
-  ? {
-      idProofType: state.idProofType,
-      idProofUrl: state.idProofExistingUrl || undefined,   // 👈 real Cloudinary URL
-    }
-  : {};
+      const finalAvatarUrl = state.avatarUrl;
+
+      const finalDocuments = (state.documents || []).map((doc: { title?: string; type?: string; url?: string }) => ({
+        title: doc.title,
+        type: doc.type,
+        url: doc.url
+      }));
+
+      const idProofPayload = state.idProofType
+        ? {
+            idProofType: state.idProofType,
+            idProofUrl: state.idProofExistingUrl || undefined,
+          }
+        : {};
 
       const fullPhone = `${state.countryCode} ${state.phoneNumber}`.trim();
 
-      // Ensure fallback array exists agar state null/undefined ho
-      const finalBankDetails = state.bankDetails || state.bankDetailsList || [];
 
       await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${teacherId}`, {
         method: "PUT",
@@ -174,14 +184,22 @@ const idProofPayload = state.idProofType
           phone: fullPhone,
           countryCode: state.countryCode,
           phoneNumber: state.phoneNumber,
-          avatarUrl: state.avatarUrl,
+          avatarUrl: finalAvatarUrl,
           ...(state.password && { password: state.password }),
           permissions: state.selectedPermissions,
           maritalStatus: state.maritalStatus,
           nationality: state.nationality,
           languagesKnown: state.languagesKnown,
-          emergencyContact: state.emergencyContacts?.map(Number) || [],
-          bankDetails: finalBankDetails, 
+          emergencyContact: state.emergencyContacts?.map(String) || [],
+          bankAccounts: state.bankAccounts,
+          documents: finalDocuments,
+          dob: state.dob ? state.dob.split("T")[0] : "",
+          gender: state.gender,
+          address: state.address,
+          joiningDate: state.joiningDate ? state.joiningDate.split("T")[0] : "",
+          salaryRate: state.salaryRate,
+          designation: state.designation,
+          primaryExpertise: state.primaryExpertise,
           assignedBatches: state.assignedBatches || [],
           ...idProofPayload,
         }),

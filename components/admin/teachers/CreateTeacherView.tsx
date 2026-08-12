@@ -19,15 +19,38 @@ import {
 import { SidebarPermission, MODULE_PERMISSIONS_MATRIX } from "@/lib/permissions";
 import { DbBatchItem, BankDetail, DocumentItem, ID_PROOF_TYPES, COUNTRY_CODES } from "./types";
 
-interface CreateTeacherViewProps {
+const EXPERTISE_OPTIONS = ["Kathak", "Bharatanatyam", "Odissi", "Contemporary"] as const;
+type ExpertiseOption = (typeof EXPERTISE_OPTIONS)[number];
+type AccessLevelType = "FACULTY" | "ADMIN";
+
+interface DocumentSectionProps {
+  documents: DocumentItem[];
+  setDocuments: React.Dispatch<React.SetStateAction<DocumentItem[]>>;
+}
+
+interface AccessControlProps {
+  accessLevel: AccessLevelType;
+  setAccessLevel: (val: AccessLevelType) => void;
+  selectedPermissions: SidebarPermission[];
+  setSelectedPermissions: React.Dispatch<React.SetStateAction<SidebarPermission[]>>;
+}
+
+interface CredentialsProps {
+  password: string;
+  setPassword: (val: string) => void;
+  showPassword: boolean;
+  setShowPassword: (val: boolean) => void;
+}
+
+interface CreateTeacherViewProps extends DocumentSectionProps, AccessControlProps, CredentialsProps {
   fullName: string;
   setFullName: (val: string) => void;
   dob: string;
   setDob: (val: string) => void;
   gender: string;
   setGender: (val: string) => void;
-  primaryExpertise: string;
-  setPrimaryExpertise: (val: string) => void;
+  primaryExpertise: ExpertiseOption;
+  setPrimaryExpertise: (val: ExpertiseOption) => void;
   email: string;
   setEmail: (val: string) => void;
   countryCode: string;
@@ -45,14 +68,6 @@ interface CreateTeacherViewProps {
   availableDbBatches: DbBatchItem[];
   salaryRate: string;
   setSalaryRate: (val: string) => void;
-  password: string;
-  setPassword: (val: string) => void;
-  showPassword: boolean;
-  setShowPassword: (val: boolean) => void;
-  accessLevel: "FACULTY" | "ADMIN";
-  setAccessLevel: (val: "FACULTY" | "ADMIN") => void;
-  selectedPermissions: SidebarPermission[];
-  setSelectedPermissions: React.Dispatch<React.SetStateAction<SidebarPermission[]>>;
   avatarUrl: string;
   setAvatarUrl: (val: string) => void;
   maritalStatus: string;
@@ -71,9 +86,9 @@ interface CreateTeacherViewProps {
   bankAccountInput: BankDetail;
   setBankAccountInput: React.Dispatch<React.SetStateAction<BankDetail>>;
   addBankAccount: () => void;
-  documents: DocumentItem[];
-  setDocuments: React.Dispatch<React.SetStateAction<DocumentItem[]>>;
   handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleDocumentUpload: (e: React.ChangeEvent<HTMLInputElement>, selectId: string) => void;
+  isUploadingAvatar?: boolean;
   isSubmitting: boolean;
   onSubmit: (e: React.FormEvent) => Promise<void>;
   onCancel: () => void;
@@ -133,12 +148,16 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
   documents,
   setDocuments,
   handlePhotoUpload,
+  handleDocumentUpload,
+  isUploadingAvatar,
   isSubmitting,
   onSubmit,
   onCancel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const idProofInputRef = useRef<HTMLInputElement>(null);
+
+  const isAnyUploading = isUploadingAvatar || documents.some(d => d.isUploading);
+
 
   return (
     <form onSubmit={onSubmit} className="space-y-6 animate-in fade-in duration-300 max-w-[1100px] mx-auto">
@@ -168,11 +187,11 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isAnyUploading}
             className="px-6 py-2.5 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer uppercase disabled:opacity-75 flex items-center gap-2"
           >
-            {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            <span>{isSubmitting ? "Saving..." : "Save Teacher Profile"}</span>
+            {(isSubmitting || isAnyUploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+            <span>{isSubmitting ? "Saving..." : isAnyUploading ? "Uploading..." : "Save Teacher Profile"}</span>
           </button>
         </div>
       </div>
@@ -189,19 +208,24 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
             {/* Profile Photo */}
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-stone-200/90 shadow-xs">
               <div className="relative group shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={avatarUrl}
                   alt="Teacher Avatar Preview"
-                  className="w-16 h-16 rounded-full object-cover border-2 border-[#9E0C25] shadow-xs"
+                  className={`w-16 h-16 rounded-full object-cover border-2 border-[#9E0C25] shadow-xs ${isUploadingAvatar ? 'opacity-50' : ''}`}
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-stone-900/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer"
-                >
-                  <Camera className="w-5 h-5" />
-                </button>
+                {isUploadingAvatar ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 text-[#9E0C25] animate-spin" />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-stone-900/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
               <div>
@@ -469,20 +493,24 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
                       <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl border border-stone-200 bg-stone-50 text-xs group hover:border-rose-200 transition-colors">
                         <div className="flex items-center gap-3 overflow-hidden">
                           <div className="w-8 h-8 rounded-lg bg-white border border-stone-200 flex items-center justify-center shrink-0 text-stone-400">
-                            <FileText className="w-4 h-4" />
+                            {doc.isUploading ? <Loader2 className="w-4 h-4 animate-spin text-[#9E0C25]" /> : <FileText className="w-4 h-4" />}
                           </div>
                           <div className="flex flex-col truncate">
                             <span className="font-bold text-stone-900 truncate">{doc.title}</span>
-                            <span className="text-[10px] text-stone-500 font-medium uppercase tracking-wider">{doc.type}</span>
+                            <span className="text-[10px] text-stone-500 font-medium uppercase tracking-wider">
+                              {doc.isUploading ? "Uploading..." : doc.type}
+                            </span>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setDocuments(documents.filter((_, i) => i !== idx))}
-                          className="w-8 h-8 rounded-lg hover:bg-rose-100 text-stone-400 hover:text-rose-600 font-bold flex items-center justify-center cursor-pointer shrink-0 transition-colors"
-                        >
-                          ✕
-                        </button>
+                        {!doc.isUploading && (
+                          <button
+                            type="button"
+                            onClick={() => setDocuments(documents.filter((_, i) => i !== idx))}
+                            className="w-8 h-8 rounded-lg hover:bg-rose-100 text-stone-400 hover:text-rose-600 font-bold flex items-center justify-center cursor-pointer shrink-0 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -504,21 +532,7 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
                       id="doc-upload"
                       className="hidden"
                       accept="image/*,.pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        const selectEl = document.getElementById("doc-type-select") as HTMLSelectElement;
-                        const typeVal = selectEl?.options[selectEl.selectedIndex].text || "Document";
-                        
-                        if (file) {
-                          setDocuments([...documents, {
-                            title: file.name,
-                            type: typeVal,
-                            url: "",
-                            file: file
-                          }]);
-                          e.target.value = '';
-                        }
-                      }}
+                      onChange={(e) => handleDocumentUpload(e, "doc-type-select")}
                     />
                     <label
                       htmlFor="doc-upload"
@@ -679,7 +693,7 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
         </div>
 
         {/* Granular Teacher Permissions & Sub-Actions Matrix */}
-        <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-6">
+        {/* <div className="p-6 rounded-2xl bg-stone-50/80 border border-stone-200/80 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[#9E0C25]">
               <ShieldCheck className="w-4 h-4" />
@@ -789,7 +803,7 @@ export const CreateTeacherView: React.FC<CreateTeacherViewProps> = ({
               );
             })}
           </div>
-        </div>
+        </div> */}
 
         {/* Submit Bottom Bar */}
         <div className="pt-4 border-t border-stone-100 flex items-center justify-between">

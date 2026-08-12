@@ -25,6 +25,7 @@ export function useTeacherFormState() {
   ]);
   const [avatarUrl, setAvatarUrl] = useState<string>("/Ananya.png");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Personal Info Extras
@@ -68,23 +69,93 @@ export function useTeacherFormState() {
   // Multiple Documents
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    try {
+      const token = localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token");
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const res = await fetch(`${apiBase}/upload/image`, {
+        method: "POST",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.status !== "success") {
+        throw new Error(data.message || "Failed to upload file");
+      }
+      return data.data?.url || data.data?.secure_url || data.data?.directUrl || "";
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         alert("Please select an image file under 5MB.");
         return;
       }
-      setAvatarFile(file); // Save actual file for Cloudinary
-      
-      // Also generate local preview
+      // Show local preview immediately
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (reader.result) {
-          setAvatarUrl(reader.result as string);
-        }
+        if (reader.result) setAvatarUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Upload to Cloudinary
+      setIsUploadingAvatar(true);
+      try {
+        const uploadedUrl = await uploadToCloudinary(file);
+        setAvatarUrl(uploadedUrl);
+        setAvatarFile(null); // Clear the file since it's already uploaded
+      } catch (err: any) {
+        alert("Error uploading avatar: " + err.message);
+        setAvatarUrl("/Ananya.png"); // Revert
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    }
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, selectId: string) => {
+    const file = e.target.files?.[0];
+    const selectEl = document.getElementById(selectId) as HTMLSelectElement;
+    const typeVal = selectEl?.options[selectEl.selectedIndex]?.text || "Document";
+    
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("Please select a file under 10MB.");
+        return;
+      }
+      
+      const newDocIndex = documents.length;
+      const newDoc = {
+        title: file.name,
+        type: typeVal,
+        url: "",
+        isUploading: true
+      };
+      
+      setDocuments(prev => [...prev, newDoc]);
+      e.target.value = '';
+
+      try {
+        const uploadedUrl = await uploadToCloudinary(file);
+        setDocuments(prev => {
+          const updated = [...prev];
+          if (updated[newDocIndex]) {
+            updated[newDocIndex].url = uploadedUrl;
+            updated[newDocIndex].isUploading = false;
+          }
+          return updated;
+        });
+      } catch (err: any) {
+        alert("Error uploading document: " + err.message);
+        setDocuments(prev => prev.filter((_, i) => i !== newDocIndex)); // Remove failed doc
+      }
     }
   };
 
@@ -129,6 +200,8 @@ export function useTeacherFormState() {
     addBankAccount,
     documents, setDocuments,
     handlePhotoUpload,
+    handleDocumentUpload,
+    isUploadingAvatar,
     avatarFile, setAvatarFile,
   };
 }

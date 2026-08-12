@@ -36,15 +36,20 @@ export default function AdminTeachersPage() {
       setFacultyList(teachers);
       setDirectoryList(directory);
       setMetrics(metricsData);
-    } catch (err) {
-      console.error("Failed to fetch teachers:", err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Failed to fetch teachers:", message);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchTeachersData();
+    const loadTeachers = async () => {
+      await fetchTeachersData();
+    };
+
+    void loadTeachers();
   }, [fetchTeachersData]);
 
   const handleToggleStatus = async (id: string, name: string, currentStatus: string) => {
@@ -59,8 +64,9 @@ export default function AdminTeachersPage() {
         "Faculty Status Updated"
       );
       await fetchTeachersData();
-    } catch (err: any) {
-      alert(err.message || "Failed to update teacher status.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(message || "Failed to update teacher status.");
     }
   };
 
@@ -70,8 +76,9 @@ export default function AdminTeachersPage() {
         await apiRequest(`${ENDPOINTS.ADMIN_TEACHERS}/${id}`, { method: "DELETE" });
         await openThemeSuccess(`Teacher "${name}" deleted successfully from Database!`, "Teacher Deleted");
         await fetchTeachersData();
-      } catch (err: any) {
-        alert(err.message || "Failed to delete teacher account.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        alert(message || "Failed to delete teacher account.");
       }
     }
   };

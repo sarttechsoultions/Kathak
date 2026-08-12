@@ -13,6 +13,7 @@ export interface DocumentItem {
   type: string;
   url: string;
   file?: File;
+  isUploading?: boolean;
 }
 
 export interface TeacherRecord {
