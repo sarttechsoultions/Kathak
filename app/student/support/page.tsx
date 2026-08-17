@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { HelpCircle, Send, CheckCircle2, Loader2, MessageSquare, AlertCircle } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 
-export default function TeacherSupportPage() {
+export default function StudentSupportPage() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,9 +45,9 @@ export default function TeacherSupportPage() {
           <HelpCircle className="w-7 h-7 text-[#900C27]" />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-stone-900 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Instructor Helpdesk</h1>
+          <h1 className="text-2xl font-black text-stone-900 tracking-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Contact Support</h1>
           <p className="text-sm font-medium text-stone-500 mt-1">
-            Need assistance with managing your batches, exams, or account? Contact the Kathak Admin team.
+            Need help with your classes, assignments, or fees? Send a message to the Admin team.
           </p>
         </div>
       </div>
@@ -63,7 +63,7 @@ export default function TeacherSupportPage() {
               </div>
               <h2 className="text-2xl font-black text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Ticket Submitted!</h2>
               <p className="text-sm font-medium text-stone-500 max-w-md">
-                We have successfully received your query. The administration team will review it and reply to your registered email address as soon as possible.
+                We have successfully received your query. Our admin team will review it and reply to your registered email address within 24 hours.
               </p>
               <button
                 onClick={() => setIsSuccess(false)}
@@ -79,7 +79,7 @@ export default function TeacherSupportPage() {
               <div className="flex gap-3 bg-stone-50 border border-stone-200 p-4 rounded-2xl">
                 <AlertCircle className="w-5 h-5 text-[#900C27] shrink-0 mt-0.5" />
                 <p className="text-[13px] font-medium text-stone-600 leading-relaxed">
-                  Your Name, Email, and Instructor Profile will be automatically attached to this ticket. Please be as descriptive as possible so we can resolve your issue quickly.
+                  Your Name, Email, and Student ID will be automatically attached to this ticket. Please provide as much detail as possible in the message box below so we can resolve your issue quickly!
                 </p>
               </div>
 
@@ -88,7 +88,7 @@ export default function TeacherSupportPage() {
                 <label className="block text-xs font-extrabold text-stone-700 uppercase tracking-wider">Subject</label>
                 <input
                   type="text"
-                  placeholder="E.g. Unable to update exam schedule for Batch A"
+                  placeholder="E.g. Unable to upload video assignment"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   disabled={isSubmitting}
@@ -149,7 +149,7 @@ export default function TeacherSupportPage() {
           </div>
           <div>
             <h3 className="font-bold text-stone-900 text-sm mb-1">When will I get a reply?</h3>
-            <p className="text-xs font-medium text-stone-500 leading-relaxed">Our support team operates Mon-Sat, 9 AM - 6 PM. Most tickets are prioritized for instructors and resolved within 12 hours.</p>
+            <p className="text-xs font-medium text-stone-500 leading-relaxed">Our support team operates Mon-Sat, 9 AM - 6 PM. Most tickets are resolved within 24 hours.</p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-start gap-4">
@@ -157,8 +157,8 @@ export default function TeacherSupportPage() {
             <AlertCircle className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-stone-900 text-sm mb-1">Technical Issues</h3>
-            <p className="text-xs font-medium text-stone-500 leading-relaxed">If you are facing technical issues regarding a Live Class, please add "[URGENT]" to your subject line.</p>
+            <h3 className="font-bold text-stone-900 text-sm mb-1">Emergency Queries</h3>
+            <p className="text-xs font-medium text-stone-500 leading-relaxed">If you are facing a payment failure issue, please include the Razorpay Transaction ID in your message.</p>
           </div>
         </div>
       </div>

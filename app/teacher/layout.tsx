@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import TeacherHeader from "@/components/teacher/TeacherHeader";
 import { Loader2 } from "lucide-react";
+import { apiRequest, ENDPOINTS } from "@/lib/api";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -12,18 +13,65 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("kathak_teacher_token") ||
-      localStorage.getItem("kathak_admin_token") ||
-      localStorage.getItem("kathak_token");
+    let isMounted = true;
 
-    if (!token) {
-      setIsAuthenticated(false);
-      router.replace("/login");
-      return;
+    // 1. Instant optimistic check using saved user session if available
+    const savedUserStr = localStorage.getItem("kathak_teacher_user") || localStorage.getItem("kathak_session_user");
+    let currentUser: any = null;
+    
+    if (savedUserStr) {
+      try {
+        currentUser = JSON.parse(savedUserStr);
+        if (currentUser && (currentUser.role === "TEACHER" || currentUser.role === "ADMIN")) {
+          // Optimistically show UI
+          setTimeout(() => { if (isMounted) setIsAuthenticated(true); }, 0);
+        }
+      } catch {
+        currentUser = null;
+      }
     }
 
-    setIsAuthenticated(true);
+    // 2. Validate session directly against API (HttpOnly Cookie aware)
+    async function verifyAuthWithApi() {
+      try {
+        const res = await apiRequest<{ data?: { user?: any, profile?: any } }>(ENDPOINTS.AUTH_ME);
+        const user = res.data?.user || res.data?.profile;
+
+        if (user && isMounted) {
+          if (user.role === "TEACHER" || user.role === "ADMIN") {
+            localStorage.setItem("kathak_teacher_user", JSON.stringify(user));
+            localStorage.setItem("kathak_session_user", JSON.stringify(user));
+            setIsAuthenticated(true);
+          } else {
+            // Not a teacher or admin, clear and redirect
+            localStorage.removeItem("kathak_teacher_user");
+            setIsAuthenticated(false);
+            router.replace("/login");
+          }
+        } else if (!user && !currentUser && isMounted) {
+          setIsAuthenticated(false);
+          router.replace("/login");
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("API Auth check:", msg);
+        // If explicitly Unauthorized (401 / 403) from API, clear session and redirect
+        if (msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized") || msg.includes("expired") || !currentUser) {
+          localStorage.removeItem("kathak_teacher_user");
+          localStorage.removeItem("kathak_session_user");
+          if (isMounted) {
+            setIsAuthenticated(false);
+            router.replace("/login");
+          }
+        }
+      }
+    }
+
+    verifyAuthWithApi();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   if (isAuthenticated === null) {

@@ -98,7 +98,8 @@ export default function EditTeacherPage() {
 
     fetchTeacher();
     // YAHAN SE 'state' aur 'router' hata diya hai. Sirf 'teacherId' rakha hai.
-  }, [teacherId, router, state]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherId, router]); 
 
   // 2nd useEffect: For Fetching Batches
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -14,82 +14,94 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  MoreVertical
+  MoreVertical,
+  Loader2,
+  Trash2
 } from "lucide-react";
+import { apiRequest } from "@/lib/api";
+import { ENDPOINTS } from "@/lib/api";
+import { openThemeSuccess, openThemeError } from "@/components/ThemeDialogProvider";
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  isUnread: boolean;
+  link: string | null;
+  createdAt: string;
+}
 
 export default function StudentNotificationsPage() {
   const [selectedFilter, setSelectedFilter] = useState("All");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const notificationsList = [
-    {
-      id: 1,
-      type: "Feedback",
-      title: "New Feedback Received",
-      message: "Guru S. Mukherjee has reviewed your 'Tatkar' video submission.",
-      time: "2 hours ago",
-      isUnread: true,
-      icon: Video,
-      color: "bg-indigo-100 text-indigo-700",
-      link: "/student/progress"
-    },
-    {
-      id: 2,
-      type: "Announcement",
-      title: "Dussehra Holiday Schedule",
-      message: "The academy will remain closed from Oct 22 to Oct 24 for Dussehra celebrations.",
-      time: "1 day ago",
-      isUnread: true,
-      icon: AlertCircle,
-      color: "bg-amber-100 text-amber-700",
-      link: "#"
-    },
-    {
-      id: 3,
-      type: "Achievement",
-      title: "Module Completed!",
-      message: "Congratulations! You have successfully completed the 'Basic Mudras' module.",
-      time: "2 days ago",
-      isUnread: false,
-      icon: Award,
-      color: "bg-emerald-100 text-emerald-700",
-      link: "/student/progress"
-    },
-    {
-      id: 4,
-      type: "Class Alert",
-      title: "Live Session Reminder",
-      message: "Your 'Advanced Kathak' live session starts in 15 minutes. Click to join.",
-      time: "3 days ago",
-      isUnread: false,
-      icon: Clock,
-      color: "bg-sky-100 text-sky-700",
-      link: "/student/live-classes"
-    },
-    {
-      id: 5,
-      type: "Payment",
-      title: "Payment Successful",
-      message: "We have received your fee payment for the Oct-Dec quarter. View receipt.",
-      time: "1 week ago",
-      isUnread: false,
-      icon: CheckCircle2,
-      color: "bg-emerald-100 text-emerald-700",
-      link: "#"
-    },
-    {
-      id: 6,
-      type: "System",
-      title: "System Maintenance",
-      message: "The learning portal will be down for scheduled maintenance on Sunday from 2 AM to 4 AM.",
-      time: "2 weeks ago",
-      isUnread: false,
-      icon: Calendar,
-      color: "bg-stone-200 text-stone-700",
-      link: "#"
-    },
-  ];
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const res = await apiRequest(ENDPOINTS.NOTIFICATIONS);
+      if (res.data) {
+        setNotifications(res.data);
+      }
+    } catch (err: any) {
+      console.error(err);
+      openThemeError("Failed to fetch notifications");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const unreadCount = notificationsList.filter(n => n.isUnread).length;
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const markAllAsRead = async () => {
+    try {
+      await apiRequest(`${ENDPOINTS.NOTIFICATIONS}/read-all`, { method: "PUT" });
+      setNotifications(prev => prev.map(n => ({ ...n, isUnread: false })));
+      openThemeSuccess("All notifications marked as read.", "Success");
+    } catch (err: any) {
+      openThemeError("Failed to mark all as read");
+    }
+  };
+
+  const markAsRead = async (id: string, isUnread: boolean) => {
+    if (!isUnread) return;
+    try {
+      await apiRequest(`${ENDPOINTS.NOTIFICATIONS}/${id}/read`, { method: "PUT" });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isUnread: false } : n));
+    } catch (err) {
+      console.error("Failed to mark as read", err);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => n.isUnread).length;
+
+  const filteredNotifications = notifications.filter(n => {
+    if (selectedFilter === "All") return true;
+    if (selectedFilter === "Feedback" && n.type === "FEEDBACK") return true;
+    if (selectedFilter === "Announcements" && n.type === "ANNOUNCEMENT") return true;
+    if (selectedFilter === "Classes" && n.type === "CLASS") return true;
+    if (selectedFilter === "Payments" && n.type === "PAYMENT") return true;
+    return false;
+  });
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "FEEDBACK": return { icon: Video, color: "bg-indigo-100 text-indigo-700" };
+      case "ANNOUNCEMENT": return { icon: AlertCircle, color: "bg-amber-100 text-amber-700" };
+      case "ACHIEVEMENT": return { icon: Award, color: "bg-emerald-100 text-emerald-700" };
+      case "CLASS": return { icon: Clock, color: "bg-sky-100 text-sky-700" };
+      case "PAYMENT": return { icon: CheckCircle2, color: "bg-emerald-100 text-emerald-700" };
+      default: return { icon: Bell, color: "bg-stone-200 text-stone-700" };
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="space-y-8 font-sans pb-16">
@@ -111,7 +123,11 @@ export default function StudentNotificationsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-           <button className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-800 transition-colors">
+           <button 
+             onClick={markAllAsRead}
+             disabled={unreadCount === 0 || isLoading}
+             className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-800 transition-colors disabled:opacity-50 cursor-pointer"
+           >
             <Check className="w-4 h-4" />
             Mark all as read
            </button>
@@ -119,7 +135,7 @@ export default function StudentNotificationsPage() {
       </div>
 
       {/* 2. NOTIFICATIONS LIST SECTION */}
-      <div className="bg-white rounded-2xl border border-stone-200/80 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-stone-200/80 shadow-sm overflow-hidden min-h-[400px] flex flex-col">
         
         {/* Filters Area */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border-b border-stone-100 bg-stone-50/50">
@@ -128,9 +144,9 @@ export default function StudentNotificationsPage() {
               <button
                 key={filter}
                 onClick={() => setSelectedFilter(filter)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   selectedFilter === filter
-                    ? "bg-[#2563EB] text-white shadow-xs"
+                    ? "bg-[#900C27] text-white shadow-sm"
                     : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-100"
                 }`}
               >
@@ -139,75 +155,68 @@ export default function StudentNotificationsPage() {
             ))}
           </div>
 
-          <button className="p-2 border border-stone-200 rounded-lg text-stone-500 hover:bg-stone-50 bg-white shrink-0">
+          <button className="p-2 border border-stone-200 rounded-lg text-stone-500 hover:bg-stone-50 bg-white shrink-0 cursor-pointer">
              <Filter className="w-4 h-4" />
           </button>
         </div>
 
         {/* List Content */}
-        <div className="divide-y divide-stone-100">
-          {notificationsList.map((notification) => {
-            const Icon = notification.icon;
-            return (
-              <div 
-                key={notification.id} 
-                className={`p-4 sm:p-6 transition-colors hover:bg-stone-50 flex gap-4 ${notification.isUnread ? 'bg-sky-50/30' : ''}`}
-              >
-                {/* Icon Column */}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 ${notification.color}`}>
-                   <Icon className="w-5 h-5" />
-                </div>
-
-                {/* Content Column */}
-                <div className="flex-1 space-y-1 relative">
-                  {notification.isUnread && (
-                    <div className="absolute -left-2 top-2 w-2 h-2 rounded-full bg-[#900C27]" />
-                  )}
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <h3 className={`text-[15px] ${notification.isUnread ? 'font-bold text-[#1B1B24]' : 'font-semibold text-stone-800'}`}>
-                      {notification.title}
-                    </h3>
-                    <span className="text-[11px] font-medium text-stone-400 whitespace-nowrap">
-                      {notification.time}
-                    </span>
+        <div className="divide-y divide-stone-100 flex-1">
+          {isLoading ? (
+            <div className="p-12 flex justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-stone-300" />
+            </div>
+          ) : filteredNotifications.length > 0 ? (
+            filteredNotifications.map((notification) => {
+              const { icon: Icon, color } = getIcon(notification.type);
+              return (
+                <div 
+                  key={notification.id} 
+                  onClick={() => markAsRead(notification.id, notification.isUnread)}
+                  className={`p-4 sm:p-6 transition-colors hover:bg-stone-50/80 flex gap-4 cursor-pointer ${notification.isUnread ? 'bg-sky-50/30' : ''}`}
+                >
+                  {/* Icon Column */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 ${color}`}>
+                     <Icon className="w-5 h-5" />
                   </div>
-                  
-                  <p className="text-sm text-stone-600 leading-relaxed pr-8">
-                    {notification.message}
-                  </p>
 
-                  <div className="pt-2 flex items-center gap-3">
-                     <Link href={notification.link} className="text-xs font-bold text-sky-700 hover:text-sky-800 hover:underline">
-                        View Details
-                     </Link>
+                  {/* Content Column */}
+                  <div className="flex-1 space-y-1 relative">
+                    {notification.isUnread && (
+                      <div className="absolute -left-2 top-2 w-2 h-2 rounded-full bg-[#900C27]" />
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <h3 className={`text-[15px] ${notification.isUnread ? 'font-bold text-[#1B1B24]' : 'font-semibold text-stone-800'}`}>
+                        {notification.title}
+                      </h3>
+                      <span className="text-[11px] font-medium text-stone-400 whitespace-nowrap">
+                        {formatTime(notification.createdAt)}
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-stone-600 leading-relaxed pr-8">
+                      {notification.message}
+                    </p>
+
+                    {notification.link && (
+                      <div className="pt-2 flex items-center gap-3">
+                         <Link href={notification.link} className="text-xs font-bold text-[#900C27] hover:text-[#780a20] hover:underline">
+                            View Details
+                         </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Actions Column */}
-                <div className="shrink-0">
-                  <button className="p-1.5 text-stone-400 hover:text-stone-700 rounded-md hover:bg-stone-100 transition-colors">
-                     <MoreVertical className="w-4 h-4" />
-                  </button>
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Pagination Footer */}
-        <div className="p-4 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500 font-medium bg-stone-50/50">
-          <span>Showing 1 to 6 of 24 notifications</span>
-
-          <div className="flex items-center gap-1">
-            <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-stone-200 border border-stone-200 bg-white">
-               <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-stone-200 border border-stone-200 bg-white">
-               <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+              );
+            })
+          ) : (
+            <div className="p-12 text-center flex flex-col items-center">
+              <Bell className="w-12 h-12 text-stone-200 mb-3" />
+              <p className="text-sm font-semibold text-stone-500">No notifications found.</p>
+              <p className="text-xs text-stone-400 mt-1">You're all caught up!</p>
+            </div>
+          )}
         </div>
 
       </div>

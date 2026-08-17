@@ -31,7 +31,7 @@ interface SidebarItem {
 
 const teacherSidebarItems: SidebarItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/teacher/dashboard" },
-  { label: "Profile", icon: User, href: "/teacher/profile" },
+  // { label: "Profile", icon: User, href: "/teacher/profile" },
   { label: "My Batches", icon: Layers, href: "/teacher/batches" },
   { label: "Live Classes", icon: Video, href: "/teacher/live-classes" },
   { label: "Assignments", icon: FileText, href: "/teacher/assignments" },
@@ -54,16 +54,29 @@ export default function TeacherSidebar({ isMobileOpen = false, onCloseMobile }: 
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
     try {
       await apiRequest(ENDPOINTS.AUTH_LOGOUT, { method: "POST" });
-    } catch {
-      console.log("Logout completed");
+    } catch (err) {
+      console.log("Logout API call handled");
     } finally {
-      localStorage.removeItem("kathak_teacher_token");
+      // 1. Clear Local Storage (Saari relevant keys)
+      localStorage.removeItem("token");
       localStorage.removeItem("kathak_token");
-      localStorage.removeItem("kathak_admin_user");
-      router.push("/login");
+      localStorage.removeItem("kathak_teacher_token");
+      localStorage.removeItem("kathak_teacher_user");
+      localStorage.removeItem("kathak_session_user");
+
+      // 2. Clear Session Storage
+      sessionStorage.removeItem("kathak_teacher_token");
+      sessionStorage.removeItem("token");
+
+      // 3. Clear Cookies (Ye sabse important hai Next.js ke liye)
+      document.cookie = "kathak_teacher_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+      // 4. Redirect to Home/Login
+      router.push("/");
     }
   };
 

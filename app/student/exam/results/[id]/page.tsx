@@ -3,8 +3,31 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Download, MessageSquare, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
+interface FeedbackEntry {
+  id: string;
+  role: string;
+  text: string;
+  updatedAt: string;
+}
+
+const parseFeedbackArray = (raw: any): FeedbackEntry[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+      return [{ id: Math.random().toString(36).substr(2, 9), role: 'Teacher', text: raw, updatedAt: new Date().toISOString() }];
+    } catch {
+      return [{ id: Math.random().toString(36).substr(2, 9), role: 'Teacher', text: raw, updatedAt: new Date().toISOString() }];
+    }
+  }
+  return [];
+};
+
+// ─── STRICT TYPESCRIPT INTERFACES ───
 interface ExamOption {
   id: string;
   text: string;
@@ -13,9 +36,11 @@ interface ExamOption {
 
 interface ExamQuestion {
   id: string;
-  text: string;
+  questionText?: string;
+  text?: string;
   questionType?: string;
   options?: ExamOption[];
+  mediaUrl?: string;
   imageUrl?: string;
   marks?: number;
 }
@@ -25,9 +50,11 @@ interface ResultData {
   examId: string;
   answersData: Record<string, string>;
   marksObtained: number;
-  status: "PASS" | "FAIL" | "PENDING";
+  percentile?: number;
+  status: "PASS" | "FAIL" | "PENDING" | "GRADED" | string;
   grade?: string | null;
   feedback?: string | null;
+  questionEvaluations?: Record<string, { marks: number; feedback: string }>;
   submittedAt: string;
   exam: {
     title: string;
@@ -39,7 +66,7 @@ interface ResultData {
   };
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
@@ -50,11 +77,12 @@ function formatDate(dateStr: string) {
 export default function ExamResultPage() {
   const params = useParams();
   const router = useRouter();
-  const resultId = params.resultId as string;
+  
+  const resultId = params.id as string;
 
   const [result, setResult] = useState<ResultData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string>("");
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -75,13 +103,15 @@ export default function ExamResultPage() {
         setIsLoading(false);
       }
     };
+    
     if (resultId) fetchResult();
   }, [resultId]);
 
-  const handleDownload = () => {
+  const handleDownload = (): void => {
     window.print();
   };
 
+  // ─── LOADING & ERROR STATES ───
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -96,8 +126,8 @@ export default function ExamResultPage() {
         <div className="text-center space-y-4">
           <h2 className="text-xl font-bold text-stone-800">{loadError || "Result not found."}</h2>
           <button
-            onClick={() => router.push("/student/exams")}
-            className="px-5 py-2.5 rounded-xl bg-[#9B3434] text-white text-xs font-bold"
+            onClick={() => router.push("/student/exam")}
+            className="px-5 py-2.5 rounded-xl bg-[#9B3434] text-white text-xs font-bold transition-all hover:bg-[#7A2828]"
           >
             Back to Exams
           </button>
@@ -107,48 +137,85 @@ export default function ExamResultPage() {
   }
 
   const { exam } = result;
-  const questions = exam.questionsData || [];
+  const questions: ExamQuestion[] = exam.questionsData || [];
 
-  const statusConfig = {
-    PASS: {
-      label: "Passed",
-      classes: "bg-[#ECFDF5] text-[#15803D] border-green-100",
-      icon: <CheckCircle2 className="w-4 h-4 text-[#15803D]" />,
-    },
-    FAIL: {
+  // Dynamic Status Configuration
+  let statusConfig = {
+    label: "Passed",
+    classes: "bg-[#ECFDF5] text-[#15803D] border-green-100",
+    icon: <CheckCircle2 className="w-4 h-4 text-[#15803D]" />,
+  };
+
+  if (result.status === "FAIL") {
+    statusConfig = {
       label: "Failed",
       classes: "bg-[#FEF2F2] text-[#DC2626] border-red-100",
       icon: <XCircle className="w-4 h-4 text-[#DC2626]" />,
-    },
-    PENDING: {
+    };
+  } else if (result.status === "PENDING") {
+    statusConfig = {
       label: "Awaiting Review",
       classes: "bg-[#FFFBEB] text-[#B45309] border-amber-100",
       icon: <Clock className="w-4 h-4 text-[#B45309]" />,
-    },
-  }[result.status];
+    };
+  }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] font-sans text-[#0B1C30] p-6 sm:p-10">
-      <div className="max-w-[1000px] mx-auto space-y-10 animate-in fade-in duration-300">
+    <div className="min-h-screen bg-[#FAFAFA] font-sans text-[#0B1C30] p-6 sm:p-10 print:bg-white print:p-0">
+      
+      {/* ================= PRINT CSS STYLES ================= */}
+      {/* Ye code aapke localhost text, sidebar, aur download buttons ko print time par hide kar dega */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            @page { 
+              margin: 0; /* Hides browser default URL (localhost) and Date */
+            }
+            body { 
+              margin: 1.5cm; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+            /* Hide sidebar, top navigation, and buttons */
+            aside, nav, header, .no-print { 
+              display: none !important; 
+            }
+          }
+        `
+      }} />
+
+      <div className="max-w-[1000px] bg-white p-6 sm:p-10 mx-auto space-y-10  animate-in fade-in duration-300 print:space-y-6">
         
         {/* ================= HEADER ================= */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* 'no-print' class se ye header print mein hide ho jayega */}
+        <div className="flex flex-col  sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
           <h1 className="font-sans font-bold text-[32px] tracking-[-0.32px] text-[#0B1C30]">
             Exam Results
           </h1>
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#9B3434] hover:bg-[#7A2828] text-white text-[14px] font-bold transition-all shadow-sm"
-          >
-            <Download className="w-4 h-4" />
-            Download PDF Report
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/student/exam")}
+              className="px-6 py-3 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-[14px] font-bold transition-all shadow-sm"
+            >
+              Back to Exams
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#9B3434] hover:bg-[#7A2828] text-white text-[14px] font-bold transition-all shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              Download PDF Report
+            </button>
+          </div>
         </div>
+
+        {/* Print Only Title (PDF mein dikhega) */}
+        <h1 className="hidden print:block font-sans font-bold text-[28px] text-[#0B1C30] border-b border-stone-200 pb-4">
+          Exam Report: {exam.title}
+        </h1>
 
         {/* ================= SUMMARY CARDS ================= */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-[800px]">
-          
-          {/* Card 1: Final Score */}
           <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-sm flex flex-col justify-center">
             <p className="font-inter font-semibold text-[12px] text-[#464555] uppercase tracking-wider mb-1">
               FINAL SCORE
@@ -163,17 +230,15 @@ export default function ExamResultPage() {
             </div>
           </div>
 
-          {/* Card 2: Percentile */}
           <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-sm flex flex-col justify-center">
             <p className="font-inter font-semibold text-[12px] text-[#464555] uppercase tracking-wider mb-1">
               PERCENTILE
             </p>
             <span className="font-sans font-bold text-[36px] text-[#9B3434] leading-none">
-              —
+              {result.percentile !== undefined ? `${Math.round(result.percentile)}th` : "—"}
             </span>
           </div>
 
-          {/* Card 3: Status */}
           <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-sm flex flex-col justify-center">
             <p className="font-inter font-semibold text-[12px] text-[#464555] uppercase tracking-wider mb-2.5">
               STATUS
@@ -188,39 +253,47 @@ export default function ExamResultPage() {
               </span>
             </div>
           </div>
-
         </div>
 
         {/* ================= DETAILED QUESTION REVIEW ================= */}
         <div className="pt-4">
-          <h2 className="font-sans font-bold text-[24px] text-[#0B1C30] mb-8">
+          <h2 className="font-sans font-bold text-[24px] text-[#0B1C30] mb-8 print:text-[20px]">
             Detailed Question Review
           </h2>
 
-          <div className="space-y-12">
+          <div className="space-y-12 print:space-y-8">
             {questions.map((q, index) => {
-              const studentAnswerId = result.answersData?.[q.id];
+              const studentAnswerText = result.answersData?.[q.id] || "";
               const isMCQ = q.questionType === "Multiple Choice";
               const correctOption = isMCQ ? q.options?.find((o) => o.isCorrect) : undefined;
-              const isCorrect = isMCQ ? studentAnswerId === correctOption?.id : undefined;
+              const isCorrect = isMCQ ? studentAnswerText === correctOption?.id : undefined;
               const selectedOptionText = isMCQ
-                ? q.options?.find((o) => o.id === studentAnswerId)?.text
+                ? q.options?.find((o) => o.id === studentAnswerText)?.text
                 : undefined;
+
+              // 👇 Fixed Question Text Mapping 👇
+              const qText = q.questionText || q.text || "Question text not provided.";
+              const qImage = q.mediaUrl || q.imageUrl;
+              
+              const evaluation = result.questionEvaluations?.[q.id];
+              const teacherFeedback = evaluation?.feedback;
+              const teacherMarks = evaluation?.marks;
 
               return (
                 <React.Fragment key={q.id}>
-                  <div className="flex gap-4 sm:gap-6 group">
+                  <div className="flex gap-4 sm:gap-6 group print:break-inside-avoid">
                     {/* Question Number */}
                     <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center font-bold text-[16px] shrink-0 mt-1">
                       {index + 1}
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 space-y-6">
+                    <div className="flex-1 space-y-6 print:space-y-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <h3 className="font-sans font-normal text-[16px] text-[#0B1C30]">
-                            {q.text}
+                          {/* Display the Question Text */}
+                          <h3 className="font-sans font-normal text-[16px] text-[#0B1C30] whitespace-pre-wrap leading-[24px]">
+                            {qText}
                           </h3>
                         </div>
                         <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -239,18 +312,23 @@ export default function ExamResultPage() {
                               {result.status === "PENDING" ? "PENDING REVIEW" : "REVIEWED"}
                             </span>
                           )}
-                          {isMCQ && (
+                          {isMCQ ? (
                             <span className="font-sans font-bold text-[16px] text-[#9B3434]">
                               {isCorrect ? q.marks || 1 : 0}/{q.marks || 1} pts
+                            </span>
+                          ) : (
+                            <span className="font-sans font-bold text-[16px] text-[#9B3434]">
+                              {teacherMarks ?? 0}/{q.marks || 5} pts
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {q.imageUrl && (
-                        <div className="w-full max-w-2xl bg-stone-50 border border-stone-200 rounded-xl overflow-hidden flex items-center justify-center">
+                      {/* Display Image if present */}
+                      {qImage && (
+                        <div className="w-full max-w-2xl bg-[#E0F2FE] border border-sky-100 p-6 rounded-xl overflow-hidden flex items-center justify-center print:border-stone-200">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={q.imageUrl} alt="Question attachment" className="max-w-full max-h-[300px]" />
+                          <img src={qImage} alt="Question Attachment" className="max-w-full max-h-[300px] rounded-lg shadow-sm" />
                         </div>
                       )}
 
@@ -261,9 +339,37 @@ export default function ExamResultPage() {
                         <p className="font-inter italic text-[14px] text-[#0B1C30] leading-[24px] max-w-3xl">
                           {isMCQ
                             ? selectedOptionText || "Not answered"
-                            : studentAnswerId || "Not answered"}
+                            : studentAnswerText || "Not answered"}
                         </p>
                       </div>
+                      
+                      {/* Show Correct Answer for MCQ if answered incorrectly */}
+                      {isMCQ && !isCorrect && correctOption && (
+                        <div className="space-y-2">
+                           <p className="font-inter font-bold text-[11px] text-[#15803D] uppercase tracking-widest">
+                            CORRECT ANSWER
+                          </p>
+                          <p className="font-inter font-medium text-[14px] text-[#15803D] bg-[#ECFDF5] px-4 py-2 rounded-lg border border-green-100 inline-block">
+                            {correctOption.text}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Teacher Feedback for this Question */}
+                        {parseFeedbackArray(teacherFeedback).length > 0 && (
+                          <div className="space-y-3 mt-4">
+                            {parseFeedbackArray(teacherFeedback).map(fb => (
+                              <div key={fb.id} className="p-4 rounded-[12px] bg-[#FFFBEB] border border-[#FEF3C7]">
+                                <span className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[#92400E] mb-2">
+                                  <span>{fb.role} FEEDBACK</span>
+                                </span>
+                                <p className="font-sans text-[14px] text-[#92400E] whitespace-pre-wrap leading-[20px]">
+                                  {fb.text}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   </div>
 
@@ -275,18 +381,23 @@ export default function ExamResultPage() {
             })}
           </div>
 
-          {/* Overall Teacher Feedback (exam-level, not per-question) */}
-          {result.feedback && (
-            <div className="mt-12 bg-[#F0F9FF] border border-sky-100 rounded-xl p-5 max-w-4xl">
+          {/* Overall Teacher Feedback */}
+          {parseFeedbackArray(result.feedback).length > 0 && (
+            <div className="mt-12 bg-[#F0F9FF] border border-sky-100 rounded-xl p-5 max-w-4xl print:break-inside-avoid">
               <div className="flex items-center gap-2 mb-2.5">
                 <MessageSquare className="w-4 h-4 text-[#0EA5E9]" />
                 <span className="font-inter font-bold text-[12px] text-[#0EA5E9] uppercase tracking-wider">
-                  OVERALL TEACHER FEEDBACK{result.grade ? ` • GRADE: ${result.grade}` : ""}
+                  OVERALL FEEDBACK{result.grade ? ` • GRADE: ${result.grade}` : ""}
                 </span>
               </div>
-              <p className="font-inter text-[14px] text-[#0B1C30] leading-[21px]">
-                {result.feedback}
-              </p>
+              <div className="space-y-3">
+                 {parseFeedbackArray(result.feedback).map((fb) => (
+                    <div key={fb.id} className="font-inter text-[14px] text-[#0B1C30] leading-[21px] p-3 bg-white rounded-lg border border-sky-50 shadow-sm">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-[#0EA5E9] mb-1">{fb.role} Feedback</div>
+                      <div className="whitespace-pre-wrap">{fb.text}</div>
+                    </div>
+                 ))}
+              </div>
             </div>
           )}
         </div>

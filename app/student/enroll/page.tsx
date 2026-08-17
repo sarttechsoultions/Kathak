@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import type { Country as PhoneCountryCode } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -26,6 +27,7 @@ import {
   Film,
   Users,
   CreditCard,
+  Loader2,
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
@@ -167,6 +169,7 @@ export default function StudentEnrollPage() {
   const [cityError, setCityError] = useState("");
   const [postalCodeError, setPostalCodeError] = useState("");
   const [addressError, setAddressError] = useState("");
+  const [submitError, setSubmitError] = useState("");
 
   // STEP 2 FIELDS
   const [courseId, setCourseId] = useState("");
@@ -411,63 +414,153 @@ export default function StudentEnrollPage() {
     }
   };
 
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      if (document.getElementById("razorpay-checkout-script")) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.id = "razorpay-checkout-script";
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleCompleteEnrollment = async () => {
+    if (!batchId) {
+      alert("Please select a batch before proceeding to payment.");
+      return;
+    }
+
     setIsSubmitted(true);
+    
     try {
-      const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
+      // 1. Load Razorpay Script
+      const resRazorpay = await loadRazorpay();
+      if (!resRazorpay) {
+        alert("Razorpay SDK failed to load. Are you online?");
+        setIsSubmitted(false);
+        return;
+      }
+
+      // 2. Create Order from Backend
+      const orderRes = await apiRequest(ENDPOINTS.CREATE_ORDER, {
         method: "POST",
-        body: JSON.stringify({
-          fullName,
-          email,
-          phone,
-          country: selectedCountry?.name || "India",
-          countryCode: selectedCountry
-            ? `+${selectedCountry.phonecode}`
-            : "+91",
-          password,
-          dob,
-          gender,
-          address,
-          region: selectedState?.name || "",
-          city: selectedCity?.name || "",
-          postalCode,
-          profileImage,
-          courseTitle: selectedCourseObj?.title || "",
-          courseId: selectedCourseObj?.id,
-          batchId,
-          batch: selectedBatch?.name || "",
-          joiningDate: getTodayDateString(), // 🔥 Auto-captured Joining Date
-          isUnder18,
-          guardianName,
-          relationship,
-          emergencyContact,
-          paymentMethod,
-          groupFeeINR: selectedCourseObj?.groupFeeINR || 2200,
-          groupFeeUSD: selectedCourseObj?.groupFeeUSD || 50,
-        }),
+        body: JSON.stringify({ batchId }),
       });
 
-      const token = res?.data?.token;
-      const user = res?.data?.user;
-
-      if (token) {
-        localStorage.setItem("kathak_student_token", token);
-        localStorage.setItem("kathak_token", token);
+      if (!orderRes || orderRes.status === "error") {
+        alert(orderRes?.message || "Failed to create payment order.");
+        setIsSubmitted(false);
+        return;
       }
 
-      if (user) {
-        localStorage.setItem("kathak_student_user", JSON.stringify(user));
-      }
+      const { orderId, amount, currency, keyId } = orderRes.data;
 
-      await openThemeSuccess(
-        `Congratulations ${fullName}! Your enrollment for "${selectedCourseObj?.title || "your selected course"}" is complete. Redirecting to your Student Portal...`,
-        "Enrollment & Course Unlocked"
-      );
+      // 3. Open Razorpay Checkout Window
+      console.log("ORDER RES:", orderRes);
 
-      router.push("/student/dashboard");
+      const options = {
+        key: keyId,
+        amount: amount.toString(),
+        currency: currency,
+        name: "Kathak Academy",
+        description: `Enrollment Fee for ${selectedCourseObj?.title}`,
+        image: "/logo.png", // Replace with actual logo URL if you have one
+        order_id: orderId,
+        handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
+          try {
+            // 4. On Payment Success, submit full registration form
+            const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
+              method: "POST",
+              body: JSON.stringify({
+                fullName,
+                email,
+                phone,
+                country: selectedCountry?.name || "India",
+                countryCode: selectedCountry
+                  ? `+${selectedCountry.phonecode}`
+                  : "+91",
+                password,
+                dob,
+                gender,
+                address,
+                region: selectedState?.name || "",
+                city: selectedCity?.name || "",
+                postalCode,
+                profileImage,
+                courseTitle: selectedCourseObj?.title || "",
+                courseId: selectedCourseObj?.id,
+                batchId,
+                batch: selectedBatch?.name || "",
+                joiningDate: getTodayDateString(),
+                isUnder18,
+                guardianName,
+                relationship,
+                emergencyContact,
+                paymentMethod: "RAZORPAY",
+                groupFeeINR: selectedCourseObj?.groupFeeINR || 2200,
+                groupFeeUSD: selectedCourseObj?.groupFeeUSD || 50,
+                // Razorpay verification details
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+
+            const token = res?.data?.token;
+            const user = res?.data?.user;
+
+            if (res.status === "success" && token) {
+              if (token) {
+                localStorage.setItem("kathak_student_token", token);
+                localStorage.setItem("kathak_token", token);
+              }
+              if (user) {
+                localStorage.setItem("kathak_student_user", JSON.stringify(user));
+              }
+
+              await openThemeSuccess(
+                `Congratulations ${fullName}! Your enrollment for "${selectedCourseObj?.title || "your selected course"}" is complete. Redirecting to your Student Portal...`,
+                "Enrollment & Course Unlocked"
+              );
+              router.push("/student/dashboard");
+            } else {
+              setSubmitError(res?.message || "Registration failed after payment.");
+              setIsSubmitted(false);
+            }
+          } catch (error) {
+            console.error(error);
+            setSubmitError("Network error occurred during final enrollment processing.");
+            setIsSubmitted(false);
+          }
+        },
+        prefill: {
+          name: fullName,
+          email: email,
+          contact: `${selectedCountry ? `+${selectedCountry.phonecode}` : "+91"}${phone}`,
+        },
+        theme: {
+          color: "#900C27", // Branded Kathak Academy Red
+        },
+      };
+
+      const rzp1 = new (window as unknown as { Razorpay: new (options: unknown) => { on: (event: string, callback: (response: { error: { description: string } }) => void) => void; open: () => void } }).Razorpay(options);
+      
+      rzp1.on("payment.failed", function (response: { error: { description: string } }) {
+        alert(`Payment Failed! Reason: ${response.error.description}`);
+        setIsSubmitted(false);
+      });
+
+      rzp1.open();
+
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      alert(message || "Failed to complete enrollment.");
+      alert(message || "Failed to initiate payment.");
+      setSubmitError(message || "Failed to initiate payment.");
       setIsSubmitted(false);
     }
   };

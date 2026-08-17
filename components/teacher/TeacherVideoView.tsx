@@ -328,6 +328,7 @@ export default function TeacherVideoView() {
 
       const xhr = new XMLHttpRequest();
       xhr.open("POST", endpoint, true);
+      xhr.withCredentials = true; // Send HttpOnly cookie
       if (token) {
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       }

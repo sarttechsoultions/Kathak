@@ -212,7 +212,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#1B1B24] flex selection:bg-[#900C27] selection:text-white font-sans">
       {/* MOBILE TOP NAVIGATION BAR */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between shadow-2xs">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between shadow-2xs print:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -233,7 +233,7 @@ useEffect(() => {
 
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r border-stone-200 flex flex-col justify-between transition-all duration-300 ${
+        className={`fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r border-stone-200 flex flex-col justify-between transition-all duration-300 print:hidden ${
           collapsed ? "w-20" : "w-[250px]"
         } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -295,8 +295,8 @@ useEffect(() => {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0">
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 px-6 lg:px-10 py-3.5 flex items-center justify-between gap-4">
+      <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0 print:pt-0">
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 px-6 lg:px-10 py-3.5 flex items-center justify-between gap-4 print:hidden">
           <div className="flex-1 max-w-md">
             <div className="relative">
               <Search className="w-4 h-4 text-stone-400 absolute left-4 top-1/2 -translate-y-1/2" />

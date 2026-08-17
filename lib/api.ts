@@ -1,4 +1,3 @@
-
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
 
 interface RequestOptions extends RequestInit {
@@ -47,6 +46,7 @@ export async function apiRequest<T = any>(
   const response = await fetch(url, {
     ...options,
     credentials: "include", 
+    cache: "no-store",
     headers: {
       ...defaultHeaders,
       ...options.headers,
@@ -82,9 +82,13 @@ export const ENDPOINTS = {
   ADMIN_FINANCE: "/admin/finance",
   ADMIN_CERTIFICATES: "/admin/certificates",
   ADMIN_EXAMS: "/admin/exams",
+  ADMIN_REPORTS_OVERVIEW: "/admin/reports/overview",
   STUDENT_ENROLL: "/student/enroll",
   PUBLIC_COURSES: "/student/public/courses",
+  SUPPORT_SUBMIT: "/support/ticket",
+  NOTIFICATIONS: "/notifications",
   INQUIRIES: "/inquiries",
+  ADMIN_INQUIRIES: "/admin/inquiries",
   ADMIN_COURSES: "/admin/courses",
   ADMIN_COURSE_BY_ID: "/admin/courses/:id",
   COURSES: "/courses",
@@ -98,5 +102,10 @@ export const ENDPOINTS = {
   UPLOAD_FILE: "/upload/file",
   ADMIN_RECORDED_CLASSES: "/admin/recorded-classes",
   STUDENT_RECORDED_CLASSES: "/student/recorded-classes",
-  
+  ADMIN_EVENTS: "/admin/events",
+  ADMIN_EVENTS_STATS: "/admin/events/stats",
+  STUDENT_EVENTS: "/student/events",
+  STUDENT_COMPETITION_TRACK: "/student/competition/track",
+  TEACHER_SETTINGS: "/teacher/settings",
+  CREATE_ORDER: "/payment/create-order",
 };

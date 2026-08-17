@@ -139,8 +139,6 @@ export default function StudentExamsPage() {
     const target = activeFilterTab.toUpperCase();
     return examsList.filter((e) => e.category?.toUpperCase() === target);
   }, [examsList, activeFilterTab]);
-
-  // ── Pagination ──
   const totalPages = Math.max(1, Math.ceil(filteredExams.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedExams = filteredExams.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -152,9 +150,9 @@ export default function StudentExamsPage() {
 
 const handleViewExam = (exam: ExamItem) => {
   if (exam.resultId) {
-    router.push(`/student/exams/result/${exam.resultId}`);
+    router.push(`/student/exam/results/${exam.resultId}`);
   } else if (exam.status === "Upcoming" || exam.status === "LIVE") {  
-    router.push(`/student/exams/take/${exam.id}`);
+    router.push(`/student/exam/take/${exam.id}`);
   } else {
     alert("This exam is either missed or not available.");
   }
@@ -187,7 +185,7 @@ const handleViewExam = (exam: ExamItem) => {
               </div>
             </div>
             <button
-              onClick={() => router.push(`/student/exams/${nextUpcomingExam.id}/attempt`)}
+              onClick={() => router.push(`/student/${nextUpcomingExam.id}/attempt`)}
               className="px-6 py-2.5 rounded-[12px] bg-[#D97706] hover:bg-[#B45309] text-white text-[12px] font-bold transition-all shadow-sm shrink-0"
             >
               Join Exam Lobby

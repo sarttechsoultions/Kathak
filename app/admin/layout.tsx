@@ -27,7 +27,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           router.replace("/admin/dashboard");
         }
       } else {
-        setIsAuthenticated(true);
+        // Avoid calling setState synchronously within the effect to prevent cascading renders
+        setTimeout(() => setIsAuthenticated(true), 0);
       }
       return;
     }
@@ -46,7 +47,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     if (currentUser && canAccessRoute(currentUser, pathname)) {
-      setIsAuthenticated(true);
+      // Avoid calling setState synchronously within the effect to prevent cascading renders
+      setTimeout(() => setIsAuthenticated(true), 0);
     } else if (currentUser && !canAccessRoute(currentUser, pathname)) {
       const destination = getDefaultAccessibleRoute(currentUser);
       router.replace(destination || "/admin/login");

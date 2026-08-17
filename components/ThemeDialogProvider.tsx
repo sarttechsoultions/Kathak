@@ -1,9 +1,10 @@
 "use client";
 
 import { CheckCircle2, HelpCircle, Info, X, ShieldAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type DialogKind = "alert" | "confirm" | "prompt" | "success" | "error";
+type DialogResolveValue = boolean | string | null;
 
 interface ToastItem {
   id: string;
@@ -17,7 +18,7 @@ interface DialogRequest {
   message: string;
   title?: string;
   defaultValue?: string;
-  resolve?: (value: any) => void;
+  resolve?: (value: DialogResolveValue) => void;
 }
 
 const DIALOG_EVENT = "kathak:theme-dialog";
@@ -53,10 +54,21 @@ export function openThemePrompt(message: string, title = "Enter details", defaul
   );
 }
 
+// SSR pe hamesha false, client pe mount hote hi true — bina kisi Effect + setState ke,
+// isliye "setState synchronously within an effect" wala warning nahi aata.
+function useMounted() {
+  return useSyncExternalStore(
+    () => () => {}, // subscribe: koi external store nahi hai, no-op
+    () => true, // client snapshot
+    () => false // server snapshot
+  );
+}
+
 export default function ThemeDialogProvider() {
   const [modalDialog, setModalDialog] = useState<DialogRequest | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const mounted = useMounted();
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -82,42 +94,21 @@ export default function ThemeDialogProvider() {
 
     const handleToast = (event: Event) => {
       const toastDetail = (event as CustomEvent<Omit<ToastItem, "id">>).detail;
-      const newToast: ToastItem = {
-        id: `toast-${Date.now()}-${Math.random()}`,
-        ...toastDetail
-      };
-
+      const newToast: ToastItem = { id: `toast-${Date.now()}-${Math.random()}`, ...toastDetail };
       setToasts((prev) => [...prev, newToast]);
-
-      // Auto dismiss after 3.5 seconds
-      setTimeout(() => {
-        removeToast(newToast.id);
-      }, 3500);
+      setTimeout(() => removeToast(newToast.id), 3500);
     };
 
     window.alert = (message?: string) => {
       const msgStr = String(message ?? "");
       const lower = msgStr.toLowerCase();
+      const isSuccess = Boolean(lower.match(/(success|created|saved|updated|deleted|uploaded|added)/));
+      const isError = Boolean(lower.match(/(failed|error|invalid|denied)/));
 
-      const isSuccess =
-        lower.includes("success") ||
-        lower.includes("created") ||
-        lower.includes("saved") ||
-        lower.includes("updated") ||
-        lower.includes("deleted") ||
-        lower.includes("uploaded") ||
-        lower.includes("added");
-
-      const isError =
-        lower.includes("failed") ||
-        lower.includes("error") ||
-        lower.includes("invalid") ||
-        lower.includes("denied");
-
-      const kind = isSuccess ? "success" : isError ? "error" : "alert";
+      const kind: "success" | "error" | "alert" = isSuccess ? "success" : isError ? "error" : "alert";
       const title = isSuccess ? "Action Successful!" : isError ? "Error Occurred" : "Notification";
 
-      openToast({ kind: kind as any, message: msgStr, title });
+      openToast({ kind, message: msgStr, title });
     };
 
     window.addEventListener(DIALOG_EVENT, handleDialog);
@@ -130,15 +121,19 @@ export default function ThemeDialogProvider() {
     };
   }, []);
 
-  const closeModal = (result: any = null) => {
+  const closeModal = (result: DialogResolveValue = null) => {
     modalDialog?.resolve?.(result);
     setModalDialog(null);
   };
 
+  // Server render aur pehla client render dono mein kuch bhi render nahi hota.
+  // Toasts/modal sirf client events se trigger hote hain, isliye SSR ki koi zaroorat nahi.
+  if (!mounted) return null;
+
   return (
     <>
-      {/* Top Right Floating Toast Notifications Stack */}
-      <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+      {/* Top Right Floating Toast Notifications */}
+      <div className="fixed top-6 right-6 z-[1000] flex flex-col gap-3 pointer-events-none max-w-[320px] w-full [font-family:'Inter',_sans-serif]">
         {toasts.map((toast) => {
           const isSuccess = toast.kind === "success";
           const isError = toast.kind === "error";
@@ -146,54 +141,27 @@ export default function ThemeDialogProvider() {
           return (
             <div
               key={toast.id}
-              className={`pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl p-4 border shadow-xl flex items-start gap-3.5 transition-all duration-300 animate-in slide-in-from-top-5 fade-in relative overflow-hidden ${
-                isSuccess
-                  ? "border-emerald-200/80 shadow-emerald-950/10"
-                  : isError
-                  ? "border-rose-200/80 shadow-rose-950/10"
-                  : "border-stone-200 shadow-stone-900/10"
-              }`}
+              className="pointer-events-auto bg-white rounded-xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 flex items-start gap-3 transition-all duration-300 animate-in slide-in-from-top-4 fade-in"
             >
-              {/* Left Color Accent Bar */}
-              <div
-                className={`absolute top-0 bottom-0 left-0 w-1.5 ${
-                  isSuccess ? "bg-emerald-500" : isError ? "bg-rose-600" : "bg-[#9E0C25]"
-                }`}
-              />
-
-              {/* Toast Icon */}
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                  isSuccess
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
-                    : isError
-                    ? "bg-rose-50 text-rose-600 border border-rose-200/60"
-                    : "bg-rose-50 text-[#9E0C25]"
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                  isSuccess ? "bg-green-50 text-green-600" : isError ? "bg-red-50 text-red-600" : "bg-[#9B3434]/10 text-[#9B3434]"
                 }`}
               >
-                {isSuccess ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                ) : isError ? (
-                  <ShieldAlert className="w-5 h-5 text-rose-600" />
-                ) : (
-                  <Info className="w-5 h-5 text-[#9E0C25]" />
-                )}
+                {isSuccess ? <CheckCircle2 className="w-4 h-4" /> : isError ? <ShieldAlert className="w-4 h-4" /> : <Info className="w-4 h-4" />}
               </div>
 
-              {/* Toast Content */}
-              <div className="flex-1 space-y-0.5 pr-2">
-                <h4 className="font-sans font-bold text-xs text-stone-900 leading-snug">
+              <div className="flex-1 pt-0.5">
+                <h4 className="font-semibold text-[13px] text-gray-900 mb-0.5 [font-family:'Plus_Jakarta_Sans',_sans-serif]">
                   {toast.title}
                 </h4>
-                <p className="font-sans text-[11.5px] font-medium text-stone-600 leading-relaxed">
+                <p className="text-[12px] text-gray-500 leading-relaxed">
                   {toast.message}
                 </p>
               </div>
 
-              {/* Close Button */}
               <button
                 onClick={() => removeToast(toast.id)}
-                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg hover:bg-stone-100 transition-colors shrink-0 cursor-pointer"
+                className="text-gray-400 hover:text-gray-700 p-1 rounded-md hover:bg-gray-50 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -202,54 +170,48 @@ export default function ThemeDialogProvider() {
         })}
       </div>
 
-      {/* Modal Dialog for Confirmations / Prompts */}
+      {/* Modal Dialog (Clean & Professional) */}
       {modalDialog && (
-        <div className="fixed inset-0 z-[999] bg-stone-900/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6 border border-stone-100 animate-in zoom-in-95 duration-200 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#9E0C25] to-rose-600" />
+        <div className="fixed inset-0 z-[999] bg-gray-900/40 flex items-center justify-center p-4 transition-opacity [font-family:'Inter',_sans-serif]">
+          <div className="bg-white rounded-[16px] p-6 max-w-[380px] w-full shadow-2xl animate-in zoom-in-95 duration-200">
 
-            <button
-              onClick={() => closeModal(false)}
-              className="absolute top-4 right-4 p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="flex flex-col items-center space-y-3 pt-2">
-              <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 border border-amber-200/80 shadow-amber-500/10 flex items-center justify-center shadow-lg">
-                <HelpCircle className="w-9 h-9 text-amber-600" />
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-[#9B3434]/10 text-[#9B3434] flex items-center justify-center">
+                <HelpCircle className="w-6 h-6" />
               </div>
 
-              <div className="space-y-1 text-center max-w-xs mx-auto">
-                <h3 className="font-sans font-bold text-xl text-stone-900 tracking-tight">
+              <div className="space-y-1.5">
+                <h3 className="font-bold text-[18px] text-[#0B1C30] [font-family:'Plus_Jakarta_Sans',_sans-serif]">
                   {modalDialog.title || "Please Confirm"}
                 </h3>
-                <p className="text-xs sm:text-sm text-stone-600 font-medium leading-relaxed pt-1">
+                <p className="text-[14px] text-gray-500 leading-relaxed">
                   {modalDialog.message}
                 </p>
               </div>
             </div>
 
             {modalDialog.kind === "prompt" && (
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                className="w-full h-11 px-4 rounded-xl bg-stone-50 border border-stone-200 text-stone-900 font-semibold text-xs focus:bg-white focus:outline-none focus:border-[#9E0C25]"
-                placeholder="Type your response..."
-              />
+              <div className="mt-5">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  className="w-full h-[44px] px-4 rounded-[8px] bg-white border border-gray-200 text-gray-900 text-[14px] focus:outline-none focus:border-[#9B3434] focus:ring-1 focus:ring-[#9B3434] transition-all"
+                  placeholder="Type your response..."
+                />
+              </div>
             )}
 
-            <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="flex items-center gap-3 mt-6">
               <button
                 onClick={() => closeModal(modalDialog.kind === "prompt" ? null : false)}
-                className="flex-1 h-11 rounded-xl border border-stone-300 text-stone-700 font-bold text-xs hover:bg-stone-100 transition-all cursor-pointer"
+                className="flex-1 h-[42px] rounded-[8px] border border-gray-200 text-gray-600 font-medium text-[14px] hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => closeModal(modalDialog.kind === "prompt" ? inputValue : true)}
-                className="flex-1 h-11 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-extrabold text-xs shadow-md transition-all cursor-pointer"
+                className="flex-1 h-[42px] rounded-[8px] bg-[#9B3434] hover:bg-[#832c2c] text-white font-medium text-[14px] transition-colors"
               >
                 Confirm
               </button>

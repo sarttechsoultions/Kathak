@@ -9,7 +9,7 @@ export const SIDEBAR_PERMISSIONS = [
   { value: "MANAGE_RECORDED_CLASSES", label: "Recorded Classes", href: "/admin/recorded-class" },
   { value: "MANAGE_VIDEO_REVIEWS", label: "Video Reviews", href: "/admin/video-review" },
   { value: "MANAGE_EXAMS", label: "Exams", href: "/admin/exam" },
-  { value: "VIEW_EXAM_RESULTS", label: "Exam Results", href: "/admin/exam-results" },
+  { value: "VIEW_EXAM_RESULTS", label: "Exam Results", href: "/admin/exam/results" },
   { value: "MANAGE_ATTENDANCE", label: "Attendance", href: "/admin/attendance" },
   { value: "MANAGE_EVENTS", label: "Events & Workshops", href: "/admin/events" },
   { value: "MANAGE_COMMUNICATION", label: "Communication", href: "/admin/communication" },

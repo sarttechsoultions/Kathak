@@ -19,6 +19,26 @@ export default function CombinedLoginPage() {
   const [error, setError] = useState("");
   const [isFlipping, setIsFlipping] = useState(false);
 
+  // If already logged in, redirect to respective dashboard
+  React.useEffect(() => {
+    const savedSession = localStorage.getItem("kathak_session_user");
+    if (savedSession) {
+      try {
+        const user = JSON.parse(savedSession);
+        if (user.role === "ADMIN") {
+          router.replace("/admin/dashboard");
+        } else if (user.role === "TEACHER") {
+          router.replace("/teacher/dashboard");
+        } else {
+          router.replace("/student/dashboard");
+        }
+      } catch (err) {
+        // parsing failed, clear and stay
+        localStorage.removeItem("kathak_session_user");
+      }
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

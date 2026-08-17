@@ -285,6 +285,7 @@ export default function TeacherAssignmentsView() {
     try {
       const url = await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+      xhr.withCredentials = true; 
         xhr.open("POST", endpoint);
 
         if (token) {
@@ -1791,17 +1792,36 @@ console.log("UI teacherBatches length:", teacherBatches.length, teacherBatches);
                       <div className="space-y-3 w-full text-center">
                         <div className="flex items-center justify-center gap-2 text-emerald-700 font-extrabold text-xs">
                           <Check className="w-5 h-5 bg-emerald-500 text-white rounded-full p-0.5" />
-                          <span>{uploadedFileName || uploadedFile?.name || "Uploaded Reference Video"}</span>
+                          <span>{uploadedFileName || uploadedFile?.name || "Uploaded Reference File"}</span>
                         </div>
 
-                        {/* Interactive Video Preview Player */}
+                        {/* Interactive Preview Player */}
                         <div className="max-w-md mx-auto rounded-2xl overflow-hidden shadow-lg border border-stone-800 bg-black aspect-video flex items-center justify-center">
-                          <video
-                            src={uploadedFileUrl}
-                            controls
-                            playsInline
-                            className="w-full h-full object-contain"
-                          />
+                          {(() => {
+                            const fileName = uploadedFileName || uploadedFile?.name || uploadedFileUrl || "";
+                            const isPdf = fileName.toLowerCase().endsWith(".pdf") || uploadedFile?.type === "application/pdf";
+                            const isImage = uploadedFile?.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                            
+                            if (isPdf) {
+                              return (
+                                <iframe src={uploadedFileUrl} className="w-full h-full bg-white" title="PDF Preview" />
+                              );
+                            } else if (isImage) {
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              return (
+                                <img src={uploadedFileUrl} className="w-full h-full object-contain bg-stone-900" alt="Preview" />
+                              );
+                            } else {
+                              return (
+                                <video
+                                  src={uploadedFileUrl}
+                                  controls
+                                  playsInline
+                                  className="w-full h-full object-contain"
+                                />
+                              );
+                            }
+                          })()}
                         </div>
 
                         <div className="pt-1 flex items-center justify-center gap-3">

@@ -1,11 +1,153 @@
 'use client';
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
+import { apiRequest, ENDPOINTS } from '@/lib/api';
+import { openThemeSuccess, openThemeError } from '@/components/ThemeDialogProvider';
+import { Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
-  const [smsNotifs, setSmsNotifs] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Profile State
+  const [profile, setProfile] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    designation: '',
+    avatarUrl: ''
+  });
+
+  // Security State
+  const [passwords, setPasswords] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  // Notification State
+  const [notifs, setNotifs] = useState({
+    emailNotifs: true,
+    pushNotifs: true,
+    smsNotifs: false
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await apiRequest<{ status: string; data: any }>(ENDPOINTS.TEACHER_SETTINGS);
+        if (res.status === "success" && res.data) {
+          setProfile({
+            fullName: res.data.fullName || "",
+            email: res.data.email || "",
+            phone: res.data.phone || "",
+            designation: res.data.designation || res.data.primaryExpertise || "",
+            avatarUrl: res.data.avatarUrl || ""
+          });
+          
+          if (res.data.notificationPrefs) {
+            setNotifs({
+              emailNotifs: res.data.notificationPrefs.emailNotifs ?? true,
+              pushNotifs: res.data.notificationPrefs.pushNotifs ?? true,
+              smsNotifs: res.data.notificationPrefs.smsNotifs ?? false
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setProfile({ ...profile, [e.target.name]: e.target.value });
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPasswords({ ...passwords, [e.target.name]: e.target.value });
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const payload = {
+        fullName: profile.fullName,
+        phone: profile.phone,
+        designation: profile.designation,
+        avatarUrl: profile.avatarUrl
+      };
+      await apiRequest(`${ENDPOINTS.TEACHER_SETTINGS}/profile`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      openThemeSuccess("Profile Updated", "Your personal information has been saved.");
+    } catch (error: any) {
+      openThemeError(error.message || "Failed to update profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSecurity = async () => {
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      openThemeError("Passwords do not match");
+      return;
+    }
+    if (!passwords.currentPassword) {
+      openThemeError("Please enter your current password");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiRequest(`${ENDPOINTS.TEACHER_SETTINGS}/security`, {
+        method: "PUT",
+        body: JSON.stringify({
+          currentPassword: passwords.currentPassword,
+          newPassword: passwords.newPassword
+        })
+      });
+      openThemeSuccess("Password Updated", "Your password has been changed securely.");
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      openThemeError(error.message || "Failed to update password");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveNotifs = async () => {
+    setIsSaving(true);
+    try {
+      await apiRequest(`${ENDPOINTS.TEACHER_SETTINGS}/notifications`, {
+        method: "PUT",
+        body: JSON.stringify(notifs)
+      });
+      openThemeSuccess("Preferences Saved", "Your notification settings have been updated.");
+    } catch (error: any) {
+      openThemeError(error.message || "Failed to save notifications");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveCurrentTab = () => {
+    if (activeTab === 'profile') handleSaveProfile();
+    else if (activeTab === 'security') handleSaveSecurity();
+    else if (activeTab === 'notifications') handleSaveNotifs();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#A42E30]" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-8 text-[#0B1C30]" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -67,13 +209,6 @@ export default function SettingsPage() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 Security & Password
               </button>
-
-              <div className="pt-4 mt-4 border-t border-gray-100">
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[14px] font-semibold text-[#EF4444] hover:bg-[#FEF2F2] transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  Log Out
-                </button>
-              </div>
             </nav>
           </div>
 
@@ -88,57 +223,43 @@ export default function SettingsPage() {
                   <p className="text-[14px] text-gray-500 mt-1">Update your photo and personal details here.</p>
                 </div>
 
-                {/* Avatar Upload */}
                 <div className="flex items-center gap-6 mb-8 pb-8 border-b border-gray-100">
                   <div className="relative">
-                    <img src="https://i.pravatar.cc/150?img=47" alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-gray-50" />
-                    <button className="absolute bottom-0 right-0 w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-600 hover:text-[#A42E30] hover:border-[#A42E30] shadow-sm transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
+                    <img src={profile.avatarUrl || "https://i.pravatar.cc/150?img=47"} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-gray-50" />
                   </div>
                   <div>
                     <div className="flex gap-3">
                       <button className="bg-[#A42E30] hover:bg-[#8B2627] text-white text-[13px] font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm">
                         Change Photo
                       </button>
-                      <button className="bg-white border border-gray-200 hover:bg-gray-50 text-[#464555] text-[13px] font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm">
-                        Remove
-                      </button>
                     </div>
                     <p className="text-[12px] text-gray-500 mt-2">JPG, GIF or PNG. Max size of 2MB.</p>
                   </div>
                 </div>
 
-                {/* Form Fields */}
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">First Name</label>
-                      <input type="text" defaultValue="Priya" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Last Name</label>
-                      <input type="text" defaultValue="Iyer" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
-                    </div>
+                  <div>
+                    <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Full Name</label>
+                    <input type="text" name="fullName" value={profile.fullName} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
                       <div className="relative">
-                        <input type="email" defaultValue="priya.iyer@institution.edu" className="w-full bg-gray-50 border border-gray-200 text-gray-500 text-[14px] font-medium py-3 pl-10 pr-4 rounded-xl outline-none cursor-not-allowed" readOnly />
+                        <input type="email" value={profile.email} className="w-full bg-gray-50 border border-gray-200 text-gray-500 text-[14px] font-medium py-3 pl-10 pr-4 rounded-xl outline-none cursor-not-allowed" readOnly />
                         <svg className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
                       </div>
                     </div>
                     <div>
                       <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
-                      <input type="tel" defaultValue="+91 98765 43210" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
+                      <input type="tel" name="phone" value={profile.phone} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Department / Bio</label>
-                    <textarea rows={3} defaultValue="Senior Instructor - Bharatnatyam Intermediate level. Focused on classical expressions and foundational footwork." className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all resize-none"></textarea>
+                    <textarea name="designation" value={profile.designation} onChange={handleProfileChange} rows={3} className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all resize-none"></textarea>
                   </div>
                 </div>
               </div>
@@ -159,8 +280,8 @@ export default function SettingsPage() {
                       <div className="text-[15px] font-bold text-[#0B1C30]">Email Notifications</div>
                       <div className="text-[13px] text-gray-500 mt-1">Receive daily summaries and important alerts directly to your inbox.</div>
                     </div>
-                    <button onClick={() => setEmailNotifs(!emailNotifs)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${emailNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${emailNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <button onClick={() => setNotifs({...notifs, emailNotifs: !notifs.emailNotifs})} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifs.emailNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifs.emailNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
 
@@ -170,8 +291,8 @@ export default function SettingsPage() {
                       <div className="text-[15px] font-bold text-[#0B1C30]">Push Notifications</div>
                       <div className="text-[13px] text-gray-500 mt-1">Get real-time alerts for student submissions and leave approvals.</div>
                     </div>
-                    <button onClick={() => setPushNotifs(!pushNotifs)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pushNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${pushNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <button onClick={() => setNotifs({...notifs, pushNotifs: !notifs.pushNotifs})} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifs.pushNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifs.pushNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
 
@@ -181,8 +302,8 @@ export default function SettingsPage() {
                       <div className="text-[15px] font-bold text-[#0B1C30]">SMS Alerts</div>
                       <div className="text-[13px] text-gray-500 mt-1">Only receive messages for urgent system announcements.</div>
                     </div>
-                    <button onClick={() => setSmsNotifs(!smsNotifs)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${smsNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${smsNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <button onClick={() => setNotifs({...notifs, smsNotifs: !notifs.smsNotifs})} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifs.smsNotifs ? 'bg-[#A42E30]' : 'bg-gray-200'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifs.smsNotifs ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
                 </div>
@@ -200,28 +321,18 @@ export default function SettingsPage() {
                 <div className="space-y-6">
                   <div>
                     <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Current Password</label>
-                    <input type="password" placeholder="••••••••" className="w-full max-w-md bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
+                    <input type="password" name="currentPassword" value={passwords.currentPassword} onChange={handlePasswordChange} placeholder="••••••••" className="w-full max-w-md bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
                     <div>
                       <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">New Password</label>
-                      <input type="password" placeholder="Enter new password" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
+                      <input type="password" name="newPassword" value={passwords.newPassword} onChange={handlePasswordChange} placeholder="Enter new password" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
                     </div>
                     <div>
                       <label className="block text-[12px] font-bold text-gray-500 uppercase tracking-wider mb-2">Confirm New Password</label>
-                      <input type="password" placeholder="Confirm new password" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
+                      <input type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={handlePasswordChange} placeholder="Confirm new password" className="w-full bg-white border border-gray-200 text-[#0B1C30] text-[14px] font-medium py-3 px-4 rounded-xl outline-none focus:border-[#A42E30] focus:ring-1 focus:ring-[#A42E30] transition-all" />
                     </div>
-                  </div>
-
-                  <div className="pt-6 mt-8 border-t border-gray-100 flex items-center justify-between">
-                    <div>
-                      <div className="text-[15px] font-bold text-[#0B1C30]">Two-Factor Authentication (2FA)</div>
-                      <div className="text-[13px] text-gray-500 mt-1">Add an extra layer of security to your account.</div>
-                    </div>
-                    <button className="bg-white border border-gray-200 hover:bg-gray-50 text-[#0B1C30] text-[13px] font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm">
-                      Enable 2FA
-                    </button>
                   </div>
                 </div>
               </div>
@@ -232,7 +343,12 @@ export default function SettingsPage() {
               <button className="text-[14px] font-semibold text-[#464555] hover:text-[#0B1C30] transition-colors">
                 Cancel
               </button>
-              <button className="bg-[#A42E30] hover:bg-[#8B2627] text-white text-[14px] font-bold py-3 px-6 rounded-xl transition-all shadow-md shadow-[#A42E30]/20">
+              <button 
+                onClick={saveCurrentTab}
+                disabled={isSaving}
+                className="bg-[#A42E30] hover:bg-[#8B2627] text-white text-[14px] font-bold py-3 px-6 rounded-xl transition-all shadow-md shadow-[#A42E30]/20 disabled:opacity-70 flex items-center gap-2"
+              >
+                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Save Changes
               </button>
             </div>

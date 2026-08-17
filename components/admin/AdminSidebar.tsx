@@ -60,7 +60,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Recorded Class", icon: Film, href: "/admin/recorded-class" },
   { label: "Video Review", icon: Eye, href: "/admin/video-review" },
   { label: "Exam", icon: FileSpreadsheet, href: "/admin/exam" },
-  { label: "Exam Results", icon: Award, href: "/admin/exam-results" },
+  { label: "Exam Results", icon: Award, href: "/admin/exam/results" },
   { label: "Attendance", icon: CalendarCheck, href: "/admin/attendance" },
   { label: "Events & Workshops", icon: CalendarDays, href: "/admin/events" },
   { label: "Communication", icon: MessageSquare, href: "/admin/communication" },
@@ -215,7 +215,9 @@ export default function AdminSidebar({ isMobileOpen = false, onCloseMobile }: Ad
 
           const isActive =
             pathname === item.href ||
-            (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"));
+            (item.href !== "/admin/dashboard" &&
+              pathname.startsWith(item.href + "/") &&
+              !(item.href === "/admin/exam" && pathname.startsWith("/admin/exam/results")));
 
           return (
             <Link
