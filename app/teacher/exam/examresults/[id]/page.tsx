@@ -52,7 +52,7 @@ export default function ExamResultDetail() {
   useEffect(() => {
     const fetchResultDetail = async () => {
       try {
-        const res = await apiRequest<{ data?: { results?: any[] } }>("/admin/exams/results");
+      const res = await apiRequest<{ data?: { results?: any[] } }>("/teacher/exams/results");
         if (res?.data?.results) {
           const currentResult = res.data.results.find(r => r.id === resultId);
           if (currentResult) {
@@ -185,7 +185,7 @@ export default function ExamResultDetail() {
     });
 
     try {
-      await apiRequest(`/admin/exams/results/${resultId}/evaluate`, {
+      await apiRequest(`/teacher/exams/results/${resultId}/evaluate`, {
         method: "POST",
         body: JSON.stringify({
           marksObtained: totalScore,

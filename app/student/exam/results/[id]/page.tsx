@@ -263,12 +263,13 @@ export default function ExamResultPage() {
 
           <div className="space-y-12 print:space-y-8">
             {questions.map((q, index) => {
-              const studentAnswerText = result.answersData?.[q.id] || "";
+              const qId = q.id || index.toString();
+              const studentAnswerText = result.answersData?.[qId] || result.answersData?.[q.id] || "";
               const isMCQ = q.questionType === "Multiple Choice";
               const correctOption = isMCQ ? q.options?.find((o) => o.isCorrect) : undefined;
               const isCorrect = isMCQ ? studentAnswerText === correctOption?.id : undefined;
               const selectedOptionText = isMCQ
-                ? q.options?.find((o) => o.id === studentAnswerText)?.text
+                ? q.options?.find((o, oIdx) => (o.id || `opt-${oIdx}`) === studentAnswerText || o.id === studentAnswerText)?.text
                 : undefined;
 
               // 👇 Fixed Question Text Mapping 👇
@@ -280,7 +281,7 @@ export default function ExamResultPage() {
               const teacherMarks = evaluation?.marks;
 
               return (
-                <React.Fragment key={q.id}>
+                <React.Fragment key={q.id || `q-${index}`}>
                   <div className="flex gap-4 sm:gap-6 group print:break-inside-avoid">
                     {/* Question Number */}
                     <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center font-bold text-[16px] shrink-0 mt-1">
@@ -324,11 +325,15 @@ export default function ExamResultPage() {
                         </div>
                       </div>
 
-                      {/* Display Image if present */}
+                      {/* Display Image/Video if present */}
                       {qImage && (
                         <div className="w-full max-w-2xl bg-[#E0F2FE] border border-sky-100 p-6 rounded-xl overflow-hidden flex items-center justify-center print:border-stone-200">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={qImage} alt="Question Attachment" className="max-w-full max-h-[300px] rounded-lg shadow-sm" />
+                          {(q as any).mediaType === "video" || (typeof qImage === 'string' && (qImage.startsWith("data:video/") || qImage.includes("/video/upload/") || qImage.match(/\.(mp4|webm|ogg|mov)$/i))) ? (
+                            <video src={qImage} controls className="max-w-full max-h-[300px] rounded-lg outline-none shadow-sm" />
+                          ) : (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={qImage} alt="Question Attachment" className="max-w-full max-h-[300px] rounded-lg shadow-sm" />
+                          )}
                         </div>
                       )}
 

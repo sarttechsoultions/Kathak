@@ -241,7 +241,7 @@ export default function CreateNewExam() {
         }))
       };
 
-      await apiRequest("/admin/exams", {
+      await apiRequest("/teacher/exams", {
         method: "POST",
         body: JSON.stringify(payload)
       });
@@ -557,39 +557,41 @@ export default function CreateNewExam() {
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#0B1C30] mb-3">Answer Choices</label>
-                  <div className="space-y-3">
-                    {activeQ.options.map((opt, idx) => (
-                      <div key={opt.id} className={`flex items-center gap-4 ${!opt.isCorrect ? 'group' : ''}`}>
-                        {opt.isCorrect ? (
-                          <div className="w-5 h-5 rounded-full border-[6px] border-[#A42E30] bg-white flex-shrink-0 shadow-[0_0_0_1px_rgba(164,46,48,0.2)]"></div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setCorrectOption(opt.id)}
-                            className="w-5 h-5 rounded-full border border-gray-300 flex-shrink-0 group-hover:border-[#A42E30] transition-colors cursor-pointer"
-                          ></button>
-                        )}
-                        <input
-                          type="text"
-                          value={opt.text}
-                          onChange={(e) => updateOptionText(opt.id, e.target.value)}
-                          placeholder={`Option ${idx + 1}${opt.isCorrect ? ' (Correct Answer)' : ''}`}
-                          className={opt.isCorrect
-                            ? "flex-1 px-4 py-2.5 bg-[#FFF8F8] border border-[#FCA5A5] rounded-lg outline-none text-sm text-[#A42E30]"
-                            : "flex-1 px-4 py-2.5 bg-gray-50 border border-transparent rounded-lg outline-none focus:border-gray-300 focus:bg-white transition-all text-sm"
-                          }
-                        />
-                      </div>
-                    ))}
+                {activeQ.type === 'Multiple Choice' && (
+                  <div>
+                    <label className="block text-xs font-bold text-[#0B1C30] mb-3">Answer Choices</label>
+                    <div className="space-y-3">
+                      {activeQ.options.map((opt, idx) => (
+                        <div key={opt.id} className={`flex items-center gap-4 ${!opt.isCorrect ? 'group' : ''}`}>
+                          {opt.isCorrect ? (
+                            <div className="w-5 h-5 rounded-full border-[6px] border-[#A42E30] bg-white flex-shrink-0 shadow-[0_0_0_1px_rgba(164,46,48,0.2)]"></div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setCorrectOption(opt.id)}
+                              className="w-5 h-5 rounded-full border border-gray-300 flex-shrink-0 group-hover:border-[#A42E30] transition-colors cursor-pointer"
+                            ></button>
+                          )}
+                          <input
+                            type="text"
+                            value={opt.text}
+                            onChange={(e) => updateOptionText(opt.id, e.target.value)}
+                            placeholder={`Option ${idx + 1}${opt.isCorrect ? ' (Correct Answer)' : ''}`}
+                            className={opt.isCorrect
+                              ? "flex-1 px-4 py-2.5 bg-[#FFF8F8] border border-[#FCA5A5] rounded-lg outline-none text-sm text-[#A42E30]"
+                              : "flex-1 px-4 py-2.5 bg-gray-50 border border-transparent rounded-lg outline-none focus:border-gray-300 focus:bg-white transition-all text-sm"
+                            }
+                          />
+                        </div>
+                      ))}
 
-                    <button type="button" onClick={addOption} className="flex items-center gap-1.5 text-[#A42E30] text-xs font-bold mt-4 hover:underline">
-                      <Plus className="w-3.5 h-3.5" />
-                      Add Option
-                    </button>
+                      <button type="button" onClick={addOption} className="flex items-center gap-1.5 text-[#A42E30] text-xs font-bold mt-4 hover:underline">
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Option
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
               </div>
 

@@ -111,4 +111,10 @@ export const ENDPOINTS = {
   ADMIN_CLASSES: "/admin/classes",
   TEACHERS: "/teachers", 
   BATCHES: "/batches",
+  STUDENT_LEAVE: "/student/leave",
+  STUDENT_ATTENDANCE: "/student/attendance",
+  STUDENT_PROGRESS: "/student/progress",
+  CONTENT_LIBRARY_ADMIN: "/content/admin",
+  CONTENT_LIBRARY_STUDENT: "/content/student",
+  CONTENT_UPLOAD: "/content",
 };
