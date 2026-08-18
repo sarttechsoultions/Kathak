@@ -87,7 +87,7 @@ export default function AttendanceView() {
   };
 
   return <div className="space-y-8 animate-in fade-in duration-300 max-w-[1350px] mx-auto pb-12">
-    <div><h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900">Attendance Management</h1><p className="text-sm text-stone-500 mt-1">Mark and save attendance for enrolled students.</p></div>
+    <div><h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900">Attendance Management</h1><p className="text-sm text-stone-500 mt-1">Mark and save attendance for enrolled students.</p></div>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {summaryCards.map(({ Icon, label, value, color }) => <div key={label} className="bg-white rounded-2xl border border-stone-200 p-5"><Icon className={`w-5 h-5 ${color}`} /><p className="text-xs font-semibold text-stone-500 mt-3">{label}</p><p className="text-3xl font-black text-stone-900">{value}</p></div>)}
     </div>

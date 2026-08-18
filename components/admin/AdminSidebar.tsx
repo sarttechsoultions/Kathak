@@ -63,7 +63,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Exam Results", icon: Award, href: "/admin/exam/results" },
   { label: "Attendance", icon: CalendarCheck, href: "/admin/attendance" },
   { label: "Events & Workshops", icon: CalendarDays, href: "/admin/events" },
-  { label: "Communication", icon: MessageSquare, href: "/admin/communication" },
+  // { label: "Communication", icon: MessageSquare, href: "/admin/communication" },
   { label: "Content Library", icon: FolderKanban, href: "/admin/content-library" },
   { label: "Finance", icon: CreditCard, href: "/admin/finance" },
   {

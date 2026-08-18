@@ -96,7 +96,7 @@ export const ENDPOINTS = {
   AUTH_ME: "/auth/me",
   AUTH_CHANGE_PASSWORD: "/auth/change-password",
   AUTH_PROFILE: "/auth/profile",
-  LIVE_CLASS_TEACHER: "/liveclass/teacher/classes",
+  LIVE_CLASS_TEACHER: "/teacher/classes",
   UPLOAD_IMAGE: "/upload/image",
   UPLOAD_VIDEO: "/upload/video",
   UPLOAD_FILE: "/upload/file",
@@ -108,4 +108,7 @@ export const ENDPOINTS = {
   STUDENT_COMPETITION_TRACK: "/student/competition/track",
   TEACHER_SETTINGS: "/teacher/settings",
   CREATE_ORDER: "/payment/create-order",
+  ADMIN_CLASSES: "/admin/classes",
+  TEACHERS: "/teachers", 
+  BATCHES: "/batches",
 };
