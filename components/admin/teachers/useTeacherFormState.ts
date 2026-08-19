@@ -6,7 +6,7 @@ export function useTeacherFormState() {
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("Select Gender");
-  const [primaryExpertise, setPrimaryExpertise] = useState("Kathak");
+  const [primaryExpertise, setPrimaryExpertise] = useState<"Kathak" | "Bharatanatyam" | "Contemporary" | "Odissi">("Kathak");
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
