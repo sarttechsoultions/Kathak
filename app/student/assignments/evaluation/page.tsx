@@ -218,7 +218,7 @@ export default function StudentTaskEvaluationPage() {
         <div className="lg:col-span-8 bg-black rounded-[28px] overflow-hidden relative shadow-lg min-h-[380px] border border-stone-800 flex flex-col justify-between p-2 text-white">
           {AssignmentSourceUrl ? (
             <div className="w-full h-full flex flex-col justify-between min-h-[360px] relative">
-              <Assignment
+              <video
                 src={AssignmentSourceUrl}
                 controls
                 preload="metadata"
