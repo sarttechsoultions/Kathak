@@ -34,7 +34,7 @@ export default function ExamResults() {
       try {
         setLoading(true);
         // Uses the teacher-filtered controller endpoint we created earlier
-        const res = await apiRequest<{ data?: { results?: ExamResultItem[] } }>("/admin/exams/results");
+        const res = await apiRequest<{ data?: { results?: ExamResultItem[] } }>("/teacher/exams/results");
         if (isMounted && res?.data?.results) {
           setResults(res.data.results);
         }

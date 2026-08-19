@@ -53,7 +53,7 @@ export default function ExamsListPage() {
 
   return (
     <div className="font-sans text-[#0B1C30]">
-      <div className="space-y-8 animate-in fade-in duration-300 max-w-[1100px]">
+      <div className="space-y-8 animate-in fade-in duration-300 max-w-full">
         
         {/* Header & Create Exam Button */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

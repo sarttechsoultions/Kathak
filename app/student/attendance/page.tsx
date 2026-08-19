@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   CheckCircle2,
   Clock,
@@ -10,100 +11,130 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Loader2
 } from "lucide-react";
+import { apiRequest } from "@/lib/api";
 
 export default function StudentAttendancePage() {
-  const [markedPresent, setMarkedPresent] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const activityLogs = [
-    {
-      id: 1,
-      date: "July 24, 2026",
-      className: "Kathak Basics - Module A",
-      time: "05:00 PM",
-      status: "Present",
-      statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
-    },
-    {
-      id: 2,
-      date: "July 22, 2026",
-      className: "Rhythm & Footwork",
-      time: "06:30 PM",
-      status: "Late (10m)",
-      statusBadge: "bg-[#FEF3C7] text-[#D97706]",
-    },
-    {
-      id: 3,
-      date: "July 20, 2026",
-      className: "Cultural History Workshop",
-      time: "04:00 PM",
-      status: "Present",
-      statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
-    },
-    {
-      id: 4,
-      date: "July 17, 2026",
-      className: "Kathak Basics - Module A",
-      time: "05:00 PM",
-      status: "Absent",
-      statusBadge: "bg-[#FDF2F4] text-[#C10F3A]",
-    },
-    {
-      id: 5,
-      date: "July 15, 2026",
-      className: "Technique Drill - Online",
-      time: "07:00 PM",
-      status: "Present",
-      statusBadge: "bg-[#E6F7ED] text-[#22A05B]",
-    },
-  ];
+  useEffect(() => {
+    apiRequest<{ data: any }>("/student/attendance")
+      .then((res) => setData(res.data))
+      .catch((err) => console.error("Failed to load attendance", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-stone-400">
+        <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+        <span>Loading attendance records...</span>
+      </div>
+    );
+  }
+
+  const stats = data?.stats || {
+    overallAttendance: 0,
+    presentDays: 0,
+    totalWorkingDays: 0,
+    currentStreak: 0
+  };
+
+  const logs = data?.logs || [];
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "PRESENT": return "bg-[#E6F7ED] text-[#22A05B]";
+      case "ABSENT": return "bg-[#FDF2F4] text-[#C10F3A]";
+      case "LATE": return "bg-[#FEF3C7] text-[#D97706]";
+      case "LEAVE": return "bg-[#EFF6FF] text-[#3B82F6]";
+      case "PENDING": return "bg-gray-100 text-gray-500";
+      default: return "bg-gray-100 text-gray-500";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "PRESENT": return "Present";
+      case "ABSENT": return "Absent";
+      case "LATE": return "Late";
+      case "LEAVE": return "On Leave";
+      case "PENDING": return "Pending Leave";
+      default: return status;
+    }
+  };
+
+  // Helper to determine if a specific date has a log
+  const getLogForDate = (day: number) => {
+    // Current month calendar
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const dateStr = `${year}-${month}-${day.toString().padStart(2, '0')}`;
+    
+    const log = logs.find((l: any) => {
+      const d = new Date(l.date);
+      const dStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+      return dStr === dateStr;
+    });
+    return log?.status;
+  };
 
   return (
     <div className="space-y-8 font-sans pb-16">
       
       {/* 1. TOP NOTIFICATION BANNER ("ONGOING CLASS") */}
+      {/* Keeping UI as requested, but linking to live classes since attendance is auto-captured */}
       <div className="bg-[#E5F2FF]/60 border border-sky-200 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 bg-[#900C27] text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-              ONGOING CLASS
+              AUTO CAPTURE
             </span>
-            <span className="text-xs text-sky-800 font-bold">Live Now</span>
+            <span className="text-xs text-sky-800 font-bold">Attendance System</span>
           </div>
 
           <h2 className="text-base sm:text-lg font-bold text-[#1B1B24]">
-            Kathak Basics - Module A
+            Live Class Attendance
           </h2>
           <p className="text-xs text-stone-500 flex items-center gap-1 font-medium">
             <Clock className="w-3.5 h-3.5 text-stone-400" />
-            <span>Started 10 mins ago</span>
+            <span>Attendance is automatically marked when you join a live class</span>
           </p>
         </div>
 
-        <button
-          onClick={() => setMarkedPresent(true)}
-          disabled={markedPresent}
-          className={`px-6 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md shrink-0 ${
-            markedPresent
-              ? "bg-emerald-600 text-white cursor-default"
-              : "bg-[#900C27] hover:bg-[#780A20] text-white"
-          }`}
+        <Link
+          href="/student/classes"
+          className={`px-6 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-md shrink-0 bg-[#900C27] hover:bg-[#780A20] text-white`}
         >
           <CheckCircle2 className="w-4 h-4" />
-          <span>{markedPresent ? "✓ Present Marked!" : "Mark Present"}</span>
-        </button>
+          <span>Join Live Class</span>
+        </Link>
       </div>
 
       {/* 2. PAGE HEADER & SUBTITLE */}
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold text-[#1B1B24] tracking-tight">
-          Attendance Overview
-        </h1>
-        <p className="text-sm font-normal text-[#464555]">
-          Track your consistency and class presence across all academy modules.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold text-[#1B1B24] tracking-tight">
+            Attendance Overview
+          </h1>
+          <p className="text-sm font-normal text-[#464555]">
+            Track your consistency and class presence across all academy modules.
+          </p>
+        </div>
+        <Link 
+          href="/student/attendance/leave"
+          className="bg-[#A42E30] hover:bg-[#8B2627] text-white text-sm font-semibold py-2.5 px-4 rounded-lg flex items-center gap-2 transition-colors shadow-sm whitespace-nowrap self-start sm:self-auto"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Apply for Leave
+        </Link>
       </div>
 
       {/* 3. TOP 3 METRIC CARDS */}
@@ -112,12 +143,12 @@ export default function StudentAttendancePage() {
         {/* Card 1: Overall Attendance */}
         <div className="bg-white rounded-2xl p-6 border border-stone-200/80 shadow-2xs flex items-center gap-5">
           <div className="w-16 h-16 rounded-full border-4 border-rose-500 border-t-rose-200 flex items-center justify-center font-extrabold text-xl text-[#900C27] shrink-0">
-            92%
+            {stats.overallAttendance}%
           </div>
           <div>
             <h3 className="text-sm font-bold text-[#1B1B24]">Overall Attendance</h3>
             <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider block mt-0.5">
-              EXCELLENT CONSISTENCY • ACROSS 4 MODULES
+              EXCELLENT CONSISTENCY • ACROSS ALL MODULES
             </span>
           </div>
         </div>
@@ -128,7 +159,7 @@ export default function StudentAttendancePage() {
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">23 / 25</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">{stats.presentDays} / {stats.totalWorkingDays}</span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
               Classes Attended
             </span>
@@ -141,7 +172,7 @@ export default function StudentAttendancePage() {
             <Flame className="w-6 h-6 fill-amber-500 text-amber-500" />
           </div>
           <div>
-            <span className="text-2xl font-extrabold text-[#1B1B24]">18 Days</span>
+            <span className="text-2xl font-extrabold text-[#1B1B24]">{stats.currentStreak} Days</span>
             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
               Current Learning Streak
             </span>
@@ -150,13 +181,13 @@ export default function StudentAttendancePage() {
 
       </div>
 
-      {/* 4. JULY 2026 CALENDAR BREAKDOWN CARD */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-2xs space-y-6">
+      {/* 4. CALENDAR BREAKDOWN CARD */}
+      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-2xs space-y-6 hidden md:block">
         
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-[#1B1B24]">
-              July 2026
+              Monthly Breakdown
             </h3>
             <p className="text-xs text-stone-400 font-medium">
               Daily attendance breakdown
@@ -177,80 +208,23 @@ export default function StudentAttendancePage() {
         {/* Dates Grid with status bars */}
         <div className="grid grid-cols-7 gap-2 text-center text-xs font-medium">
           
-          {/* Week 1 */}
-          <div className="p-2 sm:p-3 text-stone-300"></div>
-          <div className="p-2 sm:p-3 text-stone-300"></div>
-          <div className="p-2 sm:p-3 text-stone-300"></div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">01</span>
-            <div className="w-full h-1 bg-emerald-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">02</span>
-            <div className="w-full h-1 bg-emerald-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">03</span>
-            <div className="w-full h-1 bg-emerald-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">04</span>
-          </div>
-
-          {/* Week 2 */}
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">05</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">06</span>
-            <div className="w-full h-1 bg-rose-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">07</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">08</span>
-            <div className="w-full h-1 bg-emerald-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">09</span>
-            <div className="w-full h-1 bg-amber-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-stone-700">10</span>
-            <div className="w-full h-1 bg-emerald-500 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">11</div>
-
-          {/* Week 3 */}
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">12</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1">
-            <span className="font-bold text-rose-600">13</span>
-            <div className="w-full h-1 bg-rose-500 rounded-full" />
-            <div className="w-full h-0.5 bg-sky-600 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">14</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">15</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">16</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">17</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">18</div>
-
-          {/* Week 4 */}
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">19</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">20</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">21</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">22</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">23</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1 bg-sky-50/50">
-            <span className="font-bold text-[#900C27]">24</span>
-            <div className="w-full h-0.5 bg-sky-600 rounded-full" />
-          </div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">25</div>
-
-          {/* Week 5 */}
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">26</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">27</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">28</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">29</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">30</div>
-          <div className="p-2 sm:p-3 border border-stone-100 rounded-xl">31</div>
-          <div className="p-2 sm:p-3 text-stone-300"></div>
+          {Array.from({ length: 31 }).map((_, i) => {
+            const day = i + 1;
+            const status = getLogForDate(day);
+            const isToday = new Date().getDate() === day;
+            
+            return (
+              <div key={day} className={`p-2 sm:p-3 border border-stone-100 rounded-xl relative space-y-1 ${isToday ? 'bg-sky-50/50' : ''}`}>
+                <span className={`font-bold ${isToday ? 'text-[#900C27]' : 'text-stone-700'}`}>
+                  {day.toString().padStart(2, '0')}
+                </span>
+                {status === "PRESENT" && <div className="w-full h-1 bg-emerald-500 rounded-full" />}
+                {status === "ABSENT" && <div className="w-full h-1 bg-rose-500 rounded-full" />}
+                {status === "LATE" && <div className="w-full h-1 bg-amber-500 rounded-full" />}
+                {status === "LEAVE" && <div className="w-full h-1 bg-sky-600 rounded-full" />}
+              </div>
+            );
+          })}
 
         </div>
 
@@ -270,7 +244,7 @@ export default function StudentAttendancePage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-sky-600" />
-            <span>Upcoming Class</span>
+            <span>On Leave</span>
           </div>
         </div>
 
@@ -301,28 +275,29 @@ export default function StudentAttendancePage() {
             </thead>
 
             <tbody className="divide-y divide-stone-100 text-xs font-medium">
-              {activityLogs.map((log) => (
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-stone-400">
+                    No attendance records found.
+                  </td>
+                </tr>
+              ) : logs.map((log: any) => (
                 <tr key={log.id} className="hover:bg-stone-50/60 transition-colors">
-                  <td className="py-3.5 px-4 text-stone-600 font-semibold">{log.date}</td>
+                  <td className="py-3.5 px-4 text-stone-600 font-semibold">
+                    {new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
                   <td className="py-3.5 px-4 font-bold text-[#1B1B24]">{log.className}</td>
                   <td className="py-3.5 px-4 text-stone-500">{log.time}</td>
                   <td className="py-3.5 px-4 text-right">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${log.statusBadge}`}>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusBadge(log.status)}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                      {log.status}
+                      {getStatusText(log.status)}
                     </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-
-        {/* View All Button */}
-        <div className="text-center pt-2">
-          <button className="border border-stone-200 hover:border-stone-300 text-stone-700 px-6 py-2 rounded-full text-xs font-semibold transition-colors">
-            View All July Records
-          </button>
         </div>
 
       </div>

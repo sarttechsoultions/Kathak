@@ -63,8 +63,8 @@ const sidebarItems: SidebarItem[] = [
   { label: "Exam Results", icon: Award, href: "/admin/exam/results" },
   { label: "Attendance", icon: CalendarCheck, href: "/admin/attendance" },
   { label: "Events & Workshops", icon: CalendarDays, href: "/admin/events" },
-  { label: "Communication", icon: MessageSquare, href: "/admin/communication" },
-  { label: "Content Library", icon: FolderKanban, href: "/admin/content-library" },
+  // { label: "Communication", icon: MessageSquare, href: "/admin/communication" },
+  // { label: "Content Library", icon: FolderKanban, href: "/admin/content-library" },
   { label: "Finance", icon: CreditCard, href: "/admin/finance" },
   {
     label: "Website",
@@ -75,7 +75,7 @@ const sidebarItems: SidebarItem[] = [
   },
   { label: "Reports & Analytics", icon: BarChart3, href: "/admin/analytics" },
   { label: "Certificates", icon: FileCheck, href: "/admin/certificates" },
-  { label: "Settings", icon: Settings, href: "/admin/settings" },
+  // { label: "Settings", icon: Settings, href: "/admin/settings" },
   { label: "Support", icon: HelpCircle, href: "/admin/support" },
 ];
 

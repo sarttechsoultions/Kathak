@@ -8,8 +8,8 @@ import {
   Video,
   Loader2,
   TrendingUp,
-  Calendar,
-  ChevronRight
+  // Calendar,
+  // ChevronRight
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
 
@@ -66,7 +66,7 @@ export default function DashboardOverview() {
       {/* Header Bar */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+          <h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
             Dashboard Overview
           </h1>
           <p className="text-xs sm:text-sm font-medium text-stone-500">
@@ -219,7 +219,7 @@ export default function DashboardOverview() {
         {/* Today's Schedule (7 Cols) */}
         <div className="lg:col-span-7 bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-sans font-bold text-base text-stone-900">Today's Schedule</h3>
+            <h3 className="font-sans font-bold text-base text-stone-900">Today&apos;s Schedule</h3>
             <button className="text-xs font-bold text-[#9E0C25] hover:underline cursor-pointer">View Full Schedule</button>
           </div>
 

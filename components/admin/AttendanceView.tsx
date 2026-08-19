@@ -9,7 +9,7 @@ import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 
 type Status = "U" | "P" | "A" | "L" | "LV";
 interface Record { id: string; studentId: string; name: string; email?: string; avatar: string; batchCode: string; courseName: string; status: Status; }
-interface Batch { id: string; name: string; code: string; course: string; status: string; }
+interface Batch { id: string; name: string; code: string; course: string; status: string; createdAt: string; }
 
 const sessions = ["Morning Session", "Afternoon Session", "Evening Session"];
 
@@ -78,6 +78,8 @@ export default function AttendanceView() {
       await apiRequest(ENDPOINTS.ADMIN_ATTENDANCE, { method: "POST", body: JSON.stringify({ batchId: selectedBatchId, date: selectedDate, session: selectedSession, records }) });
       await loadAttendance();
       await openThemeSuccess("Attendance saved successfully.", "Attendance Saved");
+    } catch (err: any) {
+      alert(err.message || "Failed to save attendance.");
     } finally { setSaving(false); }
   };
   const exportCsv = () => {
@@ -87,12 +89,12 @@ export default function AttendanceView() {
   };
 
   return <div className="space-y-8 animate-in fade-in duration-300 max-w-[1350px] mx-auto pb-12">
-    <div><h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900">Attendance Management</h1><p className="text-sm text-stone-500 mt-1">Mark and save attendance for enrolled students.</p></div>
+    <div><h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900">Attendance Management</h1><p className="text-sm text-stone-500 mt-1">Mark and save attendance for enrolled students.</p></div>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {summaryCards.map(({ Icon, label, value, color }) => <div key={label} className="bg-white rounded-2xl border border-stone-200 p-5"><Icon className={`w-5 h-5 ${color}`} /><p className="text-xs font-semibold text-stone-500 mt-3">{label}</p><p className="text-3xl font-black text-stone-900">{value}</p></div>)}
     </div>
     <div className="bg-white rounded-2xl border border-stone-200 p-4 flex flex-wrap gap-3 items-center">
-      <input aria-label="Attendance date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="h-10 px-3 rounded-xl border border-stone-200 text-sm font-semibold" />
+      <input aria-label="Attendance date" type="date" value={selectedDate} min={selectedBatch?.createdAt?.slice(0, 10)} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setSelectedDate(event.target.value)} className="h-10 px-3 rounded-xl border border-stone-200 text-sm font-semibold" />
       <select aria-label="Batch" value={selectedBatchId} onChange={(event) => setSelectedBatchId(event.target.value)} className="h-10 px-3 rounded-xl border border-stone-200 text-sm font-semibold min-w-52"><option value="">Select an active batch</option>{batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name} · {batch.code}</option>)}</select>
       <select aria-label="Session" value={selectedSession} onChange={(event) => setSelectedSession(event.target.value)} className="h-10 px-3 rounded-xl border border-stone-200 text-sm font-semibold">{sessions.map((session) => <option key={session}>{session}</option>)}</select>
       <div className="ml-auto flex flex-wrap gap-2"><button onClick={() => markAll("P")} disabled={!records.length} className="px-3 py-2 rounded-xl text-xs font-bold border border-emerald-200 text-emerald-700 disabled:opacity-50">Mark all present</button><button onClick={exportCsv} className="px-3 py-2 rounded-xl text-xs font-bold border border-stone-200 flex gap-1"><Download className="w-4 h-4" />Export</button><button onClick={() => window.print()} className="px-3 py-2 rounded-xl text-xs font-bold border border-stone-200 flex gap-1"><Printer className="w-4 h-4" />Print</button><button onClick={saveAttendance} disabled={!records.length || saving} className="px-4 py-2 rounded-xl text-xs font-bold bg-[#9E0C25] text-white disabled:opacity-50 flex gap-1">{saving ? <RotateCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{saving ? "Saving" : "Save attendance"}</button></div>

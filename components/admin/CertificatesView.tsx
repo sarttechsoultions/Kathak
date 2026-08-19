@@ -132,7 +132,7 @@ export default function CertificatesView() {
           {/* Header & Top Buttons */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+              <h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
                 Digital Certificate Hub
               </h1>
               <p className="text-xs sm:text-sm font-medium text-stone-500 max-w-3xl">

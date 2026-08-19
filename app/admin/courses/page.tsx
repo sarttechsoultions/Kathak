@@ -76,7 +76,7 @@ export default function AdminCoursesListPage() {
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">Course Catalog</h1>
+          <h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">Course Catalog</h1>
           <p className="text-xs sm:text-sm font-semibold text-stone-500">Manage institutional learning tracks and fee structures.</p>
         </div>
         <button onClick={() => router.push("/admin/courses/create")} className="px-5 py-2.5 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-semibold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0">

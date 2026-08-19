@@ -364,25 +364,25 @@ interface CriteriaItem {
 
             let parsedRubric: CriteriaItem[] | null = null;
             if (Array.isArray(item.scoreBreakdown)) {
-              parsedRubric = item.scoreBreakdown;
+              parsedRubric = item.scoreBreakdown as CriteriaItem[];
             } else if (item.rubric) {
               try {
-                parsedRubric = typeof item.rubric === "string" ? JSON.parse(item.rubric) : item.rubric;
+                parsedRubric = typeof item.rubric === "string" ? JSON.parse(item.rubric) as CriteriaItem[] : item.rubric as CriteriaItem[];
               } catch {}
             }
 
             return {
               id: String(item.id || `hist-${idx + 1}`),
-              videoTitle: item.videoTitle || item.title || "Kathak Practice Video",
-              thumbnail: item.fileUrl || "/kathak_course_dancer_1785146082697.jpg",
-              fileUrl: item.fileUrl || item.url || "",
+              videoTitle: String(item.videoTitle || item.title || "Kathak Practice Video"),
+              thumbnail: String(item.fileUrl || "/kathak_course_dancer_1785146082697.jpg"),
+              fileUrl: String(item.fileUrl || item.url || ""),
               submissionDate: item.submissionDate ? new Date(item.submissionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-              courseBatch: item.courseAndBatch || "Kathak Advanced / Alpha",
+              courseBatch: String(item.courseAndBatch || "Kathak Advanced / Alpha"),
               status: item.status === "NEEDS_IMPROVEMENT" ? "Needs Improvement" : (item.status === "REVIEWED" ? "Reviewed" : "Pending"),
               marks: formatScoreDisplay(item.marks),
               scoreBreakdown: parsedRubric || undefined,
               correctionNotes: corrArr,
-              feedbackNotes: item.feedbackNotes || item.overallReview || ""
+              feedbackNotes: typeof item.feedbackNotes === "string" ? item.feedbackNotes : (typeof item.overallReview === "string" ? item.overallReview : "")
             };
           });
           setStudentHistoryList(mappedHistory);
@@ -592,7 +592,7 @@ interface CriteriaItem {
           {/* Header & Top Action Button */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
-              <h1 className="font-playfair font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
+              <h1 className="font-sans font-bold text-2xl sm:text-3xl text-stone-900 tracking-tight">
                 Student Practice Submissions
               </h1>
             </div>
@@ -685,7 +685,7 @@ interface CriteriaItem {
                     <Filter className="w-3.5 h-3.5 text-[#2563EB]" />
                     <select
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as any)}
+                      onChange={(e) => setStatusFilter(e.target.value as unknown as "ALL" | "PENDING" | "REVIEWED" | "NEEDS_IMPROVEMENT")}
                       className="bg-transparent text-[#2563EB] font-extrabold text-xs focus:outline-none cursor-pointer"
                     >
                       <option value="ALL">All Status</option>

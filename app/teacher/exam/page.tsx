@@ -37,7 +37,7 @@ export default function ExamPage() {
       try {
         setLoading(true);
         // Using the same getExams controller endpoint which handles Teacher logic safely
-        const res = await apiRequest<{ data?: { exams?: ExamItem[] } }>("/admin/exams");
+        const res = await apiRequest<{ data?: { exams?: ExamItem[] } }>("/teacher/exams");
         if (isMounted && res?.data?.exams) {
           setExams(res.data.exams);
         }
