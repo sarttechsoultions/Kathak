@@ -71,6 +71,7 @@ export default function GetInTouchSection() {
                 <input
                   type="text"
                   required
+                  aria-label="Full Name"
                   placeholder="Full Name"
                   value={formData.fullName}
                   onChange={(e) =>
@@ -85,6 +86,7 @@ export default function GetInTouchSection() {
                 <input
                   type="text"
                   required
+                  aria-label="Email or Phone Number"
                   placeholder="Email / Phone Number"
                   value={formData.contactInfo}
                   onChange={(e) => setFormData({ ...formData, contactInfo: e.target.value })}
@@ -96,6 +98,7 @@ export default function GetInTouchSection() {
               <div className="relative">
                 <select
                   required
+                  aria-label="Class Mode"
                   value={formData.classMode}
                   onChange={(e) => setFormData({ ...formData, classMode: e.target.value })}
                   className="w-full h-[60px] rounded-xl bg-white pl-7 pr-14 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer appearance-none"
@@ -114,6 +117,7 @@ export default function GetInTouchSection() {
               <div className="relative">
                 <select
                   required
+                  aria-label="Courses"
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                   className="w-full h-[60px] rounded-xl bg-white pl-7 pr-14 text-[16px] leading-[24px] font-normal font-['Plus_Jakarta_Sans'] text-black placeholder:text-black border-0 outline-none shadow-none focus:ring-0 focus:outline-none cursor-pointer appearance-none truncate"
@@ -149,6 +153,7 @@ export default function GetInTouchSection() {
               <div>
                 <textarea
                   rows={3}
+                  aria-label="Your Message"
                   placeholder="Your Message"
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
