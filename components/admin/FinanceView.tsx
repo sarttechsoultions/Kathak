@@ -189,13 +189,13 @@ export default function FinanceView() {
           </p>
         </div>
 
-        <button
+        {/* <button
           onClick={() => setShowRecordModal(true)}
           className="px-4 py-2.5 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>+ Record Fee Payment</span>
-        </button>
+        </button> */}
       </div>
 
       {/* 6 Summary Metric Cards */}
@@ -278,12 +278,12 @@ export default function FinanceView() {
       </div>
 
       {/* Middle Grid: Today's Payments & Pending Dues Widget */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className=" items-start">
         
         <div className="lg:col-span-8 bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 space-y-5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-sans font-bold text-lg text-stone-900">Today's Transactions</h3>
+              <h3 className="font-sans font-bold text-lg text-stone-900">Today&apos;s Transactions</h3>
               <p className="text-xs text-stone-400 font-medium">Real-time incoming fee transactions processed today.</p>
             </div>
             <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-extrabold border border-emerald-200">
@@ -327,19 +327,19 @@ export default function FinanceView() {
           </div>
         </div>
 
-        <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-5">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+        {/* <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-5"> */}
+          {/* <div className="flex items-center justify-between border-b border-stone-100 pb-3">
             <h4 className="font-sans font-bold text-base text-stone-900">Pending Dues Students</h4>
             <span className="text-xs font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
               {financeList.filter((r) => r.rawPending > 0).length} Pending
             </span>
-          </div>
+          </div> */}
 
-          <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-            {financeList.filter((r) => r.rawPending > 0).slice(0, 5).map((due) => (
+          {/* <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1"> */}
+            {/* {financeList.filter((r) => r.rawPending > 0).slice(0, 5).map((due) => (
               <div key={due.id} className="flex items-center justify-between p-3 rounded-2xl bg-stone-50/80 border border-stone-200/70">
                 <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+              
                   <img src={due.studentAvatar} alt={due.studentName} className="w-8 h-8 rounded-full object-cover border border-stone-200 shrink-0" />
                   <div>
                     <span className="font-bold text-xs text-stone-900 block">{due.studentName}</span>
@@ -349,16 +349,16 @@ export default function FinanceView() {
                 <span className="font-sans font-extrabold text-xs text-rose-600">{due.pendingAmount}</span>
               </div>
             ))}
-          </div>
+          </div> */}
 
-          <button
+          {/* <button
             onClick={() => alert("Fee reminder notification sent to all pending students!")}
             className="w-full py-3 rounded-xl bg-[#9E0C25] hover:bg-[#800A1E] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer uppercase"
           >
             <Bell className="w-3.5 h-3.5" />
             <span>Send Fee Reminders</span>
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
 
       </div>
 
