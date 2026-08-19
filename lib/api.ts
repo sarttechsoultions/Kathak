@@ -117,4 +117,7 @@ export const ENDPOINTS = {
   CONTENT_LIBRARY_ADMIN: "/content/admin",
   CONTENT_LIBRARY_STUDENT: "/content/student",
   CONTENT_UPLOAD: "/content",
+  ATTENDANCE_BATCH: "/attendance/batch",
+  ATTENDANCE_TEACHERS: "/attendance/teachers",
+  ATTENDANCE_BULK_SAVE: "/attendance/bulk-save",
 };
