@@ -25,6 +25,7 @@ export function useTeacherFormState() {
   ]);
   const [avatarUrl, setAvatarUrl] = useState<string>("/Ananya.png");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [idProofFile, setIdProofFile] = useState<File | null>(null); // ✅ Added missing state here
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -201,6 +202,8 @@ export function useTeacherFormState() {
     documents, setDocuments,
     handlePhotoUpload,
     handleDocumentUpload,
+    handleIdProofFileChange, // ✅ Exported helper function
+    idProofFile, setIdProofFile, // ✅ Exported state & setter
     isUploadingAvatar,
     avatarFile, setAvatarFile,
   };
