@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ArrowRight } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 export default function GurukulBanner() {
   return (
@@ -25,7 +26,7 @@ export default function GurukulBanner() {
           <div className="hidden lg:block lg:col-span-4 xl:col-span-3 lg:min-h-[290px]" />
 
           {/* Center Column: Text Content */}
-          <div className="lg:col-span-4 px-6 sm:px-8 space-y-3 py-6 lg:py-8 border-b lg:border-b-0 lg:border-r border-dashed border-[#D4AF37]/40 flex flex-col justify-center text-center lg:text-left bg-[#153325]/90 lg:bg-transparent">
+          <Reveal animation="left" className="lg:col-span-4 px-6 sm:px-8 space-y-3 py-6 lg:py-8 border-b lg:border-b-0 lg:border-r border-dashed border-[#D4AF37]/40 flex flex-col justify-center text-center lg:text-left bg-[#153325]/90 lg:bg-transparent">
             <h3 className="font-playfair font-medium text-2xl sm:text-3xl lg:text-[32px] leading-tight sm:leading-[48px] tracking-[1px] text-[#D9BE7A]">
               Private Gurukul Experience
             </h3>
@@ -37,17 +38,17 @@ export default function GurukulBanner() {
             <p className="font-inter text-white text-sm sm:text-base leading-relaxed sm:leading-[22px] tracking-[1px] font-normal max-w-md mx-auto lg:mx-0">
               Experience personalized training designed around your unique goals and Experience personalized training designed around your unique goals.
             </p>
-          </div>
+          </Reveal>
 
           {/* Right Column: 4 Circular Feature Badges + Book Button */}
-          <div className="lg:col-span-4 xl:col-span-5 flex flex-col justify-center items-center lg:items-start gap-6 px-6 sm:px-10 py-6 lg:py-8 bg-[#153325]">
+          <Reveal animation="right" delay={120} className="lg:col-span-4 xl:col-span-5 flex flex-col justify-center items-center lg:items-start gap-6 px-6 sm:px-10 py-6 lg:py-8 bg-[#153325]">
 
             {/* 4 Circular Feature Icons: 2x2 Grid on Mobile, 4-in-a-row on Tablet/Desktop */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 w-full max-w-md mx-auto lg:max-w-none">
 
               {/* Badge 1 */}
               <div className="flex flex-col items-center text-center">
-                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0">
+                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110 hover:bg-[#D4AF37]/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/icons/Personalized.png"
@@ -62,7 +63,7 @@ export default function GurukulBanner() {
 
               {/* Badge 2 */}
               <div className="flex flex-col items-center text-center">
-                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0">
+                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110 hover:bg-[#D4AF37]/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/Flexible.png" alt="Flexible Schedule" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
                 </div>
@@ -73,7 +74,7 @@ export default function GurukulBanner() {
 
               {/* Badge 3 */}
               <div className="flex flex-col items-center text-center">
-                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0">
+                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110 hover:bg-[#D4AF37]/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/Faster.png" alt="Faster Progress" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" />
                 </div>
@@ -84,7 +85,7 @@ export default function GurukulBanner() {
 
               {/* Badge 4 */}
               <div className="flex flex-col items-center text-center">
-                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0">
+                <div className="w-[58px] h-[58px] sm:w-[62px] sm:h-[62px] rounded-full border border-[#D4AF37] flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110 hover:bg-[#D4AF37]/10">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/Performance.png" alt="Performance Guidance" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" />
                 </div>
@@ -99,14 +100,14 @@ export default function GurukulBanner() {
             <div className="w-full flex justify-center lg:justify-start mt-2 pb-4 lg:pb-0">
               <a
                 href="#book-personal"
-                className="inline-flex h-[44px] w-full max-w-[280px] sm:w-[261px] items-center justify-center gap-2 rounded-full bg-[#C10F3A] px-6 sm:px-8 py-3 font-playfair text-sm font-semibold text-white transition-colors hover:bg-[#A01830] shadow-md"
+                className="inline-flex h-[44px] w-full max-w-[280px] sm:w-[261px] items-center justify-center gap-2 rounded-full bg-[#C10F3A] px-6 sm:px-8 py-3 font-playfair text-sm font-semibold text-white transition-all hover:bg-[#A01830] hover:scale-105 active:scale-95 shadow-md group"
               >
                 <span>Book Your Personal Class</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
             </div>
 
-          </div>
+          </Reveal>
 
         </div>
       </div>

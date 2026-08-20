@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="SVG">
+<path id="Vector" d="M96 40C96 26.754 106.754 16 120 16C133.246 16 144 26.754 144 40C144 53.246 133.246 64 120 64M96 40C96 26.754 85.246 16 72 16C58.754 16 48 26.754 48 40C48 53.246 58.754 64 72 64M96 40V48M72 64C58.754 64 48 74.754 48 88C48 101.246 58.754 112 72 112C85.246 112 96 101.246 96 88M72 64H80M120 64C133.246 64 144 74.754 144 88C144 101.246 133.246 112 120 112C106.754 112 96 101.246 96 88M120 64H112M96 88V80" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M80 64C80 72.8306 87.1694 80 96 80C104.831 80 112 72.8306 112 64C112 55.1694 104.831 48 96 48C87.1694 48 80 55.1694 80 64V64" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M96 80V176" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_4" d="M96 176C129.6 176 152 162.664 152 136C118.4 136 96 149.336 96 176V176" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M96 176C62.4 176 40 162.664 40 136C73.6 136 96 149.336 96 176V176" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

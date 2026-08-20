@@ -1,5 +1,4 @@
-import TopHeader from "@/components/TopHeader";
-import Navbar from "@/components/Navbar";
+import SiteHeader from "@/components/SiteHeader";
 import HeroSection from "@/components/HeroSection";
 import AboutSection from "@/components/AboutSection";
 import CoursesSection from "@/components/CoursesSection";
@@ -15,11 +14,7 @@ import Footer from "@/components/Footer";
 export default function Home() {
   return (
     <div className="min-h-screen bg-white text-stone-900 flex flex-col selection:bg-[#D9383A] selection:text-white">
-      {/* Top Contact Bar */}
-      <TopHeader />
-
-      {/* Main Navigation Bar */}
-      <Navbar />
+      <SiteHeader />
 
       {/* Main Page Sections */}
       <main className="flex-1 bg-white">

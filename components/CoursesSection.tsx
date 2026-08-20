@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Reveal from "@/components/Reveal";
 
 interface CourseCardData {
   id: string;
@@ -153,7 +154,7 @@ export default function CoursesSection() {
       <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-3 mb-10 sm:mb-14">
+        <Reveal className="text-center max-w-2xl mx-auto space-y-3 mb-10 sm:mb-14">
       <span className="font-poppins text-2xl font-bold tracking-[8px] text-[#9E0C25] uppercase leading-5">
   courses
 </span>
@@ -168,24 +169,24 @@ export default function CoursesSection() {
 
           {/* Level Filter Tabs */}
           <div className="flex items-center justify-center gap-3 sm:gap-6 flex-wrap sm:flex-nowrap pt-6">
-  <button className="px-8 py-3 rounded-full text-xs  font-sans font-bold bg-[#1F4A3A] text-[#ffffff] shadow-md cursor-pointer">
+  <button className="px-8 py-3 rounded-full text-xs  font-sans font-bold bg-[#1F4A3A] text-[#ffffff] shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-transform">
     Basic
   </button>
-  <button className="px-8 py-3 rounded-full text-xs font-sans font-bold bg-[#E5B869] text-[#ffffff] shadow-md cursor-pointer">
+  <button className="px-8 py-3 rounded-full text-xs font-sans font-bold bg-[#E5B869] text-[#ffffff] shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-transform">
     Intermediate
   </button>
-  <button className="px-8 py-3 rounded-full text-xs font-sans font-bold bg-[#C81E3D] text-white shadow-md cursor-pointer">
+          <button className="px-8 py-3 rounded-full text-xs font-sans font-bold bg-[#C81E3D] text-white shadow-md cursor-pointer hover:scale-105 active:scale-95 transition-transform">
     Premium
   </button>
 </div>
-        </div>
+        </Reveal>
 
         {/* 3x3 Grid of Course Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {filteredCourses.map((course) => (
+          {filteredCourses.map((course, index) => (
+            <Reveal key={course.id} delay={index * 80} animation="scale">
             <div
-              key={course.id}
-              className={`relative rounded-3xl border-2 ${course.borderColor} bg-gradient-to-br from-white to-[#f6e6d3] shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden min-h-[330px]`}
+              className={`hover-lift relative rounded-3xl border-2 ${course.borderColor} bg-gradient-to-br from-white to-[#f6e6d3] shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden min-h-[330px]`}
             >
               {/* Card Top Left Level Badge */}
               <div className="absolute top-0 left-0 z-20">
@@ -271,6 +272,7 @@ export default function CoursesSection() {
               </div>
 
             </div>
+            </Reveal>
           ))}
         </div>
 

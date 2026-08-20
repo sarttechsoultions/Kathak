@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ArrowRight } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 interface StudentCard {
   id: string;
@@ -43,7 +44,7 @@ export default function TestimonialsSection() {
       <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12">
         
         {/* Section Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
+        <Reveal className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
           {/* Header Title & Subtitle */}
           <div className="space-y-1">
             <h2 className="font-playfair text-[40px] font-medium leading-[48px] tracking-[0px] text-[#1F4A3A]">
@@ -62,14 +63,15 @@ export default function TestimonialsSection() {
             <span>View all Testimonials</span>
             <ArrowRight className="w-4 h-4" />
           </a>
-        </div>
+        </Reveal>
 
-        {/* 4 Student Photo Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+        <Reveal delay={80}>
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-3 -mx-4 px-4 sm:-mx-8 sm:px-8 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible">
           {studentsData.map((student) => (
-            <div key={student.id} className="flex flex-col items-center group">
-              
-              {/* Image Container */}
+            <div
+              key={student.id}
+              className="flex flex-col items-center group hover-lift w-[78%] min-w-[78%] sm:w-[calc(50%-12px)] sm:min-w-[calc(50%-12px)] lg:w-auto lg:min-w-0 shrink-0 snap-start"
+            >
               <div className="relative w-full h-[280px] sm:h-[320px] lg:h-[340px] rounded-2xl overflow-hidden shadow-md border border-stone-200/60 bg-stone-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -77,26 +79,21 @@ export default function TestimonialsSection() {
                   alt={student.name}
                   className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
-                {/* Subtle Hover Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
 
-              {/* Student Name & Location */}
-              <div className="text-center mt-3.5 space-y-0.5">
-          <div className="mt-2 text-center">
-  <h3 className="font-inter text-[12px] font-normal leading-[16px] text-black">
-    {student.name}
-  </h3>
-
-  <p className="font-inter text-[12px] font-normal leading-[16px] text-[#6B7280]">
-    {student.location}
-  </p>
-</div>
+              <div className="mt-2 text-center">
+                <h3 className="font-inter text-[12px] font-normal leading-[16px] text-black">
+                  {student.name}
+                </h3>
+                <p className="font-inter text-[12px] font-normal leading-[16px] text-[#6B7280]">
+                  {student.location}
+                </p>
               </div>
-
             </div>
           ))}
         </div>
+        </Reveal>
 
       </div>
     </section>

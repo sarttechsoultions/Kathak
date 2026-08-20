@@ -2,6 +2,8 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import Reveal from "@/components/Reveal";
 
 interface GalleryImage {
   id: string;
@@ -100,7 +102,7 @@ export default function MomentsOfGrace() {
       <div className="w-full max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-12">
         
         {/* Section Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
+        <Reveal className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-8 sm:mb-10 lg:mb-12">
           {/* Header Title & Subtitle */}
           <div className="space-y-1">
             <h2 className="font-playfair text-3xl sm:text-4xl lg:text-[40px] font-bold text-[#1F4A3A] leading-tight tracking-tight">
@@ -112,16 +114,17 @@ export default function MomentsOfGrace() {
           </div>
 
           {/* Explore Gallery CTA Button */}
-          <a
-            href="#gallery"
+          <Link
+            href="/gallery"
             className="bg-[#C10F3A] hover:bg-[#A01830] text-white px-6 py-2.5 rounded-full font-playfair font-semibold text-xs sm:text-sm transition-all duration-300 shadow-md flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95 shrink-0"
           >
             <span>Explore Gallery</span>
             <ArrowRight className="w-4 h-4" />
-          </a>
-        </div>
+          </Link>
+        </Reveal>
 
         {/* Scrollable Image Cards Row: Mouse Drag + Finger Slide + Auto Scroll (Single Set) */}
+        <Reveal delay={80}>
         <div
           ref={scrollContainerRef}
           onMouseDown={handleMouseDown}
@@ -151,6 +154,7 @@ export default function MomentsOfGrace() {
             </div>
           ))}
         </div>
+        </Reveal>
 
       </div>
     </section>

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Reveal from "@/components/Reveal";
 
 interface AccoladeCard {
   id: string;
@@ -40,7 +41,7 @@ export default function AccoladesSection() {
       <div className="w-full max-w-[1232px] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-2 mb-10 sm:mb-12">
+        <Reveal className="text-center max-w-2xl mx-auto space-y-2 mb-10 sm:mb-12">
           {/* Tagline: Poppins Bold 24px, #9F0C25, Letter Spacing 1.6px */}
           <span className="font-sans font-bold text-xl sm:text-2xl tracking-[1.6px] text-[#9F0C25] uppercase leading-[24px] block">
             ACCOLADES
@@ -50,14 +51,14 @@ export default function AccoladesSection() {
           <h2 className="font-playfair text-3xl sm:text-[40px] font-bold leading-[56px] text-[#D9BE7A] tracking-normal">
             Awards & Recognitions
           </h2>
-        </div>
+        </Reveal>
 
         {/* 3 Cards Grid (Gap: 30px) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-[30px]">
-          {accoladesData.map((card) => (
+          {accoladesData.map((card, index) => (
+            <Reveal key={card.id} delay={index * 120} animation="scale">
             <div
-              key={card.id}
-              className="bg-white rounded-2xl p-6 sm:p-7 border border-[#E5E7EB] shadow-sm hover:shadow-md transition-all duration-300 space-y-5 flex flex-col justify-between"
+              className="hover-lift bg-white rounded-2xl p-6 sm:p-7 border border-[#E5E7EB] shadow-sm hover:shadow-md transition-all duration-300 space-y-5 flex flex-col justify-between"
             >
               {/* Top Red Badge Icon */}
               <div className="w-12 h-12 rounded-xl  flex items-center justify-center shadow-xs">
@@ -86,6 +87,7 @@ export default function AccoladesSection() {
                 {card.description}
               </p>
             </div>
+            </Reveal>
           ))}
         </div>
 
