@@ -143,7 +143,7 @@ export default function AboutSection() {
             {/* Bottom Call to Action Link */}
             <div className="pt-2">
               <a
-                href="#about"
+                href="/about"
                 className="inline-flex items-center gap-2 font-playfair font-semibold text-[#D9383A] hover:text-[#B91C1C] text-sm sm:text-base transition-colors group cursor-pointer"
               >
                 <span>Know More About Us</span>

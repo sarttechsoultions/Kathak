@@ -3,21 +3,21 @@
 import React, { useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface NavItem {
   label: string;
   href: string;
-  active?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { label: "Home", href: "#home", active: true },
-  { label: "About", href: "#about" },
-  { label: "Courses", href: "#courses" },
-  { label: "Vision & Goals", href: "#about" },
-  { label: "Gallery", href: "#gallery" },
-  { label: "Judges & Choreographers", href: "#accolades" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", href: "/" },
+  { label: "About", href: "/about" },
+  { label: "Courses", href: "/#courses" },
+  { label: "Vision & Goals", href: "/#about" },
+  { label: "Gallery", href: "/#gallery" },
+  { label: "Judges & Choreographers", href: "/#accolades" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 interface NavbarProps {
@@ -25,9 +25,16 @@ interface NavbarProps {
 }
 
 export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("India (IN)");
   const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+
+  const isActive = (href: string) => {
+    if (href === "/about") return pathname === "/about";
+    if (href === "/") return pathname === "/";
+    return false;
+  };
 
   return (
     <header className="sticky top-0 z-[100] w-full bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs transition-all">
@@ -45,22 +52,25 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
 
         {/* Center Navigation Links */}
         <nav className="hidden xl:flex items-center gap-6 lg:gap-7 xl:gap-8">
-          {navItems.map((item) => (
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
             <Link
               key={item.label}
               href={item.href}
               className={`font-playfair text-[15px] transition-all duration-200 whitespace-nowrap relative py-1 ${
-                item.active
+                active
                   ? "text-[#D9383A] font-semibold"
                   : "text-stone-700 hover:text-[#D9383A] font-medium"
               }`}
             >
               {item.label}
-              {item.active && (
+              {active && (
                 <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#D9383A] rounded-full animate-in fade-in zoom-in duration-300" />
               )}
             </Link>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Right Action Controls: Country / Language Selector Pill + Login Button */}
@@ -140,20 +150,23 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
       {mobileMenuOpen && (
         <div className="xl:hidden bg-white border-b border-stone-200 px-6 py-4 shadow-xl animate-in slide-in-from-top-3 relative z-[100]">
           <nav className="flex flex-col gap-3">
-            {navItems.map((item) => (
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
               <Link
                 key={item.label}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`font-playfair text-base py-2 transition-colors border-b border-stone-100 ${
-                  item.active
+                  active
                     ? "text-[#D9383A] font-semibold pl-2 border-l-4 border-l-[#D9383A]"
                     : "text-stone-700 hover:text-[#D9383A]"
                 }`}
               >
                 {item.label}
               </Link>
-            ))}
+              );
+            })}
           </nav>
           
           <div className="space-y-3 mt-4 pt-4 border-t border-stone-200">
