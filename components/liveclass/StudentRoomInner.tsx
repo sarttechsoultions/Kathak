@@ -1,9 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Hand, Maximize2, Minimize2, Mic, MicOff, PhoneOff, ShieldCheck, Video as VideoIcon, VideoOff } from "lucide-react";
 import { AgoraProvider } from "@/lib/agoraClient";
-import { LocalVideoTrack, RemoteUser, useJoin, useLocalCameraTrack, useLocalMicrophoneTrack, usePublish, useRemoteUsers, useRTCClient } from "agora-rtc-react";
+import {
+  LocalVideoTrack,
+  RemoteUser,
+  useIsConnected,
+  useJoin,
+  useLocalCameraTrack,
+  useLocalMicrophoneTrack,
+  usePublish,
+  useRemoteUsers,
+  useRemoteVideoTracks,
+} from "agora-rtc-react";
 import { LiveChatPanel } from "@/components/liveclass/LiveChatPanel";
 import { Watermark } from "@/components/liveclass/Watermark";
 import { getSocket } from "@/lib/socket";
@@ -28,10 +38,12 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   const joinUid = Number(joinInfo?.uid) || 0;
   const onLeaveRef = React.useRef(onLeave);
   onLeaveRef.current = onLeave;
+  const isConnected = useIsConnected();
+  const agoraReady = Boolean(joinInfo?.channelName && joinInfo?.appId && joinUid > 0);
 
   useJoin(
     { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinUid },
-    Boolean(joinInfo?.channelName && joinInfo?.appId && joinUid > 0)
+    agoraReady
   );
 
   const [micOn, setMicOn] = useState(true);
@@ -75,14 +87,14 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
 
   const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(true);
   const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(true);
-  const agoraClient = useRTCClient();
   const handledCamErrorRef = React.useRef<unknown>(null);
   const handledMicErrorRef = React.useRef<unknown>(null);
 
-  usePublish(
-    [localMicrophoneTrack, localCameraTrack],
-    Boolean(joinInfo?.channelName && joinInfo?.appId)
+  const publishTracks = useMemo(
+    () => [localMicrophoneTrack, localCameraTrack],
+    [localMicrophoneTrack, localCameraTrack]
   );
+  usePublish(publishTracks, isConnected && agoraReady);
 
   useEffect(() => {
     if (!localCameraTrack) return;
@@ -93,19 +105,6 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
     if (!localMicrophoneTrack) return;
     void localMicrophoneTrack.setEnabled(micOn).catch(() => {});
   }, [localMicrophoneTrack, micOn]);
-
-  useEffect(() => {
-    if (!agoraClient) return;
-    const publishReady = async () => {
-      try {
-        if (localCameraTrack) await agoraClient.publish(localCameraTrack);
-      } catch {}
-      try {
-        if (localMicrophoneTrack) await agoraClient.publish(localMicrophoneTrack);
-      } catch {}
-    };
-    void publishReady();
-  }, [agoraClient, localCameraTrack, localMicrophoneTrack]);
 
   useEffect(() => {
     if (!deviceToast) return;
@@ -130,8 +129,9 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   }, [camError]);
 
   const remoteUsers = useRemoteUsers();
+  useRemoteVideoTracks(remoteUsers);
   const hostUser =
-    remoteUsers.find((u) => u.hasVideo) ||
+    remoteUsers.find((user) => user.hasVideo || Boolean(user.videoTrack)) ||
     remoteUsers[0];
 
   useEffect(() => {
@@ -222,7 +222,15 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
           onDoubleClick={toggleFullscreen}
         >
           {hostUser ? (
-            <RemoteUser user={hostUser} playVideo playAudio className="h-full w-full object-cover" />
+            <div className="absolute inset-0 [&>div]:h-full [&>div]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover">
+              <RemoteUser
+                user={hostUser}
+                playVideo
+                playAudio
+                className="h-full w-full"
+                videoPlayerConfig={{ fit: "cover" }}
+              />
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center px-4 text-center text-sm text-stone-400">
               Waiting for the teacher to start the camera…

@@ -36,7 +36,11 @@ function StudentTile({
   onToggleCamera: (enabled: boolean) => void;
   onToggleMic: (enabled: boolean) => void;
 }) {
-  const showLiveVideo = Boolean(student.remoteUser && student.hasVideo && !isSpotlighted);
+  const showLiveVideo = Boolean(
+    student.remoteUser &&
+      !isSpotlighted &&
+      (student.hasVideo || Boolean(student.remoteUser.videoTrack))
+  );
 
   useLayoutEffect(() => {
     if (!showLiveVideo || !student.remoteUser?.videoTrack) return;
