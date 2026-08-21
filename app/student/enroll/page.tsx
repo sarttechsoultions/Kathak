@@ -604,22 +604,22 @@ export default function StudentEnrollPage() {
 
       const { orderId, amount, currency, keyId, pendingEnrollmentId } = orderRes.data;
 
+      if (!keyId || !orderId) {
+        alert("Payment could not be started. Razorpay order is missing.");
+        setIsSubmitted(false);
+        return;
+      }
+
+      const contact = String(phone || "").replace(/\D/g, "").slice(-10);
+
       const options = {
         key: keyId,
-        amount: amount.toString(),
-        currency: currency,
+        amount: Number(amount),
+        currency: currency || "INR",
         name: "Kathak Academy",
         description: `Enrollment Fee for ${selectedCourseObj?.title}`,
         image: "/logo.png",
         order_id: orderId,
-        method: {
-          upi: paymentMethod === "upi",
-          card: paymentMethod === "card",
-          netbanking: false,
-          wallet: false,
-          emi: false,
-          paylater: false,
-        },
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
           try {
             let res = null;
@@ -678,8 +678,7 @@ export default function StudentEnrollPage() {
         prefill: {
           name: fullName,
           email: email,
-          contact: phone || "",
-          method: paymentMethod,
+          contact,
         },
         modal: {
           ondismiss: function () {
