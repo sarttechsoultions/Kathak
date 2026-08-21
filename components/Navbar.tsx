@@ -13,11 +13,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Home", href: "/" },
   { label: "About", href: "/about" },
-  { label: "Courses", href: "/#courses" },
-  { label: "Vision & Goals", href: "/#about" },
-  { label: "Gallery", href: "/#gallery" },
-  { label: "Judges & Choreographers", href: "/#accolades" },
-  { label: "Contact", href: "/#contact" },
+  { label: "Courses", href: "/courses" },
+  { label: "Vision & Goals", href: "/vision-goals" },
+  { label: "Gallery", href: "/gallery" },
+  { label: "Judges & Choreographers", href: "/judges-choreographers" },
+  { label: "Contact", href: "/contact" },
 ];
 
 interface NavbarProps {
@@ -32,12 +32,17 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
 
   const isActive = (href: string) => {
     if (href === "/about") return pathname === "/about";
+    if (href === "/courses") return pathname === "/courses" || pathname.startsWith("/courses/");
+    if (href === "/vision-goals") return pathname === "/vision-goals";
+    if (href === "/gallery") return pathname === "/gallery";
+    if (href === "/judges-choreographers") return pathname === "/judges-choreographers";
+    if (href === "/contact") return pathname === "/contact";
     if (href === "/") return pathname === "/";
     return false;
   };
 
   return (
-    <header className="sticky top-0 z-[100] w-full bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs transition-all">
+    <header className="relative z-[100] w-full bg-white/95 backdrop-blur-md border-b border-stone-200/80 shadow-xs transition-all">
       <div className="w-full max-w-[1536px] mx-auto h-[60px] sm:h-[90px] px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
         
         {/* Brand Logo */}

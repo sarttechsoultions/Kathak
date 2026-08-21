@@ -44,7 +44,7 @@ export default function TopHeader() {
         {/* Right Actions */}
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href="#contact"
+            href="/contact"
             className="bg-[#C10F3A] hover:bg-[#B91C1C] text-white px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold transition-colors whitespace-nowrap"
           >
             Book Demo Classes

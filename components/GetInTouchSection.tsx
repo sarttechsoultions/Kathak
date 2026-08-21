@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ArrowRight, ChevronDown } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 export default function GetInTouchSection() {
   const [formData, setFormData] = useState({
@@ -25,7 +26,7 @@ export default function GetInTouchSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
           
           {/* Left Column: Image with Bottom-Right Overlay Box */}
-          <div className="lg:col-span-6 relative min-h-[420px] sm:min-h-[480px] lg:min-h-[580px] rounded-3xl overflow-hidden shadow-md group border border-stone-200/60">
+          <Reveal animation="left" className="lg:col-span-6 relative min-h-[420px] sm:min-h-[480px] lg:min-h-[580px] rounded-3xl overflow-hidden shadow-md group border border-stone-200/60">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/getintouch.jpeg"
@@ -48,10 +49,10 @@ export default function GetInTouchSection() {
                 </h3>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Right Column: Light Muted Beige Form Card */}
-          <div className="lg:col-span-6 bg-[#F7EFE5] rounded-3xl p-6 sm:p-10 lg:p-12 shadow-sm border border-stone-200/50 flex flex-col justify-center">
+          <Reveal animation="right" delay={120} className="lg:col-span-6 bg-[#F7EFE5] rounded-3xl p-6 sm:p-10 lg:p-12 shadow-sm border border-stone-200/50 flex flex-col justify-center">
             
             {/* Form Header */}
             <div className="text-center space-y-1 mb-6 sm:mb-8">
@@ -165,16 +166,16 @@ export default function GetInTouchSection() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full h-[60px] rounded-xl bg-[#C10F3A] text-white font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-[24px] flex items-center justify-center gap-2 transition-colors hover:bg-[#A01830] cursor-pointer"
+                  className="w-full h-[60px] rounded-xl bg-[#C10F3A] text-white font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-[24px] flex items-center justify-center gap-2 transition-all hover:bg-[#A01830] hover:scale-[1.02] active:scale-[0.98] cursor-pointer group"
                 >
                   <span>Send</span>
-                  <ArrowRight className="w-6 h-6" />
+                  <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
                 </button>
               </div>
 
             </form>
 
-          </div>
+          </Reveal>
 
         </div>
 

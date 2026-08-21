@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import CountUpValue from "@/components/CountUpValue";
 
 interface StatItem {
   number: string;
@@ -49,7 +50,7 @@ export default function StatsSection() {
           {statsData.map((stat, idx) => (
             <div
               key={idx}
-              className={`flex items-center justify-center gap-3.5 px-2 text-center mx-auto pb-3 border-b border-[#687280]/40 w-full ${
+              className={`flex items-center justify-center gap-3.5 px-2 text-center mx-auto pb-3 border-b border-[#687280]/40 w-full transition-transform duration-300 hover:-translate-y-1 ${
                 idx !== 0 ? "pt-4 sm:pt-0 lg:pl-6" : ""
               }`}
             >
@@ -64,7 +65,7 @@ export default function StatsSection() {
               {/* Text Column - Centered Number and Label */}
               <div className="flex flex-col items-center justify-center text-center">
                 <span className="font-sans font-bold text-2xl sm:text-[24px] text-[#1F4A3A] tracking-[1px] leading-[32px] text-center w-full">
-                  {stat.number}
+                  <CountUpValue display={stat.number} />
                 </span>
                 <span className="font-sans font-semibold text-[11px] sm:text-xs text-[#687280] tracking-[0.5px] leading-[15px] uppercase sm:whitespace-nowrap text-center w-full">
                   {stat.label}

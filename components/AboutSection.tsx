@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ArrowRight, Trophy, Users, Globe, Award } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 export default function AboutSection() {
   return (
@@ -12,7 +13,7 @@ export default function AboutSection() {
         <img
           src="/about/image 14.png"
           alt="Mandala Background Pattern"
-          className="w-full h-auto object-contain select-none"
+          className="spin-slow w-full h-auto object-contain select-none"
         />
       </div>
 
@@ -20,7 +21,7 @@ export default function AboutSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
 
           {/* Left Column: Image Collage with Floating Badge on Right Edge */}
-          <div className="lg:col-span-6 relative px-2 sm:px-6 lg:pr-8 lg:pl-0">
+          <Reveal animation="left" className="lg:col-span-6 relative px-2 sm:px-6 lg:pr-8 lg:pl-0">
             <div className="grid grid-cols-12 gap-3 sm:gap-4 relative max-w-[620px] mx-auto lg:max-w-none">
 
               {/* Left Tall Portrait Image (Rectangle 40.png) */}
@@ -61,7 +62,8 @@ export default function AboutSection() {
 
               {/* Floating Circular Badge on Right Edge Center with Gold Ring */}
               <div className="absolute top-[48%] sm:top-[52%] right-[-6px] sm:-right-7 lg:-right-9 -translate-y-1/2 z-30">
-                <div className="w-22 h-22 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#0A4A40] border-[3px] sm:border-[3.5px] border-[#D4AF37] shadow-2xl flex flex-col items-center justify-center text-center p-1.5 sm:p-2 transform hover:scale-105 transition-transform duration-300">
+                <div className="float-y">
+                  <div className="w-22 h-22 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#0A4A40] border-[3px] sm:border-[3.5px] border-[#D4AF37] shadow-2xl flex flex-col items-center justify-center text-center p-1.5 sm:p-2 transform hover:scale-105 transition-transform duration-300">
                   <span className="font-playfair font-bold text-xl sm:text-3xl lg:text-4xl text-white leading-none tracking-tight">
                     10+
                   </span>
@@ -69,13 +71,14 @@ export default function AboutSection() {
                     Years of <br /> Excellence
                   </span>
                 </div>
+                </div>
               </div>
 
             </div>
-          </div>
+          </Reveal>
 
           {/* Right Column: About Content */}
-          <div className="lg:col-span-6 space-y-6 lg:pl-4">
+          <Reveal animation="right" delay={120} className="lg:col-span-6 space-y-6 lg:pl-4">
 
             {/* Tagline */}
             <div>
@@ -99,7 +102,7 @@ export default function AboutSection() {
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-10 pt-2">
 
   {/* Feature 1 */}
-  <div className="flex items-start gap-3 p-3.5 rounded-xl">
+  <div className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-stone-50 transition-colors duration-300">
     <img src="/icons/trophy.png" alt="Jaipur Gharana Icon" className="w-6 h-6 object-contain" />
     <div>
       <h3 className="font-inter font-normal text-lg leading-6 tracking-[1px] text-black">
@@ -109,7 +112,7 @@ export default function AboutSection() {
   </div>
 
   {/* Feature 2 */}
-  <div className="flex items-start gap-3 p-3.5 rounded-xl">
+  <div className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-stone-50 transition-colors duration-300">
     <img src="/icons/person.png" alt="Personalized Attention Icon" className="w-6 h-6 object-contain" />
     <div>
       <h3 className="font-inter font-normal text-lg leading-6 tracking-[1px] text-black">
@@ -119,7 +122,7 @@ export default function AboutSection() {
   </div>
 
   {/* Feature 3 */}
-  <div className="flex items-start gap-3 p-3.5 rounded-xl">
+  <div className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-stone-50 transition-colors duration-300">
     <img src="/icons/Vector.png" alt="Global Online Classes Icon" className="w-6 h-6 object-contain" />
     <div>
       <h3 className="font-inter font-normal text-lg leading-6 tracking-[1px] text-black">
@@ -129,7 +132,7 @@ export default function AboutSection() {
   </div>
 
   {/* Feature 4 */}
-  <div className="flex items-start gap-3 p-3.5 rounded-xl">
+  <div className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-stone-50 transition-colors duration-300">
     <img src="/icons/stage.png" alt="Stage & Performance Opportunities Icon" className="w-6 h-6 object-contain" />
     <div>
       <h3 className="font-inter font-normal text-lg leading-6 tracking-[1px] text-black">
@@ -151,7 +154,7 @@ export default function AboutSection() {
               </a>
             </div>
 
-          </div>
+          </Reveal>
 
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Bot } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 
 interface HeroSectionProps {
   videoSrc?: string;
@@ -17,7 +17,7 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
           loop
           muted
           playsInline
-          className="w-full h-full object-cover object-center scale-105 filter brightness-90"
+          className="hero-kenburns w-full h-full object-cover object-center scale-105 filter brightness-90"
         >
           <source src={videoSrc} type="video/mp4" />
           Your browser does not support the video tag.
@@ -33,34 +33,34 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
         
         <div className="max-w-2xl space-y-5 sm:space-y-6 mx-auto sm:mx-0 text-center sm:text-left flex flex-col items-center sm:items-start -translate-y-5 sm:translate-y-0">
           {/* Subheader Badge Tagline */}
-          <div className="inline-block text-center sm:text-left">
+          <div className="hero-enter inline-block text-center sm:text-left">
             <span className="font-poppins text-xs sm:text-sm md:text-lg lg:text-[24px] font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-[8px] leading-[20px] text-white">
               Jaipur Gharana Tradition
             </span>
           </div>
 
           {/* Main Headline in Playfair Display */}
-          <h1 className="font-playfair font-medium text-[36px] sm:text-[42px] md:text-[64px] xl:text-[96px] leading-[1.1] xl:leading-[104px] tracking-normal text-center sm:text-left">
+          <h1 className="hero-enter hero-enter-d1 font-playfair font-medium text-[36px] sm:text-[42px] md:text-[64px] xl:text-[96px] leading-[1.1] xl:leading-[104px] tracking-normal text-center sm:text-left">
             <span className="text-white">
               Step Into The
             </span>
             <br />
-            <span className="sm:whitespace-nowrap text-[#F6D099]">
+            <span className="hero-gold-text sm:whitespace-nowrap">
               Rhythm of Kathak
             </span>
           </h1>
 
           {/* Description Subtitle in Playfair Display */}
-          <p className="font-playfair text-sm sm:text-base lg:text-xl text-stone-200 font-normal leading-relaxed max-w-xl opacity-95 text-center sm:text-left mx-auto sm:mx-0">
+          <p className="hero-enter hero-enter-d2 font-playfair text-sm sm:text-base lg:text-xl text-stone-200 font-normal leading-relaxed max-w-xl opacity-95 text-center sm:text-left mx-auto sm:mx-0">
             Discover the grace, discipline and storytelling that make Kathak a timeless classical art.
           </p>
 
           {/* CTA Action Buttons */}
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 sm:pt-4 mx-auto sm:mx-0">
+          <div className="hero-enter hero-enter-d3 flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4 pt-2 sm:pt-4 mx-auto sm:mx-0">
             {/* Primary Action Button */}
             <a
               href="#one-to-one"
-              className="bg-[#D9383A] hover:bg-[#B91C1C] text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-semibold text-xs sm:text-base transition-all duration-300 shadow-lg shadow-red-900/40 flex items-center gap-2 group cursor-pointer"
+              className="bg-[#D9383A] hover:bg-[#B91C1C] text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-semibold text-xs sm:text-base transition-all duration-300 shadow-lg shadow-red-900/40 flex items-center gap-2 group cursor-pointer hover:scale-105 active:scale-95"
             >
               <span>One-to-One</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -69,7 +69,7 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
             {/* Secondary Action Button */}
             <a
               href="#inquire"
-              className="border border-[#F6D099] hover:border-white bg-black/30 hover:bg-white/10 text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-medium text-xs sm:text-base transition-all backdrop-blur-sm cursor-pointer"
+              className="border border-[#F6D099] hover:border-white bg-black/30 hover:bg-white/10 text-white px-6 sm:px-7 py-3 sm:py-3.5 rounded-full font-playfair font-medium text-xs sm:text-base transition-all backdrop-blur-sm cursor-pointer hover:scale-105 active:scale-95"
             >
               Inquire Now
             </a>
@@ -93,54 +93,15 @@ export default function HeroSection({ videoSrc = "/herobg.mp4" }: HeroSectionPro
         <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6" />
       </button>
 
-      {/* FIXED Floating Action Controls (Transparent BG, Uniform Sizing, Hover Micro-Animations, Shifted UP) */}
-
-      {/* Left Side Fixed Stack: Top (Phone Icon), Bottom (Instagram Icon) */}
-      <div className="fixed bottom-12 sm:bottom-8 left-3 sm:left-6 z-50 flex flex-col items-center gap-3">
-        {/* Top: Phone Call Icon */}
+      <div className="hidden sm:block absolute bottom-7 left-1/2 -translate-x-1/2 z-30">
         <a
-          href="tel:+919876543210"
-          aria-label="Call Us"
-          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
+          href="#about"
+          aria-label="Scroll to about section"
+          className="hero-enter hero-enter-d4 flex flex-col items-center gap-1 text-white/75 hover:text-white transition-colors"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/phone.png" alt="Phone" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
+          <span className="font-sans text-[10px] tracking-[0.28em] uppercase">Scroll</span>
+          <ChevronDown className="w-5 h-5 animate-bounce" />
         </a>
-
-        {/* Bottom: Instagram Icon */}
-        <a
-          href="https://instagram.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Instagram Profile"
-          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/insta.png" alt="Instagram" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
-        </a>
-      </div>
-
-      {/* Right Side Fixed Stack: Top (WhatsApp Icon), Bottom (Chatbot Icon) */}
-      <div className="fixed bottom-12 sm:bottom-8 right-3 sm:right-6 z-50 flex flex-col items-center gap-3">
-        {/* Top: WhatsApp Icon */}
-        <a
-          href="https://wa.me/919876543210"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Chat on WhatsApp"
-          className="w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-115 hover:-translate-y-1 active:scale-95 drop-shadow-xl hover:drop-shadow-2xl group"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/whatsapp.png" alt="WhatsApp" className="w-full h-full object-contain filter group-hover:brightness-110 transition-all" />
-        </a>
-
-        {/* Bottom: Chatbot Icon */}
-        <button
-          aria-label="Chatbot Support"
-          className="w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-[#C10F3A] hover:bg-[#A01830] text-white flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-110 hover:-translate-y-1 active:scale-95 shadow-xl hover:shadow-2xl p-3"
-        >
-          <Bot className="w-7 h-7 text-white" />
-        </button>
       </div>
 
     </section>

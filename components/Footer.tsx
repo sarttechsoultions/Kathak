@@ -103,27 +103,27 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="/#courses" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/courses" className="hover:text-[#D9BE7A] transition-colors">
                   Courses
                 </a>
               </li>
               <li>
-                <a href="/#vision" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/vision-goals" className="hover:text-[#D9BE7A] transition-colors">
                   Vision &amp; Goals
                 </a>
               </li>
               <li>
-                <a href="/#gallery" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/gallery" className="hover:text-[#D9BE7A] transition-colors">
                   Gallery
                 </a>
               </li>
               <li>
-                <a href="/#judges" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/judges-choreographers" className="hover:text-[#D9BE7A] transition-colors">
                   Judges &amp; Choreographers
                 </a>
               </li>
               <li>
-                <a href="/#contact" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/contact" className="hover:text-[#D9BE7A] transition-colors">
                   Contact
                 </a>
               </li>
@@ -138,27 +138,27 @@ export default function Footer() {
             </h4>
             <ul className="space-y-1.5 sm:space-y-2 font-sans text-xs sm:text-sm text-stone-200 font-normal">
               <li>
-                <a href="/#courses-india" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/courses" className="hover:text-[#D9BE7A] transition-colors">
                   India Programs
                 </a>
               </li>
               <li>
-                <a href="/#courses-ladies" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/courses#ladies" className="hover:text-[#D9BE7A] transition-colors">
                   Ladies Wellness Batch
                 </a>
               </li>
               <li>
-                <a href="/#courses-hobby" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/courses#hobby" className="hover:text-[#D9BE7A] transition-colors">
                   Hobby Kathak Batch
                 </a>
               </li>
               <li>
-                <a href="/#courses-intl" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/courses" className="hover:text-[#D9BE7A] transition-colors">
                   International Programs
                 </a>
               </li>
               <li>
-                <a href="/#courses-private" className="hover:text-[#D9BE7A] transition-colors">
+                <a href="/student/enroll" className="hover:text-[#D9BE7A] transition-colors">
                   Private One-to-One
                 </a>
               </li>

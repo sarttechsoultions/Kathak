@@ -1,44 +1,46 @@
+"use client";
+
+import Reveal from "@/components/Reveal";
+
 export default function OurLegacySection() {
   return (
-    <section id="legacy" className="relative bg-white py-16 sm:py-20 lg:py-[80px] overflow-hidden">
-      <div className="w-full max-w-[1280px] mx-auto px-6 sm:px-10 lg:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-[50px] items-center">
-          {/* Studio portrait + experience badge */}
-          <div className="relative">
-            <div className="p-4">
-              <div className="relative aspect-[4/5] w-full overflow-hidden rounded">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/about-page/legacy-studio.png"
-                  alt="Guru Harshita teaching Kathak students in the studio"
-                  className="h-full w-full object-cover object-[30%_center]"
-                />
+    <section id="legacy" className="relative bg-white pt-8 sm:pt-10 pb-16 sm:pb-20 overflow-visible">
+      <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-10 lg:gap-[50px]">
+          <Reveal animation="left" className="relative isolate w-full lg:flex-1 mb-8 sm:mb-10 lg:mb-0">
+            <div className="relative w-full h-[300px] sm:h-[460px] lg:h-[640px] overflow-hidden rounded group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/about-page/legacy-studio.jpg"
+                alt="Guru Harshita teaching Kathak students in the studio"
+                className="h-full w-full object-cover object-[18%_center] transition-transform duration-700 group-hover:scale-105"
+              />
+            </div>
+
+            <div className="absolute z-10 bottom-[-28px] sm:bottom-[-32px] right-1 sm:right-[-8px] lg:right-[-16px]">
+              <div className="float-y">
+                <div className="size-[120px] sm:size-[160px] lg:size-[192px] rounded-full bg-gradient-to-b from-[#09996F] to-[#033325] border-4 border-[#F4FAFD] p-4 sm:p-7 flex flex-col items-center justify-center text-center shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] hover:scale-105 transition-transform duration-300">
+                  <span className="font-playfair font-bold text-[24px] sm:text-[32px] lg:text-[36px] text-white leading-none sm:leading-10">
+                    10+
+                  </span>
+                  <span className="font-sans text-[9px] sm:text-[10px] lg:text-xs text-white tracking-[0.6px] uppercase leading-[13px] sm:leading-[15px] mt-1">
+                    Years of Artistic
+                    <br />
+                    Excellence
+                  </span>
+                </div>
               </div>
             </div>
+          </Reveal>
 
-            <div className="absolute bottom-0 right-0 sm:-right-2 translate-y-2 sm:translate-y-4 size-[140px] sm:size-[192px] rounded-full bg-gradient-to-b from-[#09996f] to-[#033325] border-4 border-[#F4FAFD] shadow-xl flex flex-col items-center justify-center text-center p-4">
-              <span className="font-playfair font-bold text-3xl sm:text-4xl text-white leading-10">
-                10+
-              </span>
-              <span className="font-sans text-[10px] sm:text-xs text-white tracking-[0.6px] uppercase leading-[15px] mt-1">
-                Years of Artistic
-                <br />
-                Excellence
-              </span>
-            </div>
-          </div>
-
-          {/* Copy */}
-          <div className="space-y-4 lg:pl-2">
-            <p className="font-sans font-bold text-lg sm:text-2xl tracking-[1.6px] text-[#C10F3A] uppercase">
+          <Reveal animation="right" delay={120} className="w-full lg:flex-1 flex flex-col gap-3 sm:gap-4">
+            <p className="font-sans font-bold text-sm sm:text-lg lg:text-[24px] leading-6 tracking-[1.2px] sm:tracking-[1.6px] text-[#C10F3A] uppercase">
               Our Legacy
             </p>
-            <h2 className="font-playfair font-bold text-3xl sm:text-4xl lg:text-[48px] leading-tight lg:leading-[60px] text-black">
-              Nurturing Tradition,
-              <br />
-              Inspiring Generation
+            <h2 className="font-playfair font-bold text-[28px] sm:text-[40px] lg:text-[48px] leading-tight lg:leading-[60px] text-black">
+              Nurturing Tradition, Inspiring Generation
             </h2>
-            <div className="space-y-6 font-sans text-sm sm:text-base text-black leading-6">
+            <div className="flex flex-col gap-4 sm:gap-6 font-sans text-[15px] sm:text-[16px] leading-6 text-black">
               <p>
                 Kathak by Harshita was founded with a singular vision: to create a space where
                 the ancient art of Jaipur Gharana Kathak could flourish in the modern world while
@@ -51,27 +53,27 @@ export default function OurLegacySection() {
                 expression.
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-2">
-              <div className="flex items-start gap-3">
-                <span className="size-[22px] overflow-clip shrink-0 mt-0.5">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 flex-1 rounded-lg p-2 -ml-2 hover:bg-stone-50 transition-colors duration-300">
+                <span className="size-[22px] overflow-clip shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/about-page/icon-spark.svg" alt="" className="size-[22px]" />
                 </span>
-                <span className="font-sans text-sm sm:text-base text-[#570013] leading-6">
+                <span className="font-sans text-[15px] sm:text-[16px] leading-6 text-[#570013]">
                   Authentic Jaipur Lineage
                 </span>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-3 overflow-clip shrink-0 mt-1.5">
+              <div className="flex items-center gap-3 flex-1 rounded-lg p-2 -ml-2 hover:bg-stone-50 transition-colors duration-300">
+                <span className="w-6 h-3 overflow-clip shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/about-page/icon-people.svg" alt="" className="w-6 h-3" />
                 </span>
-                <span className="font-sans text-sm sm:text-base text-[#570013] leading-6">
+                <span className="font-sans text-[15px] sm:text-[16px] leading-6 text-[#570013]">
                   Inclusive Learning Environment
                 </span>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

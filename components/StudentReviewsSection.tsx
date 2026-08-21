@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Star, User } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 interface ReviewCard {
   id: string;
@@ -40,7 +41,7 @@ export default function StudentReviewsSection() {
       <div className="w-full max-w-[1232px] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto space-y-2 mb-10 sm:mb-12">
+        <Reveal className="text-center max-w-2xl mx-auto space-y-2 mb-10 sm:mb-12">
           {/* Tagline: Manrope Regular 16px, #570013, Letter Spacing 1.6px */}
           <span className="font-sans font-normal text-sm sm:text-base tracking-[1.6px] text-[#570013] uppercase leading-[24px] block">
             TESTIMONIALS
@@ -62,14 +63,14 @@ export default function StudentReviewsSection() {
               4.9/5 on Google Reviews
             </span>
           </div>
-        </div>
+        </Reveal>
 
         {/* 3 Review Cards Grid (Gap: 48px) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-[48px]">
-          {reviewsData.map((card) => (
+          {reviewsData.map((card, index) => (
+            <Reveal key={card.id} delay={index * 120} animation="scale">
             <div
-              key={card.id}
-              className="bg-white rounded-2xl p-6 sm:p-7 border border-[#E5E7EB] shadow-xs hover:shadow-md transition-all duration-300 space-y-6 flex flex-col justify-between"
+              className="hover-lift bg-white rounded-2xl p-6 sm:p-7 border border-[#E5E7EB] shadow-xs hover:shadow-md transition-all duration-300 space-y-6 flex flex-col justify-between"
             >
               {/* Top Row: 5 Stars */}
               <div className="flex items-center justify-between">
@@ -105,6 +106,7 @@ export default function StudentReviewsSection() {
               </div>
 
             </div>
+            </Reveal>
           ))}
         </div>
 
