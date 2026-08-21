@@ -2,8 +2,7 @@
 
 import React, { useLayoutEffect } from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
-import { RemoteUser } from "agora-rtc-react";
-import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
+import { RemoteUser, type IAgoraRTCRemoteUser } from "agora-rtc-react";
 
 export type HostStudentTile = {
   socketId: string;

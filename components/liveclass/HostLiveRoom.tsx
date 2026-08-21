@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { useFullscreen } from "@/components/liveclass/useFullscreen";
 import { AgoraProvider } from "@/lib/agoraClient";
-import {
+import AgoraRTC, {
   LocalVideoTrack,
   RemoteUser,
   TrackBoundary,
@@ -21,8 +21,8 @@ import {
   useRemoteUsers,
   useRemoteVideoTracks,
   useRTCClient,
+  type ILocalVideoTrack,
 } from "agora-rtc-react";
-import AgoraRTC, { ILocalVideoTrack } from "agora-rtc-sdk-ng";
 import StudentVideoStrip, { type HostStudentTile } from "@/components/liveclass/StudentVideoStrip";
 
 interface ChatMessage {
