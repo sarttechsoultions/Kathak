@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, MoreVertical,
@@ -15,6 +15,7 @@ import AgoraRTC, {
   RemoteUser,
   TrackBoundary,
   useJoin,
+  useIsConnected,
   useLocalCameraTrack,
   useLocalMicrophoneTrack,
   usePublish,
@@ -172,19 +173,31 @@ function HostLiveRoomInner({ joinInfo, leaveHref }: { joinInfo: LiveClassData; l
 
   const joinUid = Number(joinInfo.uid) || 0;
   const agoraReady = Boolean(joinInfo.appId && joinInfo.channelName && joinUid > 0);
+  const isConnected = useIsConnected();
 
   useJoin(
     { appid: joinInfo.appId, channel: joinInfo.channelName, token: joinInfo.token || null, uid: joinUid },
     agoraReady
   );
 
-  const { localMicrophoneTrack, error: micError } = useLocalMicrophoneTrack(isMicOn);
-  const { localCameraTrack, error: camError } = useLocalCameraTrack(isVideoOn && !isScreenSharing);
+  const { localMicrophoneTrack, error: micError } = useLocalMicrophoneTrack(true);
+  const { localCameraTrack, error: camError } = useLocalCameraTrack(true);
 
-  usePublish(
-    [isMicOn ? localMicrophoneTrack : null, isVideoOn && !isScreenSharing ? localCameraTrack : null],
-    agoraReady
+  useEffect(() => {
+    if (!localCameraTrack) return;
+    void localCameraTrack.setEnabled(isVideoOn && !isScreenSharing).catch(() => {});
+  }, [localCameraTrack, isVideoOn, isScreenSharing]);
+
+  useEffect(() => {
+    if (!localMicrophoneTrack) return;
+    void localMicrophoneTrack.setEnabled(isMicOn).catch(() => {});
+  }, [localMicrophoneTrack, isMicOn]);
+
+  const publishTracks = useMemo(
+    () => [localMicrophoneTrack, isScreenSharing ? null : localCameraTrack],
+    [localMicrophoneTrack, localCameraTrack, isScreenSharing]
   );
+  usePublish(publishTracks, isConnected && agoraReady);
 
   const remoteUsers = useRemoteUsers();
   useRemoteVideoTracks(remoteUsers);
@@ -274,8 +287,8 @@ function HostLiveRoomInner({ joinInfo, leaveHref }: { joinInfo: LiveClassData; l
           agoraUid: uid,
           studentId: user.studentId ? String(user.studentId) : undefined,
           name: String(user.userName || "Student"),
-          hasVideo: Boolean(remoteUser?.hasVideo),
-          hasAudio: Boolean(remoteUser?.hasAudio),
+          hasVideo: Boolean(remoteUser?.hasVideo || remoteUser?.videoTrack),
+          hasAudio: Boolean(remoteUser?.hasAudio || remoteUser?.audioTrack),
           remoteUser,
         } satisfies HostStudentTile;
       });
@@ -299,8 +312,8 @@ function HostLiveRoomInner({ joinInfo, leaveHref }: { joinInfo: LiveClassData; l
           agoraUid: uid,
           studentId: mapped?.studentId ? String(mapped.studentId) : undefined,
           name: String(mapped?.userName || "Student"),
-          hasVideo: Boolean(remote.hasVideo),
-          hasAudio: Boolean(remote.hasAudio),
+          hasVideo: Boolean(remote.hasVideo || remote.videoTrack),
+          hasAudio: Boolean(remote.hasAudio || remote.audioTrack),
           remoteUser: remote,
         } satisfies HostStudentTile;
       }),
