@@ -136,9 +136,11 @@ export default function CourseView() {
       const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token") : null;
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
       const uploadEndpoint = `${apiBase}/upload/image`;
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(uploadEndpoint, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers,
         body: formData,
       });
 
@@ -171,9 +173,11 @@ export default function CourseView() {
       const token = typeof window !== "undefined" ? localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token") : null;
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
       const uploadEndpoint = `${apiBase}/upload/video`;
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(uploadEndpoint, {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers,
         body: formData,
       });
 

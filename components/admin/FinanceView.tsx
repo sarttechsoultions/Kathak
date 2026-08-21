@@ -154,11 +154,13 @@ export default function FinanceView() {
     }
   };
 
-  const authHeaders = () => {
+  const authHeaders = (): Record<string, string> => {
     const token =
       localStorage.getItem("kathak_admin_token") ||
       localStorage.getItem("kathak_token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
   };
 
   const openInvoice = async (paymentId: string) => {
