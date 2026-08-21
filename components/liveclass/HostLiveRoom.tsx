@@ -4,16 +4,19 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, MoreVertical,
-  Send, Hand, PhoneOff, MessageSquare, CircleDot, Loader2
+  Send, Hand, PhoneOff, MessageSquare, CircleDot, Loader2, Maximize2, Minimize2
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
+import { useFullscreen } from "@/components/liveclass/useFullscreen";
 import AgoraRTC, {
   IAgoraRTCClient,
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
-  ILocalVideoTrack
+  ILocalVideoTrack,
+  IRemoteVideoTrack
 } from "agora-rtc-sdk-ng";
+import StudentVideoStrip, { type HostStudentTile } from "@/components/liveclass/StudentVideoStrip";
 
 interface ChatMessage {
   id: string;
@@ -23,9 +26,30 @@ interface ChatMessage {
 }
 
 interface RoomUser {
+  id?: string;
+  userName?: string;
   userRole?: string;
+  studentId?: string;
+  agoraUid?: number;
   [key: string]: string | number | boolean | undefined;
 }
+
+type RemoteMedia = {
+  uid: number;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  videoTrack?: IRemoteVideoTrack;
+};
+
+const isStudentRole = (role?: string) => {
+  const value = String(role || "student").toLowerCase();
+  return value === "student";
+};
+
+const isHostRole = (role?: string) => {
+  const value = String(role || "").toLowerCase();
+  return value === "teacher" || value === "admin";
+};
 
 interface LiveClassData {
   token: string;
@@ -71,14 +95,19 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   const [messageInput, setMessageInput] = useState("");
   const [participantsCount, setParticipantsCount] = useState(1);
   const [deviceToast, setDeviceToast] = useState<string | null>(null);
+  const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
+  const [remoteMedia, setRemoteMedia] = useState<RemoteMedia[]>([]);
+  const [spotlightUid, setSpotlightUid] = useState<number | null>(null);
 
   const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
   const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
   const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null);
   const screenTrackRef = useRef<ILocalVideoTrack | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
+  const hostPipRef = useRef<HTMLDivElement>(null);
   const isJoinedRef = useRef(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const { containerRef: stageRef, isFullscreen, toggleFullscreen } = useFullscreen();
 
   const showToast = (message: string) => {
     setDeviceToast(message);
@@ -111,6 +140,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
             userName: hostName,
             userRole: data.role === "admin" ? "Admin" : "Teacher",
             studentId: data.userId,
+            agoraUid: data.uid,
           });
 
           socketInstance.off("liveclass:chat-history");
@@ -123,7 +153,8 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
             setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
           });
           socketInstance.on("liveclass:room-users", (users: RoomUser[]) => {
-            const studentCount = users.filter((u) => !u.userRole || String(u.userRole).toLowerCase() === "student").length;
+            setRoomUsers(Array.isArray(users) ? users : []);
+            const studentCount = users.filter((u) => isStudentRole(String(u.userRole))).length;
             setParticipantsCount(studentCount);
           });
           socketInstance.on("liveclass:raise-hand", (payload: { senderName: string }) => {
@@ -137,12 +168,38 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
 
           client.on("user-published", async (user, mediaType) => {
             await client.subscribe(user, mediaType);
-            if (mediaType === "video" && user.videoTrack && !localVideoTrackRef.current && videoContainerRef.current) {
-              user.videoTrack.play(videoContainerRef.current);
-            }
-            if (mediaType === "audio" && user.audioTrack) {
-              user.audioTrack.play();
-            }
+            const uid = Number(user.uid);
+            setRemoteMedia((prev) => {
+              const existing = prev.find((item) => item.uid === uid) || { uid, hasVideo: false, hasAudio: false };
+              const next: RemoteMedia = { ...existing };
+              if (mediaType === "video" && user.videoTrack) {
+                next.hasVideo = true;
+                next.videoTrack = user.videoTrack;
+              }
+              if (mediaType === "audio" && user.audioTrack) {
+                next.hasAudio = true;
+                user.audioTrack.play();
+              }
+              return [...prev.filter((item) => item.uid !== uid), next];
+            });
+          });
+
+          client.on("user-unpublished", (user, mediaType) => {
+            const uid = Number(user.uid);
+            setRemoteMedia((prev) =>
+              prev.map((item) => {
+                if (item.uid !== uid) return item;
+                if (mediaType === "video") return { ...item, hasVideo: false, videoTrack: undefined };
+                if (mediaType === "audio") return { ...item, hasAudio: false };
+                return item;
+              })
+            );
+          });
+
+          client.on("user-left", (user) => {
+            const uid = Number(user.uid);
+            setRemoteMedia((prev) => prev.filter((item) => item.uid !== uid));
+            setSpotlightUid((current) => (current === uid ? null : current));
           });
 
           if (!isJoinedRef.current && !cancelled) {
@@ -214,6 +271,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
         screenTrackRef.current = null;
       }
       if (agoraClientRef.current && isJoinedRef.current) {
+        agoraClientRef.current.removeAllListeners();
         agoraClientRef.current.leave().finally(() => {
           isJoinedRef.current = false;
         });
@@ -232,6 +290,82 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     const timer = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
     return () => clearInterval(timer);
   }, [isRecording]);
+
+  const studentTiles: HostStudentTile[] = (() => {
+    const hostUid = classData?.uid;
+    const tilesFromRoom = roomUsers
+      .filter((user) => isStudentRole(String(user.userRole)))
+      .map((user) => {
+        const uid = typeof user.agoraUid === "number" ? user.agoraUid : Number(user.agoraUid);
+        const media = Number.isFinite(uid) ? remoteMedia.find((item) => item.uid === uid) : undefined;
+        return {
+          socketId: String(user.id || `student-${user.userName}`),
+          agoraUid: Number.isFinite(uid) ? uid : undefined,
+          studentId: user.studentId ? String(user.studentId) : undefined,
+          name: String(user.userName || "Student"),
+          hasVideo: Boolean(media?.hasVideo),
+          hasAudio: Boolean(media?.hasAudio),
+          videoTrack: media?.videoTrack,
+        } satisfies HostStudentTile;
+      });
+
+    const extras = remoteMedia.filter((media) => {
+      if (media.uid === hostUid) return false;
+      if (tilesFromRoom.some((tile) => tile.agoraUid === media.uid)) return false;
+      const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+      if (mapped && isHostRole(String(mapped.userRole))) return false;
+      return true;
+    });
+
+    return [
+      ...tilesFromRoom,
+      ...extras.map((media) => {
+        const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+        return {
+          socketId: mapped?.id ? String(mapped.id) : `agora-${media.uid}`,
+          agoraUid: media.uid,
+          studentId: mapped?.studentId ? String(mapped.studentId) : undefined,
+          name: String(mapped?.userName || "Student"),
+          hasVideo: media.hasVideo,
+          hasAudio: media.hasAudio,
+          videoTrack: media.videoTrack,
+        } satisfies HostStudentTile;
+      }),
+    ];
+  })();
+
+  const spotlightStudent = studentTiles.find((tile) => tile.agoraUid === spotlightUid) || null;
+  const peerHost = remoteMedia.find((media) => {
+    const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+    return Boolean(mapped && isHostRole(String(mapped.userRole)) && media.hasVideo && media.videoTrack);
+  });
+
+  useEffect(() => {
+    if (isScreenSharing) return;
+
+    const mainEl = videoContainerRef.current;
+    if (!mainEl) return;
+
+    if (spotlightUid != null) {
+      const spotlight = remoteMedia.find((item) => item.uid === spotlightUid);
+      if (spotlight?.videoTrack && spotlight.hasVideo) {
+        spotlight.videoTrack.play(mainEl);
+      }
+      if (hostPipRef.current && localVideoTrackRef.current && isVideoOn) {
+        localVideoTrackRef.current.play(hostPipRef.current);
+      }
+      return;
+    }
+
+    if (localVideoTrackRef.current && isVideoOn) {
+      localVideoTrackRef.current.play(mainEl);
+      return;
+    }
+
+    if (peerHost?.videoTrack) {
+      peerHost.videoTrack.play(mainEl);
+    }
+  }, [spotlightUid, remoteMedia, isVideoOn, isScreenSharing, peerHost]);
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -272,8 +406,11 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     if (!isVideoOn) {
       if (localVideoTrackRef.current) {
         await localVideoTrackRef.current.setEnabled(true);
-        if (videoContainerRef.current) {
-          localVideoTrackRef.current.play(videoContainerRef.current);
+        const playTarget = spotlightUid != null && hostPipRef.current
+          ? hostPipRef.current
+          : videoContainerRef.current;
+        if (playTarget) {
+          localVideoTrackRef.current.play(playTarget);
         }
         setIsVideoOn(true);
         return;
@@ -282,8 +419,11 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
         const videoTrack = await AgoraRTC.createCameraVideoTrack();
         localVideoTrackRef.current = videoTrack;
         await client.publish([videoTrack]);
-        if (videoContainerRef.current) {
-          videoTrack.play(videoContainerRef.current);
+        const playTarget = spotlightUid != null && hostPipRef.current
+          ? hostPipRef.current
+          : videoContainerRef.current;
+        if (playTarget) {
+          videoTrack.play(playTarget);
         }
         setIsVideoOn(true);
       } catch (err) {
@@ -406,6 +546,21 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     setMessageInput("");
   };
 
+  const controlStudentMedia = (student: HostStudentTile, kind: "camera" | "mic", enabled: boolean) => {
+    if (!socket || !classData) return;
+    socket.emit("liveclass:media-control", {
+      roomName: classData.channelName,
+      targetSocketId: student.socketId.startsWith("agora-") ? undefined : student.socketId,
+      targetStudentId: student.studentId,
+      targetAgoraUid: student.agoraUid,
+      camera: kind === "camera" ? enabled : undefined,
+      mic: kind === "mic" ? enabled : undefined,
+    });
+    showToast(
+      `${enabled ? "Turning on" : "Turning off"} ${student.name}'s ${kind === "camera" ? "camera" : "microphone"}…`
+    );
+  };
+
   const leaveClass = () => {
     if (socket && classData) {
       socket.emit("liveclass:leave", { roomName: classData.channelName });
@@ -425,82 +580,134 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#Fdf5f5] flex items-center justify-center font-sans p-6 relative">
+    <div className="w-full min-h-0 bg-[#Fdf5f5] flex justify-center font-sans p-3 sm:p-4 lg:p-6 relative">
       {handRaiseToast && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-[#9B3434] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce">
-          <Hand className="w-5 h-5" />
-          <span className="text-[14px] font-bold">{handRaiseToast}</span>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[#9B3434] text-white px-4 sm:px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 max-w-[90vw]">
+          <Hand className="w-5 h-5 shrink-0" />
+          <span className="text-[13px] sm:text-[14px] font-bold">{handRaiseToast}</span>
         </div>
       )}
       {deviceToast && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-stone-800 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
-          <span className="text-[14px] font-bold">{deviceToast}</span>
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-stone-800 text-white px-4 sm:px-6 py-3 rounded-2xl shadow-2xl max-w-[90vw]">
+          <span className="text-[13px] sm:text-[14px] font-bold">{deviceToast}</span>
         </div>
       )}
 
-      <div className="w-full max-w-[1000px] h-[960px] flex gap-6">
-        <div className="w-[626px] h-full flex flex-col shrink-0">
-          <div className="w-full h-[804px] relative rounded-[24px] overflow-hidden bg-black shadow-xl">
+      <div className="w-full max-w-[1200px] grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-6">
+        <div
+          ref={stageRef}
+          className={`w-full min-w-0 flex flex-col ${isFullscreen ? "h-screen w-screen bg-black p-3 sm:p-4" : ""}`}
+        >
+          <div className={`w-full relative overflow-hidden bg-black shadow-xl ${
+            isFullscreen
+              ? "flex-1 min-h-0 rounded-2xl"
+              : studentTiles.length > 0
+                ? "rounded-2xl sm:rounded-[24px] h-[40vh] min-h-[240px] sm:h-[48vh] xl:h-[min(54vh,560px)]"
+                : "rounded-2xl sm:rounded-[24px] h-[48vh] min-h-[260px] sm:h-[56vh] xl:h-[min(70vh,720px)]"
+          }`}>
             <div ref={videoContainerRef} className="absolute inset-0 w-full h-full object-cover" />
+            {spotlightStudent && !spotlightStudent.hasVideo ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-stone-400">
+                <VideoOff className="w-8 h-8" />
+                <span className="text-sm font-semibold">{spotlightStudent.name}&apos;s camera is off</span>
+              </div>
+            ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/20 pointer-events-none" />
 
-            <div className="absolute top-6 left-6 flex gap-2 items-center z-10">
+            <div className="absolute top-3 left-3 sm:top-6 sm:left-6 flex gap-2 items-center z-10">
               <button
+                type="button"
                 onClick={toggleRecording}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-2 border transition-all ${isRecording ? "bg-red-600 border-red-400 animate-pulse" : "bg-black/60 border-white/10 hover:bg-black/80"}`}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-2 border transition-all ${isRecording ? "bg-red-600 border-red-400 animate-pulse" : "bg-black/60 border-white/10 hover:bg-black/80"}`}
               >
                 <CircleDot className={`w-3.5 h-3.5 ${isRecording ? "text-white fill-current" : "text-red-500"}`} />
-                <span className="text-white text-[11px] font-bold tracking-wider">
-                  {isRecording ? `STOP REC (${formatTime(recordingTime)})` : "START RECORDING"}
+                <span className="text-white text-[10px] sm:text-[11px] font-bold tracking-wider">
+                  {isRecording ? `STOP (${formatTime(recordingTime)})` : "REC"}
                 </span>
               </button>
+              {spotlightStudent ? (
+                <button
+                  type="button"
+                  onClick={() => setSpotlightUid(null)}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#9B3434] text-white text-[10px] sm:text-[11px] font-bold"
+                >
+                  Back to your camera
+                </button>
+              ) : null}
             </div>
 
-            <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-md rounded-xl p-3 pr-8 shadow-lg border border-white/20 z-10">
-              <span className="text-[#9B3434] text-[10px] font-bold uppercase tracking-wider block mb-0.5">Guru</span>
-              <span className="text-[#0B1C30] text-[14px] font-bold leading-tight block">
-                {classData?.liveClass.teacherName || "Instructor"}
+            <div className="absolute top-3 right-3 sm:top-6 sm:right-6 bg-white/90 backdrop-blur-md rounded-xl p-2.5 sm:p-3 pr-4 sm:pr-8 shadow-lg border border-white/20 z-10 max-w-[55%]">
+              <span className="text-[#9B3434] text-[10px] font-bold uppercase tracking-wider block mb-0.5">
+                {spotlightStudent ? "Student" : "Guru"}
+              </span>
+              <span className="text-[#0B1C30] text-[12px] sm:text-[14px] font-bold leading-tight block truncate">
+                {spotlightStudent?.name || classData?.liveClass.teacherName || "Instructor"}
               </span>
             </div>
+
+            {spotlightStudent && isVideoOn ? (
+              <div className="absolute bottom-3 right-3 z-20 h-20 w-28 sm:h-24 sm:w-32 overflow-hidden rounded-xl border-2 border-white/40 bg-stone-900 shadow-md">
+                <div ref={hostPipRef} className="absolute inset-0" />
+                <div className="absolute bottom-1 left-1 bg-black/75 px-1.5 py-0.5 rounded text-[10px] font-extrabold text-white">
+                  You
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          <div className="w-full flex-1 mt-6 flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
-              <button onClick={toggleVideo} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isVideoOn ? "bg-white text-stone-700 shadow-sm" : "bg-red-100 text-red-600"}`}>
+          <StudentVideoStrip
+            students={studentTiles}
+            spotlightUid={spotlightUid}
+            onSpotlight={setSpotlightUid}
+            onToggleCamera={(student, enabled) => controlStudentMedia(student, "camera", enabled)}
+            onToggleMic={(student, enabled) => controlStudentMedia(student, "mic", enabled)}
+          />
+
+          <div className="w-full mt-3 sm:mt-4 flex flex-wrap items-center justify-center sm:justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button type="button" onClick={toggleVideo} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors cursor-pointer ${isVideoOn ? "bg-white text-stone-700 shadow-sm" : "bg-red-100 text-red-600"}`}>
                 {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
               </button>
-              <button onClick={toggleMic} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${isMicOn ? "bg-white text-stone-700 shadow-sm" : "bg-red-100 text-red-600"}`}>
+              <button type="button" onClick={toggleMic} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors cursor-pointer ${isMicOn ? "bg-white text-stone-700 shadow-sm" : "bg-red-100 text-red-600"}`}>
                 {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button onClick={handleRaiseHand} className={`px-6 h-12 rounded-full flex items-center gap-2 font-bold text-[14px] transition-all shadow-md ${isHandRaised ? "bg-amber-600 text-white" : "bg-[#9B3434] text-white hover:bg-[#832c2c]"}`}>
-                <Hand className="w-5 h-5" /> {isHandRaised ? "Hand Raised" : "Raise Hand"}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button type="button" onClick={handleRaiseHand} className={`px-4 sm:px-6 h-11 sm:h-12 rounded-full flex items-center gap-2 font-bold text-[13px] sm:text-[14px] transition-all shadow-md cursor-pointer ${isHandRaised ? "bg-amber-600 text-white" : "bg-[#9B3434] text-white hover:bg-[#832c2c]"}`}>
+                <Hand className="w-5 h-5" /> <span className="hidden sm:inline">{isHandRaised ? "Hand Raised" : "Raise Hand"}</span>
               </button>
-              <button onClick={toggleScreenShare} className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors shadow-sm ${isScreenSharing ? "bg-indigo-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"}`}>
+              <button type="button" onClick={toggleScreenShare} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer ${isScreenSharing ? "bg-indigo-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"}`}>
                 <MonitorUp className="w-5 h-5" />
               </button>
-              <button className="w-12 h-12 rounded-full flex items-center justify-center bg-white text-stone-700 hover:bg-stone-50 shadow-sm transition-colors">
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer ${isFullscreen ? "bg-indigo-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"}`}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+              </button>
+              <button type="button" className="hidden sm:flex w-12 h-12 rounded-full items-center justify-center bg-white text-stone-700 hover:bg-stone-50 shadow-sm transition-colors">
                 <MoreVertical className="w-5 h-5" />
               </button>
             </div>
 
-            <button onClick={leaveClass} className="bg-[#B91C1C] hover:bg-[#991B1B] text-white px-6 h-12 rounded-full font-bold text-[14px] shadow-lg shadow-red-900/20 transition-all flex items-center gap-2">
-              <PhoneOff className="w-4 h-4" /> Leave Class
+            <button type="button" onClick={leaveClass} className="bg-[#B91C1C] hover:bg-[#991B1B] text-white px-4 sm:px-6 h-11 sm:h-12 rounded-full font-bold text-[13px] sm:text-[14px] shadow-lg shadow-red-900/20 transition-all flex items-center gap-2 cursor-pointer">
+              <PhoneOff className="w-4 h-4" /> Leave
             </button>
           </div>
         </div>
 
-        <div className="flex-1 h-full flex flex-col gap-6">
-          <div className="w-full flex-1 bg-white rounded-[24px] shadow-sm border border-stone-100 flex flex-col overflow-hidden">
-            <div className="h-[60px] flex items-center justify-center border-b border-stone-100 shrink-0">
+        <div className="w-full min-w-0 flex flex-col gap-4 h-[52vh] min-h-[360px] xl:h-[min(70vh,720px)]">
+          <div className="w-full flex-1 min-h-0 bg-white rounded-2xl sm:rounded-[24px] shadow-sm border border-stone-100 flex flex-col overflow-hidden">
+            <div className="h-[52px] sm:h-[60px] flex items-center justify-center border-b border-stone-100 shrink-0">
               <div className="flex items-center gap-2 text-[#9B3434] font-bold text-[14px]">
                 <MessageSquare className="w-4 h-4" /> Live Chat
               </div>
             </div>
 
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-5 space-y-5 scroll-smooth">
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 scroll-smooth">
               {chatMessages.map((msg, idx) => {
                 const isMe = msg.senderName === (classData?.userName || "You");
                 return (
@@ -521,7 +728,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
               })}
             </div>
 
-            <div className="p-4 bg-white border-t border-stone-50 shrink-0">
+            <div className="p-3 sm:p-4 bg-white border-t border-stone-50 shrink-0">
               <form onSubmit={sendMessage} className="relative">
                 <input
                   type="text"
@@ -537,12 +744,12 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
             </div>
           </div>
 
-          <div className="w-full h-[140px] bg-white rounded-[24px] shadow-sm border border-stone-100 p-5 flex flex-col justify-between shrink-0">
-            <div className="flex items-center justify-between">
+          <div className="w-full bg-white rounded-2xl sm:rounded-[24px] shadow-sm border border-stone-100 p-4 sm:p-5 flex flex-col justify-between shrink-0">
+            <div className="flex items-center justify-between mb-3">
               <span className="text-[#9B3434] text-[12px] font-bold tracking-widest uppercase">Engagement</span>
               <span className="bg-sky-50 text-sky-600 text-[10px] font-bold px-2 py-1 rounded-full">Live Analytics</span>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-3 sm:gap-4">
               <div className="flex-1 bg-[#Fdf5f5] rounded-xl p-3 border border-red-50">
                 <span className="text-[#9B3434] text-[9px] font-bold uppercase tracking-wider block mb-1">Students Active</span>
                 <span className="text-[#9B3434] text-[20px] font-light leading-none">{participantsCount}</span>
@@ -558,3 +765,4 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     </div>
   );
 }
+

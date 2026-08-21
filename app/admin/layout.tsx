@@ -164,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminHeader
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
-        <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-[1400px] mx-auto w-full flex-1">
+        <div className={`mx-auto w-full flex-1 ${pathname.includes("/class-management/room") ? "p-3 sm:p-4 lg:p-6 max-w-[1600px]" : "p-4 sm:p-6 lg:p-8 space-y-8 max-w-[1400px]"}`}>
           {children}
         </div>
       </main>

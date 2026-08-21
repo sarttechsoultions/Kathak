@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import TeacherSidebar from "@/components/teacher/TeacherSidebar";
 import TeacherHeader from "@/components/teacher/TeacherHeader";
 import { Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { apiRequest, ENDPOINTS } from "@/lib/api";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
@@ -102,7 +103,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <TeacherHeader
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
-        <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-[1400px] mx-auto w-full flex-1">
+        <div className={`mx-auto w-full flex-1 ${pathname.includes("/live-classes/room") ? "p-3 sm:p-4 lg:p-6 max-w-[1600px]" : "p-4 sm:p-6 lg:p-8 space-y-8 max-w-[1400px]"}`}>
           {children}
         </div>
       </main>

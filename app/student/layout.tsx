@@ -211,27 +211,15 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#1B1B24] flex selection:bg-[#900C27] selection:text-white font-sans">
-      {/* MOBILE TOP NAVIGATION BAR */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between shadow-2xs print:hidden">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg bg-stone-100 text-stone-700"
-          >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Kathak Logo" className="h-8 w-auto object-contain" />
-        </div>
+      {mobileMenuOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-30 bg-stone-900/40 lg:hidden print:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      ) : null}
 
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#900C27] text-white font-bold flex items-center justify-center text-xs">
-            {initials}
-          </div>
-        </div>
-      </div>
-
-      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r border-stone-200 flex flex-col justify-between transition-all duration-300 print:hidden ${
           collapsed ? "w-20" : "w-[250px]"
@@ -239,16 +227,17 @@ useEffect(() => {
       >
         <div className="flex flex-col h-full overflow-y-auto px-4 py-5 scrollbar-thin">
           <div className="flex items-center justify-between mb-6 px-1">
-            <Link href="/student/dashboard" className="flex items-center gap-2 overflow-hidden">
+            <Link href="/student/dashboard" className="flex items-center gap-2 overflow-hidden" onClick={() => setMobileMenuOpen(false)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo.png"
                 alt="Kathak by Harshita"
-                className="h-30 max-h-[64px] w-auto ml-5 object-contain shrink-0"
+                className="h-12 max-h-[56px] w-auto ml-2 object-contain shrink-0"
               />
             </Link>
 
             <button
+              type="button"
               onClick={() => setCollapsed(!collapsed)}
               className="hidden lg:flex items-center justify-center p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
               title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -283,6 +272,7 @@ useEffect(() => {
             })}
 
             <button
+              type="button"
               onClick={handleLogout}
               className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[15px] font-medium text-stone-700 hover:text-[#900C27] hover:bg-rose-50 transition-all cursor-pointer text-left mt-2"
               title={collapsed ? "Log Out" : undefined}
@@ -294,55 +284,75 @@ useEffect(() => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col min-w-0 pt-14 lg:pt-0 print:pt-0">
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200 px-6 lg:px-10 py-3.5 flex items-center justify-between gap-4 print:hidden">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="w-4 h-4 text-stone-400 absolute left-4 top-1/2 -translate-y-1/2" />
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-stone-200 h-16 sm:h-[72px] px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 print:hidden">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-xl">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-100 lg:hidden cursor-pointer shrink-0"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+
+            <Link href="/student/dashboard" className="lg:hidden shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="Kathak by Harshita" className="h-8 w-auto object-contain" />
+            </Link>
+
+            <div className="relative hidden sm:block w-full min-w-0">
+              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
-                type="text"
+                type="search"
                 placeholder="Search lessons, progress, or teachers..."
-                className="w-full bg-[#F5F5F7] border border-stone-200/80 focus:border-[#900C27] focus:bg-white rounded-full pl-11 pr-4 py-2.5 text-xs sm:text-sm text-[#1B1B24] placeholder-stone-400 focus:outline-none transition-all"
+                className="w-full h-10 sm:h-11 bg-[#F5F5F7] border border-stone-200/80 focus:border-[#900C27] focus:bg-white rounded-full pl-10 pr-4 text-xs sm:text-sm text-[#1B1B24] placeholder-stone-400 focus:outline-none transition-all"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
-            <button className="relative p-2 rounded-full hover:bg-stone-100 text-stone-600 transition-colors cursor-pointer">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <Link
+              href="/student/notifications"
+              className="relative p-2 rounded-full hover:bg-stone-100 text-stone-600 transition-colors"
+              aria-label="Notifications"
+            >
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#900C27]" />
-            </button>
+            </Link>
 
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
+            <Link
+              href="/student/profile"
+              className="flex items-center gap-2.5 rounded-full sm:rounded-2xl sm:pl-2 sm:pr-3 sm:py-1 hover:bg-stone-50 transition-colors"
+              title="My profile"
+            >
+              <div className="text-right hidden md:block">
                 <span className="font-semibold text-sm text-[#1B1B24] block leading-tight">
                   {displayName}
                 </span>
-                <span className="text-[11px] text-stone-500 font-sans block">
+                <span className="text-[11px] text-stone-500 block">
                   Student ID: {studentIdDisplay}
                 </span>
               </div>
-
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#900C27] to-amber-500 flex items-center justify-center font-bold text-white text-sm shadow-sm overflow-hidden shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#900C27] flex items-center justify-center font-bold text-white text-sm shadow-sm overflow-hidden shrink-0">
                 {studentUser?.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={studentUser.avatarUrl}
-                    alt={`${displayName} Avatar`}
+                    alt={displayName}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
+                      (e.target as HTMLImageElement).style.display = "none";
                     }}
                   />
                 ) : null}
                 <span>{initials}</span>
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 
-        <main className="flex-1 p-6 lg:p-10 max-w-[1400px] w-full mx-auto">
+        <main className={`flex-1 w-full mx-auto ${pathname.includes("/classes/room") ? "p-3 sm:p-4 lg:p-6 max-w-[1600px]" : "p-4 sm:p-6 lg:p-10 max-w-[1400px]"}`}>
           {children}
         </main>
       </div>
