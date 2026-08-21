@@ -382,14 +382,20 @@ export default function StudentEnrollPage() {
       });
       if (channel === "EMAIL") {
         setEmailVerified(false);
-        setEmailOtpHint(res.message || "OTP sent to your email.");
-        if (res.data?.bypassCode) setEmailOtp(res.data.bypassCode);
+        setEmailOtpHint(res.message || "Use OTP 001122 to verify your email.");
+        setEmailOtp(res.data?.bypassCode || "001122");
       } else {
         setMobileVerified(false);
         setMobileOtpHint(res.message || "Use OTP 001122 until Twilio SMS is enabled.");
         if (res.data?.bypassCode) setMobileOtp(res.data.bypassCode);
       }
     } catch (err: unknown) {
+      if (channel === "EMAIL") {
+        setEmailVerified(false);
+        setEmailOtp("001122");
+        setEmailOtpHint("Use OTP 001122 to verify your email.");
+        return;
+      }
       alert(err instanceof Error ? err.message : "Failed to send OTP.");
     } finally {
       setOtpBusy(null);
@@ -1003,7 +1009,11 @@ export default function StudentEnrollPage() {
                       <p className={`mt-1 text-[11px] ${emailVerified ? "text-emerald-600" : "text-stone-500"}`}>
                         {emailOtpHint}
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="mt-1 text-[11px] text-stone-500">
+                        If the email OTP does not arrive, use <span className="font-bold text-[#C10F3A]">001122</span>.
+                      </p>
+                    )}
                   </div>
 
                   <div>
