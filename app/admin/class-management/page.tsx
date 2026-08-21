@@ -135,13 +135,13 @@ export default function AdminLiveClassespage() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-6 lg:p-8 font-sans flex justify-center">
+    <div className="w-full pb-8 font-sans flex justify-center">
       <div className="w-full max-w-[1200px] mx-auto">
 
         {/* 1. Header Section */}
         <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between border-b border-stone-200 pb-4 mb-8 gap-4">
           <div>
-            <h1 className="text-[#0B1C30] text-[32px] font-bold leading-[38.4px] tracking-[-0.32px]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <h1 className="text-[#0B1C30] text-[24px] sm:text-[32px] font-bold leading-tight tracking-[-0.32px]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               Live Classes
             </h1>
             <p className="text-[#464555] text-[16px] leading-[25.6px] mt-1">
@@ -207,7 +207,7 @@ export default function AdminLiveClassespage() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
 
-                <div className="relative z-10 p-8 flex flex-col justify-end h-full min-h-[340px]">
+                <div className="relative z-10 p-5 sm:p-8 flex flex-col justify-end h-full min-h-[260px] sm:min-h-[340px]">
                   <div className="flex items-center gap-3 mb-4">
                     {heroClass.status === "LIVE" ? (
                       <span className="bg-[#DC2626] text-white text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_10px_rgba(220,38,38,0.5)]">
@@ -223,12 +223,12 @@ export default function AdminLiveClassespage() {
                     </span>
                   </div>
 
-                  <h2 className="text-[32px] md:text-[40px] font-bold text-white leading-tight mb-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <h2 className="text-[24px] sm:text-[32px] md:text-[40px] font-bold text-white leading-tight mb-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {heroClass.title}
                   </h2>
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full border-2 border-white/20 bg-stone-700 flex items-center justify-center text-white font-bold text-xs">
                           {heroClass.teacherName.substring(0, 2).toUpperCase()}
