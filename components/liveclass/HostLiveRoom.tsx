@@ -51,6 +51,36 @@ const isHostRole = (role?: string) => {
   return value === "teacher" || value === "admin";
 };
 
+function numericUidFromString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return (hash % 800000) + 100000;
+}
+
+function resolveAgoraUid(user: RoomUser): number | undefined {
+  const direct = Number(user.agoraUid);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  if (user.studentId) {
+    const hashed = numericUidFromString(String(user.studentId));
+    if (hashed > 0) return hashed;
+  }
+  return undefined;
+}
+
+function playRemoteVideo(track: IRemoteVideoTrack, el: HTMLElement) {
+  try {
+    track.play(el, { fit: "cover" });
+  } catch {
+    window.setTimeout(() => {
+      try {
+        track.play(el, { fit: "cover" });
+      } catch {}
+    }, 200);
+  }
+}
+
 interface LiveClassData {
   token: string;
   appId: string;
@@ -167,8 +197,25 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
           agoraClientRef.current = client;
 
           client.on("user-published", async (user, mediaType) => {
-            await client.subscribe(user, mediaType);
+            try {
+              await client.subscribe(user, mediaType);
+            } catch (err) {
+              console.warn("Failed to subscribe to remote user:", err);
+              return;
+            }
             const uid = Number(user.uid);
+            if (mediaType === "video" && user.videoTrack) {
+              const playNow = () => {
+                const el = document.getElementById(`student-video-${uid}`);
+                if (el) playRemoteVideo(user.videoTrack!, el);
+              };
+              playNow();
+              window.setTimeout(playNow, 200);
+              window.setTimeout(playNow, 600);
+            }
+            if (mediaType === "audio" && user.audioTrack) {
+              user.audioTrack.play();
+            }
             setRemoteMedia((prev) => {
               const existing = prev.find((item) => item.uid === uid) || { uid, hasVideo: false, hasAudio: false };
               const next: RemoteMedia = { ...existing };
@@ -178,7 +225,6 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
               }
               if (mediaType === "audio" && user.audioTrack) {
                 next.hasAudio = true;
-                user.audioTrack.play();
               }
               return [...prev.filter((item) => item.uid !== uid), next];
             });
@@ -296,11 +342,11 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     const tilesFromRoom = roomUsers
       .filter((user) => isStudentRole(String(user.userRole)))
       .map((user) => {
-        const uid = typeof user.agoraUid === "number" ? user.agoraUid : Number(user.agoraUid);
-        const media = Number.isFinite(uid) ? remoteMedia.find((item) => item.uid === uid) : undefined;
+        const uid = resolveAgoraUid(user);
+        const media = uid != null ? remoteMedia.find((item) => item.uid === uid) : undefined;
         return {
           socketId: String(user.id || `student-${user.userName}`),
-          agoraUid: Number.isFinite(uid) ? uid : undefined,
+          agoraUid: uid,
           studentId: user.studentId ? String(user.studentId) : undefined,
           name: String(user.userName || "Student"),
           hasVideo: Boolean(media?.hasVideo),
@@ -312,7 +358,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     const extras = remoteMedia.filter((media) => {
       if (media.uid === hostUid) return false;
       if (tilesFromRoom.some((tile) => tile.agoraUid === media.uid)) return false;
-      const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+      const mapped = roomUsers.find((user) => resolveAgoraUid(user) === media.uid);
       if (mapped && isHostRole(String(mapped.userRole))) return false;
       return true;
     });
@@ -336,7 +382,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
 
   const spotlightStudent = studentTiles.find((tile) => tile.agoraUid === spotlightUid) || null;
   const peerHost = remoteMedia.find((media) => {
-    const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+    const mapped = roomUsers.find((user) => resolveAgoraUid(user) === media.uid);
     return Boolean(mapped && isHostRole(String(mapped.userRole)) && media.hasVideo && media.videoTrack);
   });
 
@@ -349,7 +395,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     if (spotlightUid != null) {
       const spotlight = remoteMedia.find((item) => item.uid === spotlightUid);
       if (spotlight?.videoTrack && spotlight.hasVideo) {
-        spotlight.videoTrack.play(mainEl);
+        playRemoteVideo(spotlight.videoTrack, mainEl);
       }
       if (hostPipRef.current && localVideoTrackRef.current && isVideoOn) {
         localVideoTrackRef.current.play(hostPipRef.current);
