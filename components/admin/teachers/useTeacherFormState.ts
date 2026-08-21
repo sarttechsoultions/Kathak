@@ -76,10 +76,12 @@ export function useTeacherFormState() {
     try {
       const token = localStorage.getItem("kathak_admin_token") || localStorage.getItem("kathak_token");
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(`${apiBase}/upload/image`, {
         method: "POST",
         credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers,
         body: formData,
       });
       const data = await res.json();
