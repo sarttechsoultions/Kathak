@@ -383,6 +383,7 @@ export default function StudentEnrollPage() {
       if (channel === "EMAIL") {
         setEmailVerified(false);
         setEmailOtpHint(res.message || "OTP sent to your email.");
+        if (res.data?.bypassCode) setEmailOtp(res.data.bypassCode);
       } else {
         setMobileVerified(false);
         setMobileOtpHint(res.message || "Use OTP 001122 until Twilio SMS is enabled.");
