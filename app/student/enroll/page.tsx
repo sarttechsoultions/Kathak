@@ -611,6 +611,7 @@ export default function StudentEnrollPage() {
       }
 
       const contact = String(phone || "").replace(/\D/g, "").slice(-10);
+      const preferred = paymentMethod === "card" ? "card" : "upi";
 
       const options = {
         key: keyId,
@@ -620,6 +621,38 @@ export default function StudentEnrollPage() {
         description: `Enrollment Fee for ${selectedCourseObj?.title}`,
         image: "/logo.png",
         order_id: orderId,
+        config: {
+          display: {
+            blocks: {
+              upi_apps: {
+                name: "UPI — GPay, PhonePe, Paytm",
+                instruments: [
+                  {
+                    method: "upi",
+                    flows: ["intent", "collect", "qr"],
+                    apps: ["google_pay", "phonepe", "paytm", "bhim"],
+                  },
+                ],
+              },
+              cards_banks: {
+                name: "Cards, Netbanking & Wallets",
+                instruments: [
+                  { method: "card", types: ["debit", "credit"] },
+                  { method: "netbanking" },
+                  { method: "wallet" },
+                ],
+              },
+            },
+            sequence:
+              preferred === "card"
+                ? ["block.cards_banks", "block.upi_apps", "card", "upi", "netbanking", "wallet"]
+                : ["block.upi_apps", "block.cards_banks", "upi", "card", "netbanking", "wallet"],
+            preferences: {
+              show_default_blocks: true,
+            },
+            hide: [],
+          },
+        },
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
           try {
             let res = null;
@@ -1561,8 +1594,11 @@ export default function StudentEnrollPage() {
 
               <div className="space-y-3">
                 <label className="block text-xs font-semibold text-stone-700">
-                  Select Payment Method
+                  Preferred payment method
                 </label>
+                <p className="text-[11px] text-stone-500">
+                  Razorpay checkout will still show all enabled options: UPI (GPay / PhonePe / Paytm), Indian and international cards, netbanking, and wallets.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div
                     onClick={() => setPaymentMethod("upi")}
@@ -1581,7 +1617,7 @@ export default function StudentEnrollPage() {
                           GPay / PhonePe / Paytm
                         </span>
                         <span className="text-[10.5px] text-stone-500">
-                          Instant UPI Auto-Pay
+                          UPI Intent, QR and Collect
                         </span>
                       </div>
                     </div>
@@ -1607,7 +1643,7 @@ export default function StudentEnrollPage() {
                           Credit / Debit Card
                         </span>
                         <span className="text-[10.5px] text-stone-500">
-                          Visa, Mastercard, RuPay
+                          Indian and international cards
                         </span>
                       </div>
                     </div>
