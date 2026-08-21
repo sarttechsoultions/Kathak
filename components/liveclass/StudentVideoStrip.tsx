@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useLayoutEffect, useRef } from "react";
+import React, { useLayoutEffect } from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
-import type { IRemoteVideoTrack } from "agora-rtc-sdk-ng";
+import { RemoteUser } from "agora-rtc-react";
+import type { IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
 
 export type HostStudentTile = {
   socketId: string;
@@ -11,7 +12,7 @@ export type HostStudentTile = {
   name: string;
   hasVideo: boolean;
   hasAudio: boolean;
-  videoTrack?: IRemoteVideoTrack;
+  remoteUser?: IAgoraRTCRemoteUser;
 };
 
 function initials(name: string) {
@@ -21,21 +22,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-}
-
-function playStudentTrack(track: IRemoteVideoTrack, el: HTMLElement) {
-  try {
-    track.play(el, { fit: "cover" });
-  } catch (err) {
-    console.warn("Student video play failed:", err);
-    window.setTimeout(() => {
-      try {
-        track.play(el, { fit: "cover" });
-      } catch (retryErr) {
-        console.warn("Student video retry failed:", retryErr);
-      }
-    }, 250);
-  }
 }
 
 function StudentTile({
@@ -51,21 +37,18 @@ function StudentTile({
   onToggleCamera: (enabled: boolean) => void;
   onToggleMic: (enabled: boolean) => void;
 }) {
-  const videoRef = useRef<HTMLDivElement>(null);
-  const showLiveVideo = Boolean(student.hasVideo && student.videoTrack && !isSpotlighted);
+  const showLiveVideo = Boolean(student.remoteUser && student.hasVideo && !isSpotlighted);
 
   useLayoutEffect(() => {
-    const el = videoRef.current;
-    const track = student.videoTrack;
-    if (!el || !track || !showLiveVideo) return;
-
-    playStudentTrack(track, el);
-    const retry = window.setTimeout(() => {
-      if (videoRef.current) playStudentTrack(track, videoRef.current);
-    }, 250);
-
-    return () => window.clearTimeout(retry);
-  }, [student.videoTrack, student.hasVideo, student.agoraUid, showLiveVideo]);
+    if (!showLiveVideo || !student.remoteUser?.videoTrack) return;
+    const el = document.getElementById(`student-video-${student.agoraUid}`);
+    const video = el?.querySelector("video") as HTMLVideoElement | null;
+    if (video) {
+      video.style.width = "100%";
+      video.style.height = "100%";
+      video.style.objectFit = "cover";
+    }
+  }, [showLiveVideo, student.agoraUid, student.remoteUser, student.hasVideo]);
 
   return (
     <div
@@ -78,16 +61,25 @@ function StudentTile({
           onSpotlight();
         }
       }}
-      className={`relative h-[108px] w-[148px] shrink-0 overflow-hidden rounded-2xl border-2 bg-stone-900 shadow-md transition-all cursor-pointer ${
+      className={`relative h-[120px] w-[160px] shrink-0 overflow-hidden rounded-2xl border-2 bg-stone-900 shadow-md transition-all cursor-pointer ${
         isSpotlighted ? "border-[#9B3434] ring-2 ring-[#9B3434]/40" : "border-white/15 hover:border-white/40"
       }`}
       title={isSpotlighted ? "Back to your camera" : `View ${student.name}`}
     >
-      <div
-        id={student.agoraUid != null ? `student-video-${student.agoraUid}` : undefined}
-        ref={videoRef}
-        className="absolute inset-0 z-[1] [&_div]:!h-full [&_div]:!w-full [&_video]:!h-full [&_video]:!w-full [&_video]:object-cover"
-      />
+      {student.remoteUser ? (
+        <div
+          id={student.agoraUid != null ? `student-video-${student.agoraUid}` : undefined}
+          className="absolute inset-0 z-[1] [&>div]:h-full [&>div]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover"
+        >
+          <RemoteUser
+            user={student.remoteUser}
+            playVideo={!isSpotlighted}
+            playAudio
+            className="h-full w-full"
+            videoPlayerConfig={{ fit: "cover" }}
+          />
+        </div>
+      ) : null}
 
       {!showLiveVideo ? (
         <div className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-1 bg-gradient-to-b from-stone-800 to-stone-950">

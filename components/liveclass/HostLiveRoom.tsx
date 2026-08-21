@@ -9,13 +9,20 @@ import {
 import { apiRequest } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { useFullscreen } from "@/components/liveclass/useFullscreen";
-import AgoraRTC, {
-  IAgoraRTCClient,
-  ICameraVideoTrack,
-  IMicrophoneAudioTrack,
-  ILocalVideoTrack,
-  IRemoteVideoTrack
-} from "agora-rtc-sdk-ng";
+import { AgoraProvider } from "@/lib/agoraClient";
+import {
+  LocalVideoTrack,
+  RemoteUser,
+  TrackBoundary,
+  useJoin,
+  useLocalCameraTrack,
+  useLocalMicrophoneTrack,
+  usePublish,
+  useRemoteUsers,
+  useRemoteVideoTracks,
+  useRTCClient,
+} from "agora-rtc-react";
+import AgoraRTC, { ILocalVideoTrack } from "agora-rtc-sdk-ng";
 import StudentVideoStrip, { type HostStudentTile } from "@/components/liveclass/StudentVideoStrip";
 
 interface ChatMessage {
@@ -33,13 +40,6 @@ interface RoomUser {
   agoraUid?: number;
   [key: string]: string | number | boolean | undefined;
 }
-
-type RemoteMedia = {
-  uid: number;
-  hasVideo: boolean;
-  hasAudio: boolean;
-  videoTrack?: IRemoteVideoTrack;
-};
 
 const isStudentRole = (role?: string) => {
   const value = String(role || "student").toLowerCase();
@@ -69,18 +69,6 @@ function resolveAgoraUid(user: RoomUser): number | undefined {
   return undefined;
 }
 
-function playRemoteVideo(track: IRemoteVideoTrack, el: HTMLElement) {
-  try {
-    track.play(el, { fit: "cover" });
-  } catch {
-    window.setTimeout(() => {
-      try {
-        track.play(el, { fit: "cover" });
-      } catch {}
-    }, 200);
-  }
-}
-
 interface LiveClassData {
   token: string;
   appId: string;
@@ -103,13 +91,63 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   const params = useParams();
   const router = useRouter();
   const classId = params.id as string;
+  const [joinInfo, setJoinInfo] = useState<LiveClassData | null>(null);
+  const [loadError, setLoadError] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [classData, setClassData] = useState<LiveClassData | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<{ status: string; data: LiveClassData }>(`/classes/${classId}/join-token`)
+      .then((res) => {
+        if (!cancelled && res.status === "success" && res.data) setJoinInfo(res.data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : "Unable to join the virtual room session.";
+        setLoadError(message);
+        alert(message);
+        router.push(leaveHref);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [classId, router, leaveHref]);
 
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(false);
+  if (loadError) {
+    return (
+      <div className="h-screen w-full bg-[#FAECEC] flex items-center justify-center">
+        <p className="text-[#9B3434] font-bold">{loadError}</p>
+      </div>
+    );
+  }
+
+  if (!joinInfo) {
+    return (
+      <div className="h-screen w-full bg-[#FAECEC] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-[#9B3434] animate-spin" />
+          <p className="text-[#9B3434] font-bold">Connecting to Agora Secure Room...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AgoraProvider>
+      <TrackBoundary>
+        <HostLiveRoomInner joinInfo={joinInfo} leaveHref={leaveHref} />
+      </TrackBoundary>
+    </AgoraProvider>
+  );
+}
+
+function HostLiveRoomInner({ joinInfo, leaveHref }: { joinInfo: LiveClassData; leaveHref: string }) {
+  const router = useRouter();
+  const client = useRTCClient();
+
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isVideoOn, setIsVideoOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenTrack, setScreenTrack] = useState<ILocalVideoTrack | null>(null);
 
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [handRaisesCount, setHandRaisesCount] = useState(0);
@@ -126,18 +164,30 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   const [participantsCount, setParticipantsCount] = useState(1);
   const [deviceToast, setDeviceToast] = useState<string | null>(null);
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
-  const [remoteMedia, setRemoteMedia] = useState<RemoteMedia[]>([]);
   const [spotlightUid, setSpotlightUid] = useState<number | null>(null);
 
-  const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
-  const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
-  const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null);
-  const screenTrackRef = useRef<ILocalVideoTrack | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const hostPipRef = useRef<HTMLDivElement>(null);
-  const isJoinedRef = useRef(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const { containerRef: stageRef, isFullscreen, toggleFullscreen } = useFullscreen();
+
+  const joinUid = Number(joinInfo.uid) || 0;
+  const agoraReady = Boolean(joinInfo.appId && joinInfo.channelName && joinUid > 0);
+
+  useJoin(
+    { appid: joinInfo.appId, channel: joinInfo.channelName, token: joinInfo.token || null, uid: joinUid },
+    agoraReady
+  );
+
+  const { localMicrophoneTrack, error: micError } = useLocalMicrophoneTrack(isMicOn);
+  const { localCameraTrack, error: camError } = useLocalCameraTrack(isVideoOn && !isScreenSharing);
+
+  usePublish(
+    [isMicOn ? localMicrophoneTrack : null, isVideoOn && !isScreenSharing ? localCameraTrack : null],
+    agoraReady
+  );
+
+  const remoteUsers = useRemoteUsers();
+  useRemoteVideoTracks(remoteUsers);
 
   const showToast = (message: string) => {
     setDeviceToast(message);
@@ -145,185 +195,60 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   };
 
   useEffect(() => {
-    let client: IAgoraRTCClient;
-    let cancelled = false;
-    let socketInstance: ReturnType<typeof getSocket> | null = null;
-    let joinedRoom = "";
+    if (camError) {
+      setIsVideoOn(false);
+      showToast("Camera not found or permission denied.");
+    }
+  }, [camError]);
 
-    const initializeRoom = async () => {
-      try {
-        const res = await apiRequest<{ status: string; data: LiveClassData }>(`/classes/${classId}/join-token`);
+  useEffect(() => {
+    if (micError) {
+      setIsMicOn(false);
+      showToast("Microphone not found or permission denied.");
+    }
+  }, [micError]);
 
-        if (cancelled) return;
+  useEffect(() => {
+    const socketInstance = getSocket();
+    setSocket(socketInstance);
 
-        if (res.status === "success" && res.data) {
-          const data = res.data;
-          setClassData(data);
+    const hostName = joinInfo.userName || (joinInfo.role === "admin" ? "Admin" : "Teacher");
+    socketInstance.emit("liveclass:join", {
+      roomName: joinInfo.channelName,
+      userName: hostName,
+      userRole: joinInfo.role === "admin" ? "Admin" : "Teacher",
+      studentId: joinInfo.userId,
+      agoraUid: joinInfo.uid,
+    });
 
-          socketInstance = getSocket();
-          setSocket(socketInstance);
-          joinedRoom = data.channelName;
-
-          const hostName = data.userName || (data.role === "admin" ? "Admin" : "Teacher");
-          socketInstance.emit("liveclass:join", {
-            roomName: data.channelName,
-            userName: hostName,
-            userRole: data.role === "admin" ? "Admin" : "Teacher",
-            studentId: data.userId,
-            agoraUid: data.uid,
-          });
-
-          socketInstance.off("liveclass:chat-history");
-          socketInstance.off("liveclass:message");
-          socketInstance.off("liveclass:room-users");
-          socketInstance.off("liveclass:raise-hand");
-
-          socketInstance.on("liveclass:chat-history", (history: ChatMessage[]) => setChatMessages(history));
-          socketInstance.on("liveclass:message", (msg: ChatMessage) => {
-            setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-          });
-          socketInstance.on("liveclass:room-users", (users: RoomUser[]) => {
-            setRoomUsers(Array.isArray(users) ? users : []);
-            const studentCount = users.filter((u) => isStudentRole(String(u.userRole))).length;
-            setParticipantsCount(studentCount);
-          });
-          socketInstance.on("liveclass:raise-hand", (payload: { senderName: string }) => {
-            setHandRaisesCount((prev) => prev + 1);
-            setHandRaiseToast(`${payload.senderName} raised a hand! ✋`);
-            setTimeout(() => setHandRaiseToast(null), 4000);
-          });
-
-          client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-          agoraClientRef.current = client;
-
-          client.on("user-published", async (user, mediaType) => {
-            try {
-              await client.subscribe(user, mediaType);
-            } catch (err) {
-              console.warn("Failed to subscribe to remote user:", err);
-              return;
-            }
-            const uid = Number(user.uid);
-            if (mediaType === "video" && user.videoTrack) {
-              const playNow = () => {
-                const el = document.getElementById(`student-video-${uid}`);
-                if (el) playRemoteVideo(user.videoTrack!, el);
-              };
-              playNow();
-              window.setTimeout(playNow, 200);
-              window.setTimeout(playNow, 600);
-            }
-            if (mediaType === "audio" && user.audioTrack) {
-              user.audioTrack.play();
-            }
-            setRemoteMedia((prev) => {
-              const existing = prev.find((item) => item.uid === uid) || { uid, hasVideo: false, hasAudio: false };
-              const next: RemoteMedia = { ...existing };
-              if (mediaType === "video" && user.videoTrack) {
-                next.hasVideo = true;
-                next.videoTrack = user.videoTrack;
-              }
-              if (mediaType === "audio" && user.audioTrack) {
-                next.hasAudio = true;
-              }
-              return [...prev.filter((item) => item.uid !== uid), next];
-            });
-          });
-
-          client.on("user-unpublished", (user, mediaType) => {
-            const uid = Number(user.uid);
-            setRemoteMedia((prev) =>
-              prev.map((item) => {
-                if (item.uid !== uid) return item;
-                if (mediaType === "video") return { ...item, hasVideo: false, videoTrack: undefined };
-                if (mediaType === "audio") return { ...item, hasAudio: false };
-                return item;
-              })
-            );
-          });
-
-          client.on("user-left", (user) => {
-            const uid = Number(user.uid);
-            setRemoteMedia((prev) => prev.filter((item) => item.uid !== uid));
-            setSpotlightUid((current) => (current === uid ? null : current));
-          });
-
-          if (!isJoinedRef.current && !cancelled) {
-            try {
-              await client.join(data.appId, data.channelName, data.token, data.uid);
-              isJoinedRef.current = true;
-            } catch (joinErr: unknown) {
-              const error = joinErr as { code?: string };
-              if (error?.code === "UID_CONFLICT") {
-                try { await client.leave(); } catch {}
-                await new Promise((r) => setTimeout(r, 500));
-                await client.join(data.appId, data.channelName, data.token, data.uid);
-                isJoinedRef.current = true;
-              } else {
-                throw joinErr;
-              }
-            }
-
-            if (cancelled) {
-              await client.leave();
-              isJoinedRef.current = false;
-              return;
-            }
-
-            if (data.isMainSpeaker) {
-              try {
-                const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
-                localAudioTrackRef.current = audioTrack;
-                localVideoTrackRef.current = videoTrack;
-                await client.publish([audioTrack, videoTrack]);
-                if (videoContainerRef.current) {
-                  videoTrack.play(videoContainerRef.current);
-                }
-                setIsMicOn(true);
-                setIsVideoOn(true);
-              } catch (mediaErr) {
-                console.warn("Could not auto-start camera/mic:", mediaErr);
-                showToast("Allow camera and microphone to teach this class.");
-              }
-            }
-          }
-
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Failed to initialize room:", error);
-        if (!cancelled) {
-          alert(error instanceof Error ? error.message : "Unable to join the virtual room session.");
-          router.push(leaveHref);
-        }
-      }
+    const onHistory = (history: ChatMessage[]) => setChatMessages(history);
+    const onMessage = (msg: ChatMessage) => {
+      setChatMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    };
+    const onRoomUsers = (users: RoomUser[]) => {
+      setRoomUsers(Array.isArray(users) ? users : []);
+      const studentCount = (users || []).filter((u) => isStudentRole(String(u.userRole))).length;
+      setParticipantsCount(studentCount);
+    };
+    const onRaise = (payload: { senderName: string }) => {
+      setHandRaisesCount((prev) => prev + 1);
+      setHandRaiseToast(`${payload.senderName} raised a hand! ✋`);
+      setTimeout(() => setHandRaiseToast(null), 4000);
     };
 
-    initializeRoom();
+    socketInstance.on("liveclass:chat-history", onHistory);
+    socketInstance.on("liveclass:message", onMessage);
+    socketInstance.on("liveclass:room-users", onRoomUsers);
+    socketInstance.on("liveclass:raise-hand", onRaise);
 
     return () => {
-      cancelled = true;
-      if (socketInstance) {
-        if (joinedRoom) socketInstance.emit("liveclass:leave", { roomName: joinedRoom });
-        socketInstance.off("liveclass:chat-history");
-        socketInstance.off("liveclass:message");
-        socketInstance.off("liveclass:room-users");
-        socketInstance.off("liveclass:raise-hand");
-      }
-      if (localAudioTrackRef.current) localAudioTrackRef.current.close();
-      if (localVideoTrackRef.current) localVideoTrackRef.current.close();
-      if (screenTrackRef.current) {
-        screenTrackRef.current.close();
-        screenTrackRef.current = null;
-      }
-      if (agoraClientRef.current && isJoinedRef.current) {
-        agoraClientRef.current.removeAllListeners();
-        agoraClientRef.current.leave().finally(() => {
-          isJoinedRef.current = false;
-        });
-      }
+      socketInstance.emit("liveclass:leave", { roomName: joinInfo.channelName });
+      socketInstance.off("liveclass:chat-history", onHistory);
+      socketInstance.off("liveclass:message", onMessage);
+      socketInstance.off("liveclass:room-users", onRoomUsers);
+      socketInstance.off("liveclass:raise-hand", onRaise);
     };
-  }, [classId, router, leaveHref]);
+  }, [joinInfo.channelName, joinInfo.role, joinInfo.uid, joinInfo.userId, joinInfo.userName]);
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -337,81 +262,56 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     return () => clearInterval(timer);
   }, [isRecording]);
 
+  const hostUid = joinUid;
   const studentTiles: HostStudentTile[] = (() => {
-    const hostUid = classData?.uid;
     const tilesFromRoom = roomUsers
       .filter((user) => isStudentRole(String(user.userRole)))
       .map((user) => {
         const uid = resolveAgoraUid(user);
-        const media = uid != null ? remoteMedia.find((item) => item.uid === uid) : undefined;
+        const remoteUser = uid != null ? remoteUsers.find((item) => Number(item.uid) === uid) : undefined;
         return {
           socketId: String(user.id || `student-${user.userName}`),
           agoraUid: uid,
           studentId: user.studentId ? String(user.studentId) : undefined,
           name: String(user.userName || "Student"),
-          hasVideo: Boolean(media?.hasVideo),
-          hasAudio: Boolean(media?.hasAudio),
-          videoTrack: media?.videoTrack,
+          hasVideo: Boolean(remoteUser?.hasVideo),
+          hasAudio: Boolean(remoteUser?.hasAudio),
+          remoteUser,
         } satisfies HostStudentTile;
       });
 
-    const extras = remoteMedia.filter((media) => {
-      if (media.uid === hostUid) return false;
-      if (tilesFromRoom.some((tile) => tile.agoraUid === media.uid)) return false;
-      const mapped = roomUsers.find((user) => resolveAgoraUid(user) === media.uid);
+    const extras = remoteUsers.filter((remote) => {
+      const uid = Number(remote.uid);
+      if (uid === hostUid) return false;
+      if (tilesFromRoom.some((tile) => tile.agoraUid === uid)) return false;
+      const mapped = roomUsers.find((user) => resolveAgoraUid(user) === uid);
       if (mapped && isHostRole(String(mapped.userRole))) return false;
       return true;
     });
 
     return [
       ...tilesFromRoom,
-      ...extras.map((media) => {
-        const mapped = roomUsers.find((user) => Number(user.agoraUid) === media.uid);
+      ...extras.map((remote) => {
+        const uid = Number(remote.uid);
+        const mapped = roomUsers.find((user) => resolveAgoraUid(user) === uid);
         return {
-          socketId: mapped?.id ? String(mapped.id) : `agora-${media.uid}`,
-          agoraUid: media.uid,
+          socketId: mapped?.id ? String(mapped.id) : `agora-${uid}`,
+          agoraUid: uid,
           studentId: mapped?.studentId ? String(mapped.studentId) : undefined,
           name: String(mapped?.userName || "Student"),
-          hasVideo: media.hasVideo,
-          hasAudio: media.hasAudio,
-          videoTrack: media.videoTrack,
+          hasVideo: Boolean(remote.hasVideo),
+          hasAudio: Boolean(remote.hasAudio),
+          remoteUser: remote,
         } satisfies HostStudentTile;
       }),
     ];
   })();
 
   const spotlightStudent = studentTiles.find((tile) => tile.agoraUid === spotlightUid) || null;
-  const peerHost = remoteMedia.find((media) => {
-    const mapped = roomUsers.find((user) => resolveAgoraUid(user) === media.uid);
-    return Boolean(mapped && isHostRole(String(mapped.userRole)) && media.hasVideo && media.videoTrack);
+  const peerHost = remoteUsers.find((remote) => {
+    const mapped = roomUsers.find((user) => resolveAgoraUid(user) === Number(remote.uid));
+    return Boolean(mapped && isHostRole(String(mapped.userRole)) && remote.hasVideo);
   });
-
-  useEffect(() => {
-    if (isScreenSharing) return;
-
-    const mainEl = videoContainerRef.current;
-    if (!mainEl) return;
-
-    if (spotlightUid != null) {
-      const spotlight = remoteMedia.find((item) => item.uid === spotlightUid);
-      if (spotlight?.videoTrack && spotlight.hasVideo) {
-        playRemoteVideo(spotlight.videoTrack, mainEl);
-      }
-      if (hostPipRef.current && localVideoTrackRef.current && isVideoOn) {
-        localVideoTrackRef.current.play(hostPipRef.current);
-      }
-      return;
-    }
-
-    if (localVideoTrackRef.current && isVideoOn) {
-      localVideoTrackRef.current.play(mainEl);
-      return;
-    }
-
-    if (peerHost?.videoTrack) {
-      peerHost.videoTrack.play(mainEl);
-    }
-  }, [spotlightUid, remoteMedia, isVideoOn, isScreenSharing, peerHost]);
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -419,105 +319,38 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     return `${mins.toString().padStart(2, "0")}:${remainSecs.toString().padStart(2, "0")}`;
   };
 
-  const toggleMic = async () => {
-    const client = agoraClientRef.current;
-    if (!client) return;
-
-    if (!isMicOn) {
-      if (localAudioTrackRef.current) {
-        await localAudioTrackRef.current.setEnabled(true);
-        setIsMicOn(true);
-        return;
-      }
-      try {
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-        localAudioTrackRef.current = audioTrack;
-        await client.publish([audioTrack]);
-        setIsMicOn(true);
-      } catch (err) {
-        console.warn("Microphone not accessible:", err);
-        showToast("Microphone not found or permission denied.");
-        setIsMicOn(false);
-      }
-    } else if (localAudioTrackRef.current) {
-      await localAudioTrackRef.current.setEnabled(false);
-      setIsMicOn(false);
-    }
-  };
-
-  const toggleVideo = async () => {
-    const client = agoraClientRef.current;
-    if (!client) return;
-
-    if (!isVideoOn) {
-      if (localVideoTrackRef.current) {
-        await localVideoTrackRef.current.setEnabled(true);
-        const playTarget = spotlightUid != null && hostPipRef.current
-          ? hostPipRef.current
-          : videoContainerRef.current;
-        if (playTarget) {
-          localVideoTrackRef.current.play(playTarget);
-        }
-        setIsVideoOn(true);
-        return;
-      }
-      try {
-        const videoTrack = await AgoraRTC.createCameraVideoTrack();
-        localVideoTrackRef.current = videoTrack;
-        await client.publish([videoTrack]);
-        const playTarget = spotlightUid != null && hostPipRef.current
-          ? hostPipRef.current
-          : videoContainerRef.current;
-        if (playTarget) {
-          videoTrack.play(playTarget);
-        }
-        setIsVideoOn(true);
-      } catch (err) {
-        console.warn("Camera not accessible:", err);
-        showToast("Camera not found or permission denied.");
-        setIsVideoOn(false);
-      }
-    } else if (localVideoTrackRef.current) {
-      await localVideoTrackRef.current.setEnabled(false);
-      setIsVideoOn(false);
-    }
+  const toggleMic = () => setIsMicOn((value) => !value);
+  const toggleVideo = () => {
+    if (isScreenSharing) return;
+    setIsVideoOn((value) => !value);
   };
 
   const stopScreenShare = async () => {
-    const client = agoraClientRef.current;
-    if (!client) return;
-
-    if (screenTrackRef.current) {
-      await client.unpublish([screenTrackRef.current]);
-      screenTrackRef.current.close();
-      screenTrackRef.current = null;
-    }
-
-    if (localVideoTrackRef.current) {
-      await client.publish([localVideoTrackRef.current]);
-      if (videoContainerRef.current) {
-        localVideoTrackRef.current.play(videoContainerRef.current);
-      }
+    if (screenTrack) {
+      try {
+        await client.unpublish(screenTrack);
+      } catch {}
+      screenTrack.close();
+      setScreenTrack(null);
     }
     setIsScreenSharing(false);
   };
 
   const toggleScreenShare = async () => {
     try {
-      const client = agoraClientRef.current;
-      if (!client) return;
-
       if (!isScreenSharing) {
-        const screenTrack = await AgoraRTC.createScreenVideoTrack({});
-        const activeTrack = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
-        screenTrackRef.current = activeTrack as ILocalVideoTrack;
-
-        if (localVideoTrackRef.current) {
-          await client.unpublish([localVideoTrackRef.current]);
+        const created = await AgoraRTC.createScreenVideoTrack({});
+        const activeTrack = (Array.isArray(created) ? created[0] : created) as ILocalVideoTrack;
+        if (localCameraTrack) {
+          try {
+            await client.unpublish(localCameraTrack);
+          } catch {}
         }
         await client.publish(activeTrack);
-        activeTrack.play(videoContainerRef.current!);
-        activeTrack.on("track-ended", () => stopScreenShare());
+        activeTrack.on("track-ended", () => {
+          void stopScreenShare();
+        });
+        setScreenTrack(activeTrack);
         setIsScreenSharing(true);
       } else {
         await stopScreenShare();
@@ -566,36 +399,36 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   const handleRaiseHand = () => {
     const nextState = !isHandRaised;
     setIsHandRaised(nextState);
-    if (nextState && socket && classData) {
+    if (nextState && socket) {
       socket.emit("liveclass:raise-hand", {
-        roomName: classData.channelName,
-        senderName: classData.userName || "Host",
+        roomName: joinInfo.channelName,
+        senderName: joinInfo.userName || "Host",
       });
     }
   };
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !socket || !classData) return;
+    if (!messageInput.trim() || !socket) return;
 
     const newMessage: ChatMessage = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      senderName: classData.userName || "You",
+      senderName: joinInfo.userName || "You",
       text: messageInput.trim(),
       sentAt: new Date().toISOString(),
     };
 
     socket.emit("liveclass:message", {
-      roomName: classData.channelName,
+      roomName: joinInfo.channelName,
       message: newMessage,
     });
     setMessageInput("");
   };
 
   const controlStudentMedia = (student: HostStudentTile, kind: "camera" | "mic", enabled: boolean) => {
-    if (!socket || !classData) return;
+    if (!socket) return;
     socket.emit("liveclass:media-control", {
-      roomName: classData.channelName,
+      roomName: joinInfo.channelName,
       targetSocketId: student.socketId.startsWith("agora-") ? undefined : student.socketId,
       targetStudentId: student.studentId,
       targetAgoraUid: student.agoraUid,
@@ -608,22 +441,11 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
   };
 
   const leaveClass = () => {
-    if (socket && classData) {
-      socket.emit("liveclass:leave", { roomName: classData.channelName });
+    if (socket) {
+      socket.emit("liveclass:leave", { roomName: joinInfo.channelName });
     }
     router.push(leaveHref);
   };
-
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full bg-[#FAECEC] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-[#9B3434] animate-spin" />
-          <p className="text-[#9B3434] font-bold">Connecting to Agora Secure Room...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full min-h-0 bg-[#Fdf5f5] flex justify-center font-sans p-3 sm:p-4 lg:p-6 relative">
@@ -644,20 +466,51 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
           ref={stageRef}
           className={`w-full min-w-0 flex flex-col ${isFullscreen ? "h-screen w-screen bg-black p-3 sm:p-4" : ""}`}
         >
-          <div className={`w-full relative overflow-hidden bg-black shadow-xl ${
-            isFullscreen
-              ? "flex-1 min-h-0 rounded-2xl"
-              : studentTiles.length > 0
-                ? "rounded-2xl sm:rounded-[24px] h-[40vh] min-h-[240px] sm:h-[48vh] xl:h-[min(54vh,560px)]"
-                : "rounded-2xl sm:rounded-[24px] h-[48vh] min-h-[260px] sm:h-[56vh] xl:h-[min(70vh,720px)]"
-          }`}>
-            <div ref={videoContainerRef} className="absolute inset-0 w-full h-full object-cover" />
+          <div
+            ref={videoContainerRef}
+            className={`w-full relative overflow-hidden bg-black shadow-xl ${
+              isFullscreen
+                ? "flex-1 min-h-0 rounded-2xl"
+                : studentTiles.length > 0
+                  ? "rounded-2xl sm:rounded-[24px] h-[40vh] min-h-[240px] sm:h-[48vh] xl:h-[min(54vh,560px)]"
+                  : "rounded-2xl sm:rounded-[24px] h-[48vh] min-h-[260px] sm:h-[56vh] xl:h-[min(70vh,720px)]"
+            }`}
+          >
+            <div className="absolute inset-0 [&>div]:h-full [&>div]:w-full [&_video]:h-full [&_video]:w-full [&_video]:object-cover">
+              {screenTrack ? (
+                <LocalVideoTrack track={screenTrack} play className="h-full w-full object-cover" />
+              ) : spotlightStudent?.remoteUser ? (
+                <RemoteUser
+                  user={spotlightStudent.remoteUser}
+                  playVideo
+                  playAudio
+                  className="h-full w-full"
+                  videoPlayerConfig={{ fit: "cover" }}
+                />
+              ) : isVideoOn && localCameraTrack ? (
+                <LocalVideoTrack track={localCameraTrack} play className="h-full w-full object-cover" />
+              ) : peerHost ? (
+                <RemoteUser
+                  user={peerHost}
+                  playVideo
+                  playAudio
+                  className="h-full w-full"
+                  videoPlayerConfig={{ fit: "cover" }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-stone-400">
+                  {isVideoOn ? "Starting camera…" : "Camera is off"}
+                </div>
+              )}
+            </div>
+
             {spotlightStudent && !spotlightStudent.hasVideo ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-stone-400">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-stone-400 bg-black/80">
                 <VideoOff className="w-8 h-8" />
                 <span className="text-sm font-semibold">{spotlightStudent.name}&apos;s camera is off</span>
               </div>
             ) : null}
+
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/20 pointer-events-none" />
 
             <div className="absolute top-3 left-3 sm:top-6 sm:left-6 flex gap-2 items-center z-10">
@@ -687,13 +540,13 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
                 {spotlightStudent ? "Student" : "Guru"}
               </span>
               <span className="text-[#0B1C30] text-[12px] sm:text-[14px] font-bold leading-tight block truncate">
-                {spotlightStudent?.name || classData?.liveClass.teacherName || "Instructor"}
+                {spotlightStudent?.name || joinInfo.liveClass.teacherName || "Instructor"}
               </span>
             </div>
 
-            {spotlightStudent && isVideoOn ? (
+            {spotlightStudent && isVideoOn && localCameraTrack ? (
               <div className="absolute bottom-3 right-3 z-20 h-20 w-28 sm:h-24 sm:w-32 overflow-hidden rounded-xl border-2 border-white/40 bg-stone-900 shadow-md">
-                <div ref={hostPipRef} className="absolute inset-0" />
+                <LocalVideoTrack track={localCameraTrack} play className="h-full w-full object-cover" />
                 <div className="absolute bottom-1 left-1 bg-black/75 px-1.5 py-0.5 rounded text-[10px] font-extrabold text-white">
                   You
                 </div>
@@ -723,7 +576,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
               <button type="button" onClick={handleRaiseHand} className={`px-4 sm:px-6 h-11 sm:h-12 rounded-full flex items-center gap-2 font-bold text-[13px] sm:text-[14px] transition-all shadow-md cursor-pointer ${isHandRaised ? "bg-amber-600 text-white" : "bg-[#9B3434] text-white hover:bg-[#832c2c]"}`}>
                 <Hand className="w-5 h-5" /> <span className="hidden sm:inline">{isHandRaised ? "Hand Raised" : "Raise Hand"}</span>
               </button>
-              <button type="button" onClick={toggleScreenShare} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer ${isScreenSharing ? "bg-indigo-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"}`}>
+              <button type="button" onClick={() => void toggleScreenShare()} className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors shadow-sm cursor-pointer ${isScreenSharing ? "bg-indigo-600 text-white" : "bg-white text-stone-700 hover:bg-stone-50"}`}>
                 <MonitorUp className="w-5 h-5" />
               </button>
               <button
@@ -755,7 +608,7 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
 
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 scroll-smooth">
               {chatMessages.map((msg, idx) => {
-                const isMe = msg.senderName === (classData?.userName || "You");
+                const isMe = msg.senderName === (joinInfo.userName || "You");
                 return (
                   <div key={msg.id || idx} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                     <div className="flex items-center gap-2 mb-1.5">
@@ -811,4 +664,3 @@ export default function HostLiveRoom({ leaveHref }: { leaveHref: string }) {
     </div>
   );
 }
-
