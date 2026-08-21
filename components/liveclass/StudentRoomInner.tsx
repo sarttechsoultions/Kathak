@@ -73,29 +73,39 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
     return undefined;
   });
 
-  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(micOn);
-  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(camOn);
+  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(true);
+  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(true);
   const agoraClient = useRTCClient();
   const handledCamErrorRef = React.useRef<unknown>(null);
   const handledMicErrorRef = React.useRef<unknown>(null);
 
   usePublish(
-    [micOn ? localMicrophoneTrack : null, camOn ? localCameraTrack : null],
+    [localMicrophoneTrack, localCameraTrack],
     Boolean(joinInfo?.channelName && joinInfo?.appId)
   );
+
+  useEffect(() => {
+    if (!localCameraTrack) return;
+    void localCameraTrack.setEnabled(camOn).catch(() => {});
+  }, [localCameraTrack, camOn]);
+
+  useEffect(() => {
+    if (!localMicrophoneTrack) return;
+    void localMicrophoneTrack.setEnabled(micOn).catch(() => {});
+  }, [localMicrophoneTrack, micOn]);
 
   useEffect(() => {
     if (!agoraClient) return;
     const publishReady = async () => {
       try {
-        if (camOn && localCameraTrack) await agoraClient.publish(localCameraTrack);
+        if (localCameraTrack) await agoraClient.publish(localCameraTrack);
       } catch {}
       try {
-        if (micOn && localMicrophoneTrack) await agoraClient.publish(localMicrophoneTrack);
+        if (localMicrophoneTrack) await agoraClient.publish(localMicrophoneTrack);
       } catch {}
     };
     void publishReady();
-  }, [agoraClient, camOn, micOn, localCameraTrack, localMicrophoneTrack]);
+  }, [agoraClient, localCameraTrack, localMicrophoneTrack]);
 
   useEffect(() => {
     if (!deviceToast) return;
