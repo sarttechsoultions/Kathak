@@ -195,7 +195,6 @@ useJoin(
 
   const remoteUsers = useRemoteUsers();
   const teacher =
-    remoteUsers.find((u) => u.uid == 1 || u.uid == 999999 || String(u.uid) === "1" || String(u.uid) === "999999") ||
     remoteUsers.find((u) => u.hasVideo) ||
     remoteUsers[0];
   const students = remoteUsers.filter((u) => u.uid !== 1 && u.uid !== 999999);

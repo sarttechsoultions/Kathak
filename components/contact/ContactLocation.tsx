@@ -13,12 +13,12 @@ const MAP_QUERY = "G-A-63 Bhawani Nagar Sikar Road Jaipur 302016";
 const MAP_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(MAP_QUERY)}`;
 
 const socials = [
-  { href: "https://facebook.com", label: "Facebook" },
-  { href: "https://twitter.com", label: "Twitter" },
-  { href: "https://youtube.com", label: "YouTube" },
-  { href: "https://instagram.com", label: "Instagram" },
-  { href: "https://linkedin.com", label: "LinkedIn" },
-  { href: "https://pinterest.com", label: "Pinterest" },
+  { href: "https://www.facebook.com/share/17psAxmWmE/", label: "Facebook" },
+  { href: "https://x.com/HarshitaKathak", label: "Twitter" },
+  { href: "https://youtube.com/@kathakbyharshita", label: "YouTube" },
+  { href: "https://www.instagram.com/kathakbyharshita", label: "Instagram" },
+  { href: "https://www.linkedin.com/in/harshita-sharma-01453b38a/", label: "LinkedIn" },
+  { href: "https://pin.it/vz19tbUio", label: "Pinterest" },
 ];
 
 const phones = [

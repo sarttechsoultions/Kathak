@@ -2,6 +2,7 @@
 
 import React from "react";
 import { MapPin, Phone, Mail, ArrowUp } from "lucide-react";
+import SocialIcons from "@/components/SocialIcons";
 
 export default function Footer() {
   const scrollToTop = () => {
@@ -28,25 +29,12 @@ export default function Footer() {
               Preserving Tradition, Inspiring Generations.
             </h3>
 
-            {/* Footer Social Media PNG Icons */}
-            <div className="flex items-center gap-2.5 sm:gap-3 pt-2">
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="p-1.5 rounded-full bg-white/10 hover:bg-[#C10F3A] transition-all hover:scale-110">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/linkedin.png" alt="LinkedIn" className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
-              </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-1.5 rounded-full bg-white/10 hover:bg-[#C10F3A] transition-all hover:scale-110">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/insta.png" alt="Instagram" className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
-              </a>
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-1.5 rounded-full bg-white/10 hover:bg-[#C10F3A] transition-all hover:scale-110">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/facebook.png" alt="Facebook" className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
-              </a>
-              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="p-1.5 rounded-full bg-white/10 hover:bg-[#C10F3A] transition-all hover:scale-110">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/youtube.png" alt="YouTube" className="w-4 h-4 sm:w-5 sm:h-5 object-contain" />
-              </a>
-            </div>
+            {/* Footer Social Media Icons */}
+            <SocialIcons
+              className="flex items-center gap-2 sm:gap-2.5 pt-2"
+              linkClassName="inline-flex items-center justify-center rounded-full transition-transform hover:scale-110"
+              iconClassName="w-6 h-6 sm:w-7 sm:h-7 object-contain"
+            />
           </div>
 
           {/* Column 4: Contact Info (Top-Right on Mobile, lg:col-span-2) */}

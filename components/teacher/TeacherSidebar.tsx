@@ -66,6 +66,8 @@ const handleLogout = async () => {
       localStorage.removeItem("kathak_teacher_token");
       localStorage.removeItem("kathak_teacher_user");
       localStorage.removeItem("kathak_session_user");
+      localStorage.removeItem("kathak_admin_token");
+      localStorage.removeItem("kathak_admin_user");
 
       // 2. Clear Session Storage
       sessionStorage.removeItem("kathak_teacher_token");

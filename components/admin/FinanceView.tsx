@@ -19,7 +19,7 @@ import {
   X,
   FileSpreadsheet
 } from "lucide-react";
-import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { apiRequest, ENDPOINTS, API_BASE_URL } from "@/lib/api";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 
 interface FinanceRecord {
@@ -27,6 +27,13 @@ interface FinanceRecord {
   studentIdCode: string;
   studentName: string;
   studentAvatar: string;
+  email?: string;
+  phone?: string;
+  country?: string;
+  city?: string;
+  address?: string;
+  joiningDate?: string | null;
+  paymentMethod?: string | null;
   course: string;
   batch: string;
   totalFees: string;
@@ -35,21 +42,30 @@ interface FinanceRecord {
   rawTotal: number;
   rawPaid: number;
   rawPending: number;
+  statusLabel?: string;
+  lastPaymentId?: string | null;
+  lastTransactionId?: string | null;
+  lastPaymentDate?: string | null;
+  lastGateway?: string | null;
 }
 
 interface PaymentTx {
   id: string;
   amount: number;
+  currency?: string;
   gateway: string;
+  status?: string;
   transactionId: string;
+  orderId?: string;
   createdAt: string;
-  user?: { fullName: string; email: string };
+  user?: { id?: string; fullName: string; email: string; phone?: string };
   enrollment?: { course?: { title: string } };
 }
 
 export default function FinanceView() {
   const [financeList, setFinanceList] = useState<FinanceRecord[]>([]);
   const [todaysTransactions, setTodaysTransactions] = useState<PaymentTx[]>([]);
+  const [allPayments, setAllPayments] = useState<PaymentTx[]>([]);
   const [metrics, setMetrics] = useState({
     totalStudents: 0,
     paidStudents: 0,
@@ -93,6 +109,9 @@ export default function FinanceView() {
         if (Array.isArray(res.data.todaysPayments)) {
           setTodaysTransactions(res.data.todaysPayments);
         }
+        if (Array.isArray(res.data.payments)) {
+          setAllPayments(res.data.payments);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch finance records:", err);
@@ -135,45 +154,76 @@ export default function FinanceView() {
     }
   };
 
-  const handleExportCSV = async () => {
-    if (filteredRecords.length === 0) {
-      alert("No finance records available to export.");
-      return;
+  const authHeaders = () => {
+    const token =
+      localStorage.getItem("kathak_admin_token") ||
+      localStorage.getItem("kathak_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const openInvoice = async (paymentId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}${ENDPOINTS.ADMIN_PAYMENT_INVOICE}/${paymentId}/invoice`, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to load invoice.");
+      }
+      const html = await res.text();
+      const popup = window.open("", "_blank", "noopener,noreferrer");
+      if (!popup) {
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Kathak_Invoice_${paymentId}.html`;
+        link.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+      popup.document.open();
+      popup.document.write(html);
+      popup.document.close();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to download invoice.");
     }
+  };
 
-    const headers = ["Student ID", "Student Name", "Course", "Batch", "Total Fees", "Paid Amount", "Pending Amount"];
-    const rows = filteredRecords.map((r) => [
-      r.studentIdCode,
-      `"${r.studentName.replace(/"/g, '""')}"`,
-      `"${r.course}"`,
-      `"${r.batch}"`,
-      `"${r.totalFees}"`,
-      `"${r.paidAmount}"`,
-      `"${r.pendingAmount}"`
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Kathak_Finance_Report_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    await openThemeSuccess("Finance report exported successfully as CSV!", "CSV Exported");
+  const handleExportCSV = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}${ENDPOINTS.ADMIN_FINANCE_EXPORT}`, {
+        credentials: "include",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to export finance CSV.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Kathak_Finance_Report_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      await openThemeSuccess("Complete finance ledger exported as CSV.", "CSV Exported");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to export CSV.");
+    }
   };
 
   const filteredRecords = financeList.filter((r) => {
-    const matchesSearch =
-      r.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.studentIdCode.toLowerCase().includes(searchQuery.toLowerCase());
-
+    const haystack = `${r.studentName} ${r.studentIdCode} ${r.email || ""} ${r.phone || ""}`.toLowerCase();
+    const matchesSearch = haystack.includes(searchQuery.toLowerCase());
     const matchesCourse = courseFilter === "All Courses" || r.course === courseFilter;
     const matchesBatch = batchFilter === "All Batches" || r.batch === batchFilter;
-
     return matchesSearch && matchesCourse && matchesBatch;
   });
+
+  const courseOptions = Array.from(new Set(financeList.map((r) => r.course).filter(Boolean)));
+  const batchOptions = Array.from(new Set(financeList.map((r) => r.batch).filter(Boolean)));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 max-w-[1300px] mx-auto">
@@ -297,8 +347,10 @@ export default function FinanceView() {
                 <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
                   <th className="py-3 px-3">TRANSACTION ID</th>
                   <th className="py-3 px-3">STUDENT NAME</th>
+                  <th className="py-3 px-3">COURSE</th>
                   <th className="py-3 px-3">PAYMENT METHOD</th>
                   <th className="py-3 px-3 text-right">AMOUNT PAID</th>
+                  <th className="py-3 px-3 text-right">INVOICE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
@@ -307,17 +359,28 @@ export default function FinanceView() {
                     <tr key={tx.id} className="hover:bg-stone-50/80 transition-colors">
                       <td className="py-3.5 px-3 font-bold text-stone-600">{tx.transactionId}</td>
                       <td className="py-3.5 px-3 font-bold text-stone-900">{tx.user?.fullName || "Student"}</td>
+                      <td className="py-3.5 px-3 font-semibold text-stone-700">{tx.enrollment?.course?.title || "—"}</td>
                       <td className="py-3.5 px-3">
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
                           {tx.gateway}
                         </span>
                       </td>
                       <td className="py-3.5 px-3 font-extrabold text-emerald-600 text-right">₹{tx.amount.toLocaleString("en-IN")}</td>
+                      <td className="py-3.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openInvoice(tx.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-[#9E0C25] font-bold text-[10px] hover:bg-rose-100"
+                        >
+                          <Download className="w-3 h-3" />
+                          Invoice
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-xs text-stone-400 font-medium">
+                    <td colSpan={6} className="py-6 text-center text-xs text-stone-400 font-medium">
                       No fee transactions recorded today yet.
                     </td>
                   </tr>
@@ -327,7 +390,74 @@ export default function FinanceView() {
           </div>
         </div>
 
-        {/* <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs space-y-5"> */}
+        <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs p-6 space-y-5 mt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-sans font-bold text-lg text-stone-900">All Payment Ledger</h3>
+              <p className="text-xs text-stone-400 font-medium">Complete fee collection history with invoice download.</p>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-stone-100 text-stone-700 text-xs font-extrabold border border-stone-200">
+              {allPayments.length} Payments
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[760px]">
+              <thead>
+                <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
+                  <th className="py-3 px-3">DATE</th>
+                  <th className="py-3 px-3">STUDENT</th>
+                  <th className="py-3 px-3">COURSE</th>
+                  <th className="py-3 px-3">TXN / ORDER</th>
+                  <th className="py-3 px-3">STATUS</th>
+                  <th className="py-3 px-3 text-right">AMOUNT</th>
+                  <th className="py-3 px-3 text-right">INVOICE</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
+                {allPayments.length > 0 ? (
+                  allPayments.map((tx) => (
+                    <tr key={tx.id} className="hover:bg-stone-50/80 transition-colors">
+                      <td className="py-3.5 px-3 text-stone-600">
+                        {new Date(tx.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="block font-bold text-stone-900">{tx.user?.fullName || "Student"}</span>
+                        <span className="block text-[11px] text-stone-500">{tx.user?.email || ""}</span>
+                      </td>
+                      <td className="py-3.5 px-3">{tx.enrollment?.course?.title || "—"}</td>
+                      <td className="py-3.5 px-3">
+                        <span className="block font-bold text-stone-700">{tx.transactionId}</span>
+                        <span className="block text-[11px] text-stone-400">{tx.orderId || tx.gateway}</span>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                          {tx.status || tx.gateway}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 font-extrabold text-emerald-600 text-right">₹{tx.amount.toLocaleString("en-IN")}</td>
+                      <td className="py-3.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openInvoice(tx.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-[#9E0C25] font-bold text-[10px] hover:bg-rose-100"
+                        >
+                          <Download className="w-3 h-3" />
+                          Invoice
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-xs text-stone-400 font-medium">
+                      No payment records yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
           {/* <div className="flex items-center justify-between border-b border-stone-100 pb-3">
             <h4 className="font-sans font-bold text-base text-stone-900">Pending Dues Students</h4>
             <span className="text-xs font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
@@ -378,6 +508,32 @@ export default function FinanceView() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative">
+              <select
+                value={courseFilter}
+                onChange={(e) => setCourseFilter(e.target.value)}
+                className="h-10 pl-3 pr-8 rounded-xl bg-stone-50 border border-stone-200/80 text-xs font-semibold text-stone-700 appearance-none"
+              >
+                <option>All Courses</option>
+                {courseOptions.map((course) => (
+                  <option key={course}>{course}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={batchFilter}
+                onChange={(e) => setBatchFilter(e.target.value)}
+                className="h-10 pl-3 pr-8 rounded-xl bg-stone-50 border border-stone-200/80 text-xs font-semibold text-stone-700 appearance-none"
+              >
+                <option>All Batches</option>
+                {batchOptions.map((batch) => (
+                  <option key={batch}>{batch}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
             <button
               onClick={handleExportCSV}
               className="px-4 py-2 rounded-xl bg-stone-50 border border-stone-200/80 text-stone-700 font-bold text-xs flex items-center gap-1.5 hover:bg-rose-50 hover:text-[#9E0C25] cursor-pointer shrink-0"
@@ -394,11 +550,14 @@ export default function FinanceView() {
               <tr className="border-b border-stone-200/80 text-[10.5px] font-extrabold uppercase tracking-wider text-stone-400">
                 <th className="py-3.5 px-4">STUDENT ID</th>
                 <th className="py-3.5 px-4">STUDENT NAME</th>
+                <th className="py-3.5 px-4">CONTACT</th>
                 <th className="py-3.5 px-4">COURSE</th>
                 <th className="py-3.5 px-4">BATCH</th>
+                <th className="py-3.5 px-4">STATUS</th>
                 <th className="py-3.5 px-4">TOTAL FEES</th>
                 <th className="py-3.5 px-4">PAID AMOUNT</th>
                 <th className="py-3.5 px-4">PENDING AMOUNT</th>
+                <th className="py-3.5 px-4">INVOICE</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-xs font-medium text-stone-700">
@@ -413,16 +572,45 @@ export default function FinanceView() {
                         <span className="font-bold text-stone-900 text-sm">{row.studentName}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-4 font-semibold text-stone-600">{row.course}</td>
-                    <td className="py-4 px-4 font-bold text-stone-800">{row.batch}</td>
+                    <td className="py-4 px-4">
+                      <span className="block font-semibold text-stone-800">{row.email || "—"}</span>
+                      <span className="block text-[11px] text-stone-500">{row.phone || "—"}</span>
+                    </td>
+                    <td className="py-4 px-4 font-semibold text-stone-600">{row.course || "—"}</td>
+                    <td className="py-4 px-4 font-bold text-stone-800">{row.batch || "—"}</td>
+                    <td className="py-4 px-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                        row.statusLabel === "Paid"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : row.statusLabel === "Partial"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-rose-50 text-rose-700"
+                      }`}>
+                        {row.statusLabel || "Pending"}
+                      </span>
+                    </td>
                     <td className="py-4 px-4 font-bold text-stone-900">{row.totalFees}</td>
                     <td className="py-4 px-4 font-bold text-emerald-600">{row.paidAmount}</td>
                     <td className="py-4 px-4 font-bold text-rose-600">{row.pendingAmount}</td>
+                    <td className="py-4 px-4">
+                      {row.lastPaymentId ? (
+                        <button
+                          type="button"
+                          onClick={() => openInvoice(row.lastPaymentId as string)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-[#9E0C25] font-bold text-[10px] hover:bg-rose-100"
+                        >
+                          <Download className="w-3 h-3" />
+                          Invoice
+                        </button>
+                      ) : (
+                        <span className="text-stone-400 text-[11px]">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-stone-400 text-xs font-semibold">
+                  <td colSpan={10} className="py-8 text-center text-stone-400 text-xs font-semibold">
                     No student finance records found matching your search.
                   </td>
                 </tr>

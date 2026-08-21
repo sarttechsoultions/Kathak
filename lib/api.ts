@@ -28,6 +28,7 @@ export async function apiRequest<T = any>(
   if (typeof window !== "undefined") {
     const studentToken = localStorage.getItem("kathak_student_token");
     const adminToken = localStorage.getItem("kathak_admin_token");
+    const teacherToken = localStorage.getItem("kathak_teacher_token");
     const genericToken = localStorage.getItem("kathak_token");
 
     let token: string | null = null;
@@ -35,8 +36,10 @@ export async function apiRequest<T = any>(
       token = studentToken || genericToken;
     } else if (window.location.pathname.startsWith("/admin")) {
       token = adminToken || genericToken;
+    } else if (window.location.pathname.startsWith("/teacher")) {
+      token = teacherToken || adminToken || genericToken;
     } else {
-      token = adminToken || studentToken || genericToken;
+      token = adminToken || teacherToken || studentToken || genericToken;
     }
 
     if (token) {
@@ -81,6 +84,10 @@ export const ENDPOINTS = {
   ADMIN_BATCHES: "/admin/batches",
   ADMIN_ATTENDANCE: "/admin/attendance",
   ADMIN_FINANCE: "/admin/finance",
+  ADMIN_FINANCE_EXPORT: "/admin/finance/export.csv",
+  ADMIN_PAYMENT_INVOICE: "/admin/payments",
+  STUDENT_OTP_SEND: "/student/otp/send",
+  STUDENT_OTP_VERIFY: "/student/otp/verify",
   ADMIN_CERTIFICATES: "/admin/certificates",
   ADMIN_EXAMS: "/admin/exams",
   ADMIN_REPORTS_OVERVIEW: "/admin/reports/overview",
@@ -98,6 +105,8 @@ export const ENDPOINTS = {
   AUTH_CHANGE_PASSWORD: "/auth/change-password",
   AUTH_PROFILE: "/auth/profile",
   LIVE_CLASS_TEACHER: "/teacher/classes",
+  LIVE_CLASS_TEACHER_STATUS: "/teacher/classes",
+  LIVE_CLASS_JOIN_TOKEN: "/classes",
   UPLOAD_IMAGE: "/upload/image",
   UPLOAD_VIDEO: "/upload/video",
   UPLOAD_FILE: "/upload/file",

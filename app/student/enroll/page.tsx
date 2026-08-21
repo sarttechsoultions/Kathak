@@ -30,6 +30,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { persistAuthSession } from "@/lib/auth";
 import { openThemeSuccess } from "@/components/ThemeDialogProvider";
 
 // Font stacks matching Figma spec exactly.
@@ -59,6 +60,21 @@ const getMinDobDate = () => {
 
 const isValidPhone = (value: string | undefined) =>
   !!value && isValidPhoneNumber(value);
+
+const getAgeFromDob = (value: string): number | null => {
+  if (!value) return null;
+  const birthDate = new Date(value);
+  if (Number.isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+  return age;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Video URL Formatter Helper
 function getEmbedVideoUrl(url: string): { isIframe: boolean; finalUrl: string } {
@@ -170,6 +186,13 @@ export default function StudentEnrollPage() {
   const [postalCodeError, setPostalCodeError] = useState("");
   const [addressError, setAddressError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [mobileOtp, setMobileOtp] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [mobileVerified, setMobileVerified] = useState(false);
+  const [emailOtpHint, setEmailOtpHint] = useState("");
+  const [mobileOtpHint, setMobileOtpHint] = useState("");
+  const [otpBusy, setOtpBusy] = useState<"email" | "mobile" | null>(null);
 
   // STEP 2 FIELDS
   const [courseId, setCourseId] = useState("");
@@ -337,6 +360,75 @@ export default function StudentEnrollPage() {
     }
   };
 
+  const sendOtp = async (channel: "EMAIL" | "MOBILE") => {
+    try {
+      if (channel === "EMAIL" && !email.trim()) {
+        alert("Enter your email address first.");
+        return;
+      }
+      if (channel === "MOBILE" && !isValidPhone(phone)) {
+        alert("Enter a valid mobile number first.");
+        return;
+      }
+      setOtpBusy(channel === "EMAIL" ? "email" : "mobile");
+      const res = await apiRequest(ENDPOINTS.STUDENT_OTP_SEND, {
+        method: "POST",
+        body: JSON.stringify({
+          channel,
+          email,
+          phone,
+          countryCode: selectedCountry ? `+${selectedCountry.phonecode}` : "+91",
+        }),
+      });
+      if (channel === "EMAIL") {
+        setEmailVerified(false);
+        setEmailOtpHint(res.message || "OTP sent to your email.");
+      } else {
+        setMobileVerified(false);
+        setMobileOtpHint(res.message || "Use OTP 001122 until Twilio SMS is enabled.");
+        if (res.data?.bypassCode) setMobileOtp(res.data.bypassCode);
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to send OTP.");
+    } finally {
+      setOtpBusy(null);
+    }
+  };
+
+  const verifyOtp = async (channel: "EMAIL" | "MOBILE") => {
+    try {
+      const code = channel === "EMAIL" ? emailOtp : mobileOtp;
+      if (!code.trim()) {
+        alert("Enter the OTP first.");
+        return;
+      }
+      setOtpBusy(channel === "EMAIL" ? "email" : "mobile");
+      await apiRequest(ENDPOINTS.STUDENT_OTP_VERIFY, {
+        method: "POST",
+        body: JSON.stringify({
+          channel,
+          email,
+          phone,
+          countryCode: selectedCountry ? `+${selectedCountry.phonecode}` : "+91",
+          code,
+        }),
+      });
+      if (channel === "EMAIL") {
+        setEmailVerified(true);
+        setEmailOtpHint("Email verified.");
+      } else {
+        setMobileVerified(true);
+        setMobileOtpHint("Mobile number verified.");
+      }
+    } catch (err: unknown) {
+      if (channel === "EMAIL") setEmailVerified(false);
+      else setMobileVerified(false);
+      alert(err instanceof Error ? err.message : "Invalid OTP.");
+    } finally {
+      setOtpBusy(null);
+    }
+  };
+
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -394,12 +486,33 @@ export default function StudentEnrollPage() {
         alert("Passwords do not match. Please re-enter matching passwords.");
         return;
       }
+      if (!emailVerified) {
+        alert("Please verify your email with the OTP before continuing.");
+        return;
+      }
+      if (!mobileVerified) {
+        alert("Please verify your mobile number with the OTP before continuing.");
+        return;
+      }
     }
 
     if (currentStep === 2) {
       if (availableBatches.length > 0 && !batchId) {
         alert("Please select a batch assignment for this course.");
         return;
+      }
+
+      const age = getAgeFromDob(dob);
+      const requiresGuardian = isUnder18 || (age !== null && age < 18);
+      if (requiresGuardian) {
+        if (!guardianName.trim()) {
+          alert("Guardian name is required for students under 18.");
+          return;
+        }
+        if (!emergencyContact.trim()) {
+          alert("Emergency contact is required for students under 18.");
+          return;
+        }
       }
     }
 
@@ -435,10 +548,10 @@ export default function StudentEnrollPage() {
       return;
     }
 
+    setSubmitError("");
     setIsSubmitted(true);
     
     try {
-      // 1. Load Razorpay Script
       const resRazorpay = await loadRazorpay();
       if (!resRazorpay) {
         alert("Razorpay SDK failed to load. Are you online?");
@@ -446,10 +559,34 @@ export default function StudentEnrollPage() {
         return;
       }
 
-      // 2. Create Order from Backend
+      const age = getAgeFromDob(dob);
+      const under18 = isUnder18 || (age !== null && age < 18);
+
       const orderRes = await apiRequest(ENDPOINTS.CREATE_ORDER, {
         method: "POST",
-        body: JSON.stringify({ batchId }),
+        body: JSON.stringify({
+          fullName,
+          email,
+          phone,
+          country: selectedCountry?.name || "India",
+          countryCode: selectedCountry ? `+${selectedCountry.phonecode}` : "+91",
+          password,
+          dob,
+          gender,
+          address,
+          region: selectedState?.name || "",
+          city: selectedCity?.name || selectedState?.name || "",
+          postalCode,
+          profileImage,
+          courseId: selectedCourseObj?.id,
+          batchId,
+          joiningDate: getTodayDateString(),
+          isUnder18: under18,
+          guardianName,
+          relationship,
+          emergencyContact,
+          paymentMethod: paymentMethod === "card" ? "CARD" : "UPI",
+        }),
       });
 
       if (!orderRes || orderRes.status === "error") {
@@ -458,10 +595,7 @@ export default function StudentEnrollPage() {
         return;
       }
 
-      const { orderId, amount, currency, keyId } = orderRes.data;
-
-      // 3. Open Razorpay Checkout Window
-      console.log("ORDER RES:", orderRes);
+      const { orderId, amount, currency, keyId, pendingEnrollmentId } = orderRes.data;
 
       const options = {
         key: keyId,
@@ -469,59 +603,51 @@ export default function StudentEnrollPage() {
         currency: currency,
         name: "Kathak Academy",
         description: `Enrollment Fee for ${selectedCourseObj?.title}`,
-        image: "/logo.png", // Replace with actual logo URL if you have one
+        image: "/logo.png",
         order_id: orderId,
+        method: {
+          upi: paymentMethod === "upi",
+          card: paymentMethod === "card",
+          netbanking: false,
+          wallet: false,
+          emi: false,
+          paylater: false,
+        },
         handler: async function (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) {
           try {
-            // 4. On Payment Success, submit full registration form
-            const res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
-              method: "POST",
-              body: JSON.stringify({
-                fullName,
-                email,
-                phone,
-                country: selectedCountry?.name || "India",
-                countryCode: selectedCountry
-                  ? `+${selectedCountry.phonecode}`
-                  : "+91",
-                password,
-                dob,
-                gender,
-                address,
-                region: selectedState?.name || "",
-                city: selectedCity?.name || "",
-                postalCode,
-                profileImage,
-                courseTitle: selectedCourseObj?.title || "",
-                courseId: selectedCourseObj?.id,
-                batchId,
-                batch: selectedBatch?.name || "",
-                joiningDate: getTodayDateString(),
-                isUnder18,
-                guardianName,
-                relationship,
-                emergencyContact,
-                paymentMethod: "RAZORPAY",
-                groupFeeINR: selectedCourseObj?.groupFeeINR || 2200,
-                groupFeeUSD: selectedCourseObj?.groupFeeUSD || 50,
-                // Razorpay verification details
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
+            let res = null;
+            let lastMessage = "Registration failed after payment.";
+
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                res = await apiRequest(ENDPOINTS.STUDENT_ENROLL, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    pendingEnrollmentId,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_signature: response.razorpay_signature,
+                  }),
+                });
+                break;
+              } catch (retryError) {
+                lastMessage = retryError instanceof Error ? retryError.message : lastMessage;
+                if (attempt < 3) {
+                  await sleep(1500 * attempt);
+                }
+              }
+            }
 
             const token = res?.data?.token;
             const user = res?.data?.user;
 
-            if (res.status === "success" && token) {
-              if (token) {
-                localStorage.setItem("kathak_student_token", token);
-                localStorage.setItem("kathak_token", token);
-              }
-              if (user) {
-                localStorage.setItem("kathak_student_user", JSON.stringify(user));
-              }
+            if (res?.status === "success" && token) {
+              persistAuthSession({
+                role: "STUDENT",
+                token,
+                user: user || { role: "STUDENT", fullName, email },
+                rememberMe: true,
+              });
 
               await openThemeSuccess(
                 `Congratulations ${fullName}! Your enrollment for "${selectedCourseObj?.title || "your selected course"}" is complete. Redirecting to your Student Portal...`,
@@ -529,22 +655,32 @@ export default function StudentEnrollPage() {
               );
               router.push("/student/dashboard");
             } else {
-              setSubmitError(res?.message || "Registration failed after payment.");
+              const paidMessage = `Payment received (ID: ${response.razorpay_payment_id}). ${lastMessage} Your account will be activated shortly — please try logging in, or contact support with this payment ID.`;
+              setSubmitError(paidMessage);
+              alert(paidMessage);
               setIsSubmitted(false);
             }
           } catch (error) {
             console.error(error);
-            setSubmitError("Network error occurred during final enrollment processing.");
+            const paidMessage = `Payment received (ID: ${response.razorpay_payment_id}). We are activating your account. Please try logging in in a minute, or contact support with this payment ID.`;
+            setSubmitError(paidMessage);
+            alert(paidMessage);
             setIsSubmitted(false);
           }
         },
         prefill: {
           name: fullName,
           email: email,
-          contact: `${selectedCountry ? `+${selectedCountry.phonecode}` : "+91"}${phone}`,
+          contact: phone || "",
+          method: paymentMethod,
+        },
+        modal: {
+          ondismiss: function () {
+            setIsSubmitted(false);
+          },
         },
         theme: {
-          color: "#900C27", // Branded Kathak Academy Red
+          color: "#900C27",
         },
       };
 
@@ -828,9 +964,45 @@ export default function StudentEnrollPage() {
                       required
                       placeholder="example@domain.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setEmailVerified(false);
+                        setEmailOtpHint("");
+                      }}
                       className="w-full bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-4 py-2.5 text-xs text-stone-800 placeholder-stone-400 focus:outline-none transition-colors shadow-2xs"
                     />
+                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Email OTP"
+                        value={emailOtp}
+                        onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        className="flex-1 bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-3 py-2 text-xs text-stone-800 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => sendOtp("EMAIL")}
+                        disabled={otpBusy === "email" || emailVerified}
+                        className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-[11px] font-bold text-stone-700 disabled:opacity-50"
+                      >
+                        {otpBusy === "email" ? "Sending..." : "Send OTP"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => verifyOtp("EMAIL")}
+                        disabled={otpBusy === "email" || emailVerified}
+                        className="px-3 py-2 rounded-xl bg-[#C10F3A] text-white text-[11px] font-bold disabled:opacity-50"
+                      >
+                        {emailVerified ? "Verified" : "Verify"}
+                      </button>
+                    </div>
+                    {emailOtpHint ? (
+                      <p className={`mt-1 text-[11px] ${emailVerified ? "text-emerald-600" : "text-stone-500"}`}>
+                        {emailOtpHint}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div>
@@ -842,7 +1014,11 @@ export default function StudentEnrollPage() {
   international
   defaultCountry={(selectedCountry?.isoCode || "IN") as PhoneCountryCode}
   value={phone}
-  onChange={(value) => setPhone(value)}
+  onChange={(value) => {
+    setPhone(value);
+    setMobileVerified(false);
+    setMobileOtpHint("");
+  }}
   onCountryChange={(iso) => {
     if (iso) {
       const country = Country.getCountryByCode(iso);
@@ -857,6 +1033,42 @@ export default function StudentEnrollPage() {
   }}
 />
 </div>
+                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Mobile OTP"
+                        value={mobileOtp}
+                        onChange={(e) => setMobileOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        className="flex-1 bg-white border border-stone-200 focus:border-[#C10F3A] rounded-xl px-3 py-2 text-xs text-stone-800 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => sendOtp("MOBILE")}
+                        disabled={otpBusy === "mobile" || mobileVerified}
+                        className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-[11px] font-bold text-stone-700 disabled:opacity-50"
+                      >
+                        {otpBusy === "mobile" ? "Sending..." : "Send OTP"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => verifyOtp("MOBILE")}
+                        disabled={otpBusy === "mobile" || mobileVerified}
+                        className="px-3 py-2 rounded-xl bg-[#C10F3A] text-white text-[11px] font-bold disabled:opacity-50"
+                      >
+                        {mobileVerified ? "Verified" : "Verify"}
+                      </button>
+                    </div>
+                    {mobileOtpHint ? (
+                      <p className={`mt-1 text-[11px] ${mobileVerified ? "text-emerald-600" : "text-stone-500"}`}>
+                        {mobileOtpHint}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-stone-500">
+                        Until Twilio SMS is added, use mobile OTP <span className="font-bold text-[#C10F3A]">001122</span>.
+                      </p>
+                    )}
                     {phoneError ? (
                       <p className="mt-2 text-[11px] text-rose-600">
                         {phoneError}
@@ -1229,7 +1441,7 @@ export default function StudentEnrollPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                      Guardian Name
+                      Guardian Name {(isUnder18 || (getAgeFromDob(dob) ?? 99) < 18) ? <span className="text-[#C10F3A]">*</span> : null}
                     </label>
                     <input
                       type="text"
@@ -1260,7 +1472,7 @@ export default function StudentEnrollPage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-                      Emergency Contact
+                      Emergency Contact {(isUnder18 || (getAgeFromDob(dob) ?? 99) < 18) ? <span className="text-[#C10F3A]">*</span> : null}
                     </label>
                     <input
                       type="tel"
@@ -1400,6 +1612,12 @@ export default function StudentEnrollPage() {
                 <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span>256-Bit SSL Encrypted Secure Payment Gateway</span>
               </div>
+
+              {submitError ? (
+                <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-semibold">
+                  {submitError}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center justify-between pt-2">

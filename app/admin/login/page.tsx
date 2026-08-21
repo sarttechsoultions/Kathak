@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
 import { apiRequest, ENDPOINTS } from "@/lib/api";
+import { persistAuthSession } from "@/lib/auth";
 import { getDefaultAccessibleRoute } from "@/lib/permissions";
 
 export default function AdminLoginPage() {
@@ -60,22 +61,31 @@ export default function AdminLoginPage() {
       });
 
       const user = res?.data?.user;
+      const token = res?.data?.token;
 
       if (user || res?.status === "success") {
-        let destination = "/admin/dashboard";
+        const role = user?.role || "ADMIN";
 
-        if (user) {
-          localStorage.setItem(
-            "kathak_session_user",
-            JSON.stringify(user)
+        if (role !== "ADMIN") {
+          setErrorMessage(
+            role === "TEACHER"
+              ? "Teacher accounts cannot access the admin terminal. Please use Teacher Login."
+              : "Student accounts cannot access the admin terminal. Please use Student Login."
           );
-
-          destination =
-            getDefaultAccessibleRoute(user) ||
-            "/admin/dashboard";
+          return;
         }
 
-        router.replace(destination);
+        persistAuthSession({
+          role: "ADMIN",
+          token,
+          user: user || { role: "ADMIN", email },
+          rememberMe,
+        });
+
+        router.replace(
+          getDefaultAccessibleRoute(user || { role: "ADMIN", permissions: [] }) ||
+            "/admin/dashboard"
+        );
       } else {
         setErrorMessage(res?.message || "Invalid credentials or unauthorized access.");
       }
