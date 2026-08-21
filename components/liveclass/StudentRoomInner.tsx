@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Hand, Maximize2, Minimize2, Mic, MicOff, PhoneOff, ShieldCheck, Video as VideoIcon, VideoOff } from "lucide-react";
 import { AgoraProvider } from "@/lib/agoraClient";
-import { LocalVideoTrack, RemoteUser, useJoin, useLocalCameraTrack, useLocalMicrophoneTrack, usePublish, useRemoteUsers } from "agora-rtc-react";
+import { LocalVideoTrack, RemoteUser, useJoin, useLocalCameraTrack, useLocalMicrophoneTrack, usePublish, useRemoteUsers, useRTCClient } from "agora-rtc-react";
 import { LiveChatPanel } from "@/components/liveclass/LiveChatPanel";
 import { Watermark } from "@/components/liveclass/Watermark";
 import { getSocket } from "@/lib/socket";
@@ -38,7 +38,6 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   const [camOn, setCamOn] = useState(true);
   const [handRaised, setHandRaised] = useState(false);
   const [deviceToast, setDeviceToast] = useState("");
-  const [busy, setBusy] = useState<"mic" | "cam" | null>(null);
   const { containerRef, isFullscreen, toggleFullscreen } = useFullscreen();
 
   const [studentName] = useState<string>(() => {
@@ -74,19 +73,29 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
     return undefined;
   });
 
-  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(true);
-  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(true);
-
-  const localMicrophoneTrackRef = React.useRef(localMicrophoneTrack);
-  const localCameraTrackRef = React.useRef(localCameraTrack);
-  localMicrophoneTrackRef.current = localMicrophoneTrack;
-  localCameraTrackRef.current = localCameraTrack;
-  const pendingMediaRef = React.useRef<{ camera?: boolean; mic?: boolean } | null>(null);
+  const { localMicrophoneTrack, isLoading: micLoading, error: micError } = useLocalMicrophoneTrack(micOn);
+  const { localCameraTrack, isLoading: camLoading, error: camError } = useLocalCameraTrack(camOn);
+  const agoraClient = useRTCClient();
+  const handledCamErrorRef = React.useRef<unknown>(null);
+  const handledMicErrorRef = React.useRef<unknown>(null);
 
   usePublish(
-    [localMicrophoneTrack, localCameraTrack],
+    [micOn ? localMicrophoneTrack : null, camOn ? localCameraTrack : null],
     Boolean(joinInfo?.channelName && joinInfo?.appId)
   );
+
+  useEffect(() => {
+    if (!agoraClient) return;
+    const publishReady = async () => {
+      try {
+        if (camOn && localCameraTrack) await agoraClient.publish(localCameraTrack);
+      } catch {}
+      try {
+        if (micOn && localMicrophoneTrack) await agoraClient.publish(localMicrophoneTrack);
+      } catch {}
+    };
+    void publishReady();
+  }, [agoraClient, camOn, micOn, localCameraTrack, localMicrophoneTrack]);
 
   useEffect(() => {
     if (!deviceToast) return;
@@ -95,19 +104,19 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   }, [deviceToast]);
 
   useEffect(() => {
-    if (micError) {
-      console.warn("Microphone device not found or access denied:", micError);
-      setMicOn(false);
-      setDeviceToast("Microphone not found or permission denied.");
-    }
+    if (!micError || micError === handledMicErrorRef.current) return;
+    handledMicErrorRef.current = micError;
+    console.warn("Microphone device not found or access denied:", micError);
+    setMicOn(false);
+    setDeviceToast("Microphone not found or permission denied.");
   }, [micError]);
 
   useEffect(() => {
-    if (camError) {
-      console.warn("Camera device not found or access denied:", camError);
-      setCamOn(false);
-      setDeviceToast("Camera not found or permission denied.");
-    }
+    if (!camError || camError === handledCamErrorRef.current) return;
+    handledCamErrorRef.current = camError;
+    console.warn("Camera device not found or access denied:", camError);
+    setCamOn(false);
+    setDeviceToast("Camera not found or permission denied.");
   }, [camError]);
 
   const remoteUsers = useRemoteUsers();
@@ -143,44 +152,16 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   useEffect(() => {
     const socket = getSocket();
 
-    const applyCamera = async (enabled: boolean, requestedBy: string) => {
-      const track = localCameraTrackRef.current;
-      if (!track) {
-        pendingMediaRef.current = { ...(pendingMediaRef.current || {}), camera: enabled };
-        setDeviceToast(`${requestedBy} asked to turn your camera ${enabled ? "on" : "off"}. Camera is still starting.`);
-        return;
-      }
-      try {
-        await track.setEnabled(enabled);
-        setCamOn(enabled);
-        setDeviceToast(`${requestedBy} turned your camera ${enabled ? "on" : "off"}.`);
-      } catch (err) {
-        console.warn("Host camera control failed:", err);
-        setDeviceToast(`Could not change camera as requested by ${requestedBy}.`);
-      }
-    };
-
-    const applyMic = async (enabled: boolean, requestedBy: string) => {
-      const track = localMicrophoneTrackRef.current;
-      if (!track) {
-        pendingMediaRef.current = { ...(pendingMediaRef.current || {}), mic: enabled };
-        setDeviceToast(`${requestedBy} asked to turn your microphone ${enabled ? "on" : "off"}. Microphone is still starting.`);
-        return;
-      }
-      try {
-        await track.setEnabled(enabled);
-        setMicOn(enabled);
-        setDeviceToast(`${requestedBy} turned your microphone ${enabled ? "on" : "off"}.`);
-      } catch (err) {
-        console.warn("Host microphone control failed:", err);
-        setDeviceToast(`Could not change microphone as requested by ${requestedBy}.`);
-      }
-    };
-
     const onMediaControl = (payload: { camera?: boolean; mic?: boolean; requestedBy?: string }) => {
       const who = payload?.requestedBy || "Teacher";
-      if (payload?.camera !== undefined) void applyCamera(payload.camera, who);
-      if (payload?.mic !== undefined) void applyMic(payload.mic, who);
+      if (payload?.camera !== undefined) {
+        setCamOn(payload.camera);
+        setDeviceToast(`${who} turned your camera ${payload.camera ? "on" : "off"}.`);
+      }
+      if (payload?.mic !== undefined) {
+        setMicOn(payload.mic);
+        setDeviceToast(`${who} turned your microphone ${payload.mic ? "on" : "off"}.`);
+      }
     };
 
     socket.on("liveclass:media-control", onMediaControl);
@@ -189,69 +170,14 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
     };
   }, []);
 
-  useEffect(() => {
-    const pending = pendingMediaRef.current;
-    if (!pending) return;
-
-    const applyPending = async () => {
-      if (pending.camera !== undefined && localCameraTrack) {
-        try {
-          await localCameraTrack.setEnabled(pending.camera);
-          setCamOn(pending.camera);
-        } catch {}
-        pending.camera = undefined;
-      }
-      if (pending.mic !== undefined && localMicrophoneTrack) {
-        try {
-          await localMicrophoneTrack.setEnabled(pending.mic);
-          setMicOn(pending.mic);
-        } catch {}
-        pending.mic = undefined;
-      }
-      if (pending.camera === undefined && pending.mic === undefined) {
-        pendingMediaRef.current = null;
-      }
-    };
-
-    void applyPending();
-  }, [localCameraTrack, localMicrophoneTrack]);
-
-  const toggleMic = async () => {
-    if (busy || micLoading) return;
-    if (!localMicrophoneTrack) {
-      setDeviceToast("Microphone is still starting. Try again in a moment.");
-      return;
-    }
-    const next = !micOn;
-    setBusy("mic");
-    try {
-      await localMicrophoneTrack.setEnabled(next);
-      setMicOn(next);
-    } catch (err) {
-      console.warn("Failed to toggle microphone:", err);
-      setDeviceToast("Could not toggle microphone. Check browser permission.");
-    } finally {
-      setBusy(null);
-    }
+  const toggleMic = () => {
+    if (micLoading) return;
+    setMicOn((value) => !value);
   };
 
-  const toggleCam = async () => {
-    if (busy || camLoading) return;
-    if (!localCameraTrack) {
-      setDeviceToast("Camera is still starting. Try again in a moment.");
-      return;
-    }
-    const next = !camOn;
-    setBusy("cam");
-    try {
-      await localCameraTrack.setEnabled(next);
-      setCamOn(next);
-    } catch (err) {
-      console.warn("Failed to toggle camera:", err);
-      setDeviceToast("Could not toggle camera. Check browser permission.");
-    } finally {
-      setBusy(null);
-    }
+  const toggleCam = () => {
+    if (camLoading) return;
+    setCamOn((value) => !value);
   };
 
   const handRaise = () => {
@@ -313,7 +239,7 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
             <button
               type="button"
               onClick={toggleMic}
-              disabled={busy === "mic" || micLoading}
+              disabled={micLoading}
               className={`rounded-full p-3 min-w-11 min-h-11 flex items-center justify-center cursor-pointer disabled:opacity-50 ${
                 micOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-red-600 text-white"
               }`}
@@ -324,7 +250,7 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
             <button
               type="button"
               onClick={toggleCam}
-              disabled={busy === "cam" || camLoading}
+              disabled={camLoading}
               className={`rounded-full p-3 min-w-11 min-h-11 flex items-center justify-center cursor-pointer disabled:opacity-50 ${
                 camOn ? "bg-white/15 text-white hover:bg-white/25" : "bg-red-600 text-white"
               }`}
