@@ -21,15 +21,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (savedUserStr) {
         try {
           const user = JSON.parse(savedUserStr);
-          const destination = getDefaultAccessibleRoute(user) || "/admin/dashboard";
-          router.replace(destination);
+          if (user?.role === "ADMIN") {
+            const destination = getDefaultAccessibleRoute(user) || "/admin/dashboard";
+            router.replace(destination);
+          }
         } catch {
-          router.replace("/admin/dashboard");
+          // stay on login
         }
-      } else {
-        // Avoid calling setState synchronously within the effect to prevent cascading renders
-        setTimeout(() => setIsAuthenticated(true), 0);
       }
+      setTimeout(() => setIsAuthenticated(true), 0);
       return;
     }
 
@@ -44,6 +44,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       } catch {
         currentUser = null;
       }
+    }
+
+    if (currentUser && currentUser.role !== "ADMIN") {
+      setTimeout(() => setIsAuthenticated(false), 0);
+      router.replace(currentUser.role === "TEACHER" ? "/teacher/dashboard" : "/login");
+      return;
     }
 
     if (currentUser && canAccessRoute(currentUser, pathname)) {
@@ -61,6 +67,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const user = res.data?.user as AuthSessionUser | undefined;
 
         if (user && isMounted) {
+          if (user.role !== "ADMIN") {
+            setIsAuthenticated(false);
+            router.replace(user.role === "TEACHER" ? "/teacher/dashboard" : "/login");
+            return;
+          }
           localStorage.setItem("kathak_session_user", JSON.stringify(user));
           if (canAccessRoute(user, pathname)) {
             setIsAuthenticated(true);

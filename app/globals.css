@@ -11,7 +11,13 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 140px;
+  scroll-padding-top: 100px;
+}
+
+@media (min-width: 640px) {
+  html {
+    scroll-padding-top: 134px;
+  }
 }
 
 :root {

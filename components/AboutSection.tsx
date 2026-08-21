@@ -11,7 +11,7 @@ export default function AboutSection() {
       <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none z-0 opacity-40 sm:opacity-50 lg:opacity-65 max-w-[280px] sm:max-w-[380px] lg:max-w-[460px] translate-x-4 sm:translate-x-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/about/image 14.png"
+          src="/about/art.png"
           alt="Mandala Background Pattern"
           className="spin-slow w-full h-auto object-contain select-none"
         />

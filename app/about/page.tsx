@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-white text-stone-900 flex flex-col overflow-x-hidden selection:bg-[#C10F3A] selection:text-white">
+    <div className="min-h-screen bg-white text-stone-900 flex flex-col overflow-x-clip selection:bg-[#C10F3A] selection:text-white">
       <SiteHeader />
       <main className="flex-1 bg-white">
         <AboutHero />

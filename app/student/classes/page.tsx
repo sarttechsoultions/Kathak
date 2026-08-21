@@ -6,8 +6,8 @@ import {
   ChevronLeft, ChevronRight, Play, Clock, Plus, Loader2, Users
 } from "lucide-react";
 import Link from "next/link";
-import { io, Socket } from "socket.io-client";
 import { apiRequest } from "@/lib/api";
+import { getSocket } from "@/lib/socket";
 
 interface BatchInfo {
   name: string;
@@ -24,7 +24,8 @@ interface LiveClass {
   scheduledEnd: string;
   roomName: string;
   status: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED";
-  batch: BatchInfo;
+  batch?: BatchInfo;
+  batchName?: string;
 }
 
 interface StudentStats {
@@ -61,18 +62,25 @@ export default function StudentLiveClassesPage() {
   }, [fetchClasses]);
 
   useEffect(() => {
-    const socketInstance: Socket = io(process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000", {
-      transports: ["websocket"],
-    });
+    const socketInstance = getSocket();
 
-    socketInstance.on("liveclass:class-updated", (updatedClass: LiveClass) => {
-      setClasses((prev) =>
-        prev.map((c) => (c.id === updatedClass.id ? { ...c, ...updatedClass } : c))
-      );
-    });
+    const onUpdated = (updatedClass: LiveClass) => {
+      setClasses((prev) => {
+        const exists = prev.some((c) => c.id === updatedClass.id);
+        if (exists) return prev.map((c) => (c.id === updatedClass.id ? { ...c, ...updatedClass } : c));
+        return [...prev, updatedClass];
+      });
+    };
+    const onCreated = (createdClass: LiveClass) => {
+      setClasses((prev) => (prev.some((c) => c.id === createdClass.id) ? prev : [...prev, createdClass]));
+    };
+
+    socketInstance.on("liveclass:class-updated", onUpdated);
+    socketInstance.on("liveclass:class-created", onCreated);
 
     return () => {
-      socketInstance.disconnect();
+      socketInstance.off("liveclass:class-updated", onUpdated);
+      socketInstance.off("liveclass:class-created", onCreated);
     };
   }, []);
 
@@ -113,6 +121,7 @@ export default function StudentLiveClassesPage() {
   const formatMonth = (dateString: string) => new Date(dateString).toLocaleString('en-US', { month: 'short' }).toUpperCase();
   const formatDay = (dateString: string) => new Date(dateString).toLocaleString('en-US', { day: '2-digit' });
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const batchLabel = (cls: LiveClass) => cls.batch?.name || cls.batchName || "Batch";
 
   return (
     <div className="min-h-screen bg-transparent p-6 lg:p-8 font-sans flex justify-center">
@@ -203,7 +212,7 @@ export default function StudentLiveClassesPage() {
                       </span>
                     )}
                     <span className="bg-white/20 backdrop-blur-md text-white text-[10px] font-semibold px-3 py-1.5 rounded-full border border-white/10">
-                      {heroClass.batch.name}
+                      {batchLabel(heroClass)}
                     </span>
                   </div>
 
@@ -236,9 +245,15 @@ export default function StudentLiveClassesPage() {
                       </div>
                     </div>
 
-                    <Link href={`/student/classes/room/${heroClass.id}`} className="bg-white hover:bg-stone-100 text-[#9B3434] px-6 py-3.5 rounded-xl font-bold text-[14px] transition-colors shadow-lg flex items-center justify-center gap-2">
-                      <Play className="w-4 h-4 fill-current" /> Join Class
-                    </Link>
+                    {heroClass.status === "LIVE" ? (
+                      <Link href={`/student/classes/room/${heroClass.id}`} className="bg-white hover:bg-stone-100 text-[#9B3434] px-6 py-3.5 rounded-xl font-bold text-[14px] transition-colors shadow-lg flex items-center justify-center gap-2">
+                        <Play className="w-4 h-4 fill-current" /> Join Class
+                      </Link>
+                    ) : (
+                      <span className="bg-white/15 text-white px-6 py-3.5 rounded-xl font-bold text-[14px] border border-white/20">
+                        Waiting for teacher
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -271,9 +286,15 @@ export default function StudentLiveClassesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Link href={`/student/classes/room/${session.id}`} className="px-5 py-2.5 rounded-xl bg-[#9B3434] text-white hover:bg-[#7a2828] text-[13px] font-bold transition-colors">
-                        Enter Room
-                      </Link>
+                      {session.status === "LIVE" ? (
+                        <Link href={`/student/classes/room/${session.id}`} className="px-5 py-2.5 rounded-xl bg-[#9B3434] text-white hover:bg-[#7a2828] text-[13px] font-bold transition-colors">
+                          Enter Room
+                        </Link>
+                      ) : (
+                        <span className="px-5 py-2.5 rounded-xl bg-stone-100 text-stone-500 text-[13px] font-bold">
+                          Starts {formatTime(session.scheduledStart)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )) : (

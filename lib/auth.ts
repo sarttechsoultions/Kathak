@@ -107,3 +107,38 @@ export function isStudentPortalRole(user: SessionUser | null): boolean {
 export function isAdminPortalRole(user: SessionUser | null): boolean {
   return user?.role === "ADMIN" || user?.role === "TEACHER";
 }
+
+export function persistAuthSession({
+  role,
+  token,
+  user,
+  rememberMe = true,
+}: {
+  role: "ADMIN" | "TEACHER" | "STUDENT";
+  token?: string;
+  user: SessionUser;
+  rememberMe?: boolean;
+}): void {
+  if (typeof window === "undefined") return;
+
+  const expiresInMs = rememberMe
+    ? 30 * 24 * 60 * 60 * 1000
+    : 24 * 60 * 60 * 1000;
+  const sessionUser = { ...user, role: user.role || role };
+
+  if (role === "STUDENT") {
+    if (token) setPortalSession("student", token, sessionUser, expiresInMs);
+    else localStorage.setItem("kathak_student_user", JSON.stringify(sessionUser));
+    localStorage.setItem("kathak_session_user", JSON.stringify(sessionUser));
+    return;
+  }
+
+  if (token) setPortalSession("admin", token, sessionUser, expiresInMs);
+  else localStorage.setItem("kathak_session_user", JSON.stringify(sessionUser));
+  localStorage.setItem("kathak_admin_user", JSON.stringify(sessionUser));
+
+  if (role === "TEACHER") {
+    localStorage.setItem("kathak_teacher_user", JSON.stringify(sessionUser));
+    if (token) localStorage.setItem("kathak_teacher_token", token);
+  }
+}

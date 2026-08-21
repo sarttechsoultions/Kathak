@@ -2,31 +2,19 @@
 
 import React from "react";
 import { Phone, Mail } from "lucide-react";
+import SocialIcons from "@/components/SocialIcons";
 
 export default function TopHeader() {
   return (
-    <div className="bg-[#f9e7eb] text-stone-300 text-xs py-1 sm:py-2 px-3 sm:px-6 lg:px-10">
+    <div className="bg-[#f9e7eb] text-stone-300 text-xs h-10 sm:h-11 px-3 sm:px-6 lg:px-10 flex items-center">
       <div className="w-full max-w-[1536px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Left Social Icons - Hidden on Mobile, Shown on Desktop */}
-        <div className="hidden sm:flex items-center gap-3">
-          <a href="#" aria-label="LinkedIn" className="p-1 rounded-full hover:bg-stone-800 transition-colors">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/linkedin.png" alt="LinkedIn" className="w-5 h-5 object-contain" />
-          </a>
-          <a href="#" aria-label="Instagram" className="p-1 rounded-full hover:bg-stone-800 transition-colors">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/insta.png" alt="Instagram" className="w-5 h-5 object-contain" />
-          </a>
-          <a href="#" aria-label="Facebook" className="p-1 rounded-full hover:bg-stone-800 transition-colors">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/facebook.png" alt="Facebook" className="w-5 h-5 object-contain" />
-          </a>
-          <a href="#" aria-label="YouTube" className="p-1 rounded-full hover:bg-stone-800 transition-colors">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/youtube.png" alt="YouTube" className="w-5 h-5 object-contain" />
-          </a>
-        </div>
+        <SocialIcons
+          className="hidden sm:flex items-center gap-1.5 lg:gap-2.5"
+          linkClassName="inline-flex items-center justify-center rounded-full transition-transform hover:scale-110"
+          iconClassName="w-6 h-6 object-contain"
+        />
 
         {/* Center Contact Info (Mobile: Only Phone, Email & Button in one row) */}
         <div className="flex items-center gap-2 sm:gap-6 font-medium text-[#000000] text-[11px] sm:text-xs">

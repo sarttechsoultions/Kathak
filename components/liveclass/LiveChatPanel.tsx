@@ -44,9 +44,6 @@ export function LiveChatPanel({
 
   useEffect(() => {
     const socket = getSocket();
-    if (roomName && senderName) {
-      socket.emit("liveclass:join", { roomName, userName: senderName, userRole });
-    }
 
     const onChatHistory = (history: ChatMessage[]) => {
       if (Array.isArray(history) && history.length > 0) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { User, Lock, Eye, EyeOff, GraduationCap, ShieldCheck, ArrowRight, HelpCircle } from "lucide-react";
 import { apiRequest } from "@/lib/api";
+import { persistAuthSession, type SessionUser } from "@/lib/auth";
 
 const fontInter = { fontFamily: "'Inter', sans-serif" };
 
@@ -60,16 +61,26 @@ export default function CombinedLoginPage() {
         });
 
         const user = res?.data?.user;
+        const token = res?.data?.token;
+        const role = typeof user?.role === "string" ? user.role : "STUDENT";
+
+        if (role === "ADMIN" || role === "TEACHER") {
+          setError("This account is not a student account. Please use Teacher or Admin login.");
+          return;
+        }
 
         if (user || res?.status === "success") {
-          // 🔥 FIX: Clear old Teacher/Admin data completely
           localStorage.removeItem("kathak_admin_user");
           localStorage.removeItem("kathak_teacher_user");
+          localStorage.removeItem("kathak_admin_token");
+          localStorage.removeItem("kathak_teacher_token");
 
-          if (user) {
-            localStorage.setItem("kathak_student_user", JSON.stringify(user));
-            localStorage.setItem("kathak_session_user", JSON.stringify(user));
-          }
+          persistAuthSession({
+            role: "STUDENT",
+            token,
+            user: (user || { role: "STUDENT", email: email.trim() }) as SessionUser,
+            rememberMe,
+          });
           router.replace("/student/dashboard");
         } else {
           setError(res?.message || "Invalid student credentials. Please check your email/phone and password.");
@@ -89,17 +100,25 @@ export default function CombinedLoginPage() {
         });
 
         const user = res?.data?.user;
+        const token = res?.data?.token;
+        const role = typeof user?.role === "string" ? user.role : "TEACHER";
+
+        if (role === "STUDENT") {
+          setError("This account is a student account. Please use Student Login.");
+          return;
+        }
 
         if (user || res?.status === "success") {
-          // 🔥 FIX: Clear old Student data completely
           localStorage.removeItem("kathak_student_user");
+          localStorage.removeItem("kathak_student_token");
 
-          if (user) {
-            localStorage.setItem("kathak_admin_user", JSON.stringify(user));
-            localStorage.setItem("kathak_teacher_user", JSON.stringify(user));
-            localStorage.setItem("kathak_session_user", JSON.stringify(user));
-          }
-          router.replace("/teacher/dashboard");
+          persistAuthSession({
+            role: role === "ADMIN" ? "ADMIN" : "TEACHER",
+            token,
+            user: (user || { role, email: email.trim() }) as SessionUser,
+            rememberMe,
+          });
+          router.replace(role === "ADMIN" ? "/admin/dashboard" : "/teacher/dashboard");
         } else {
           setError(res?.message || "Invalid teacher credentials. Please check your teacher ID/email and password.");
         }
@@ -271,7 +290,7 @@ export default function CombinedLoginPage() {
                   <span>Remember Me</span>
                 </label>
                 <Link
-                  href="/student/forgot-password"
+                  href="/contact"
                   className="text-[#C10F3A] font-bold hover:underline"
                 >
                   Forgot Password?
@@ -309,7 +328,7 @@ export default function CombinedLoginPage() {
             {/* Contact Admin Note */}
             <div className="pt-1 text-center text-xs text-stone-500 flex items-center justify-center gap-1.5 font-medium">
               <span>Having trouble signing in?</span>
-              <Link href="/admin/support" className="text-emerald-700 font-bold hover:underline flex items-center gap-1">
+              <Link href="/contact" className="text-emerald-700 font-bold hover:underline flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Contact Admin</span>
               </Link>

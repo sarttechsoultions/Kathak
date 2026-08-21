@@ -23,12 +23,14 @@ interface StudentUser {
 }
 
 interface LiveClass {
+  id?: string;
   title?: string;
   instructor?: string;
   timeStr?: string;
   meetingLink?: string;
   subtitle?: string;
   durationStr?: string;
+  isLive?: boolean;
 }
 
 interface RecentClass {
@@ -251,10 +253,10 @@ export default function StudentDashboardPage() {
                 Today&apos;s Live Class
               </h3>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                todayLiveClass ? "bg-rose-50 text-[#C10F3A] border border-rose-200" : "bg-stone-100 text-stone-500"
+                todayLiveClass?.isLive ? "bg-rose-50 text-[#C10F3A] border border-rose-200" : "bg-stone-100 text-stone-500"
               }`}>
-                {todayLiveClass && <span className="w-1.5 h-1.5 rounded-full bg-[#C10F3A] animate-ping" />}
-                {todayLiveClass ? "LIVE" : "SCHEDULED"}
+                {todayLiveClass?.isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#C10F3A] animate-ping" />}
+                {todayLiveClass?.isLive ? "LIVE" : todayLiveClass ? "SCHEDULED" : "NONE"}
               </span>
             </div>
 
@@ -280,7 +282,7 @@ export default function StudentDashboardPage() {
               className="w-full bg-[#900C27] hover:bg-[#780A20] text-white py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
             >
               <Video className="w-4 h-4 fill-white" />
-              <span>{todayLiveClass ? "Join Live Class" : "View Class Schedule"}</span>
+              <span>{todayLiveClass?.isLive ? "Join Live Class" : todayLiveClass ? "View Class Schedule" : "View Class Schedule"}</span>
             </Link>
           </div>
 
@@ -442,15 +444,13 @@ export default function StudentDashboardPage() {
               </div>
             )}
 
-            <a
+            <Link
               href={upcomingLiveClass?.meetingLink || "/student/classes"}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full bg-[#900C27] hover:bg-[#780A20] text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all block text-center"
+              className="w-full bg-[#900C27] hover:bg-[#780A20] text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
             >
               <Video className="w-3.5 h-3.5 fill-white" />
-              <span>{upcomingLiveClass ? "Join Live Class" : "View Schedule"}</span>
-            </a>
+              <span>{upcomingLiveClass?.isLive ? "Join Live Class" : upcomingLiveClass ? "View Schedule" : "View Schedule"}</span>
+            </Link>
           </div>
 
           {/* Course Progress Card */}

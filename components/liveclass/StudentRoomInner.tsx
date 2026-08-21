@@ -13,6 +13,10 @@ export type JoinInfo = {
   channelName: string;
   token: string;
   uid: number;
+  userId?: string;
+  userName?: string;
+  isMainSpeaker?: boolean;
+  role?: string;
   liveClass: { title: string; batchName: string; teacherName: string };
 };
 
@@ -21,6 +25,8 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   const appId = joinInfo?.appId || "testing";
   
   const joinUid = Number(joinInfo?.uid) || 0;
+  const onLeaveRef = React.useRef(onLeave);
+  onLeaveRef.current = onLeave;
   
   useJoin(
     { appid: appId, channel: channelName, token: joinInfo?.token || null, uid: joinUid },
@@ -30,8 +36,8 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
 
-  // Synchronously initialize student name from localStorage
   const [studentName] = useState<string>(() => {
+    if (joinInfo.userName) return joinInfo.userName;
     if (typeof window !== "undefined") {
       try {
         const stored =
@@ -47,6 +53,20 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
       }
     }
     return "Student";
+  });
+
+  const [studentId] = useState<string | undefined>(() => {
+    if (joinInfo.userId) return joinInfo.userId;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("kathak_student_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return parsed.id || undefined;
+        }
+      } catch {}
+    }
+    return undefined;
   });
 
   const { localMicrophoneTrack, error: micError } = useLocalMicrophoneTrack(micOn);
@@ -73,20 +93,33 @@ function StudentRoomInnerContent({ joinInfo, onLeave }: { joinInfo: JoinInfo; on
   usePublish(tracksToPublish, Boolean(joinInfo?.channelName && joinInfo?.appId) && tracksToPublish.length > 0);
 
   const remoteUsers = useRemoteUsers();
-  
-  // Robust Teacher/Host user resolution (supports UID 1, 999999, string UIDs, or active video publisher)
   const hostUser =
-    remoteUsers.find((u) => u.uid == 1 || u.uid == 999999 || String(u.uid) === "1" || String(u.uid) === "999999") ||
     remoteUsers.find((u) => u.hasVideo) ||
     remoteUsers[0];
 
   useEffect(() => {
     const socket = getSocket();
     if (studentName) {
-      socket.emit("liveclass:join", { roomName: joinInfo.channelName, userName: studentName, userRole: "Student", studentId: joinInfo?.uid ? String(joinInfo.uid) : undefined });
+      socket.emit("liveclass:join", {
+        roomName: joinInfo.channelName,
+        userName: studentName,
+        userRole: "Student",
+        studentId,
+      });
     }
-    return () => { socket.emit("liveclass:leave", { roomName: joinInfo.channelName }); };
-  }, [joinInfo.channelName, joinInfo.uid, studentName]);
+
+    const onClassUpdated = (updated: { roomName?: string; status?: string }) => {
+      if (updated.roomName === joinInfo.channelName && (updated.status === "COMPLETED" || updated.status === "CANCELLED")) {
+        onLeaveRef.current();
+      }
+    };
+    socket.on("liveclass:class-updated", onClassUpdated);
+
+    return () => {
+      socket.emit("liveclass:leave", { roomName: joinInfo.channelName });
+      socket.off("liveclass:class-updated", onClassUpdated);
+    };
+  }, [joinInfo.channelName, studentId, studentName]);
 
   const handRaise = () => {
     getSocket().emit("liveclass:raise-hand", { roomName: joinInfo.channelName, senderName: studentName });

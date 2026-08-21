@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import SocialIcons from "@/components/SocialIcons";
 
 interface NavItem {
   label: string;
@@ -206,24 +207,11 @@ export default function Navbar({ logoSrc = "/logo.png" }: NavbarProps) {
             {/* Mobile Social Media Icons */}
             <div className="flex items-center justify-between pt-2">
               <span className="text-xs text-stone-500 font-medium">Follow Us:</span>
-              <div className="flex items-center gap-3">
-                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="p-1 rounded-full hover:scale-110 transition-transform">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/linkedin.png" alt="LinkedIn" className="w-5.5 h-5.5 object-contain" />
-                </a>
-                <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-1 rounded-full hover:scale-110 transition-transform">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/insta.png" alt="Instagram" className="w-5.5 h-5.5 object-contain" />
-                </a>
-                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-1 rounded-full hover:scale-110 transition-transform">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/facebook.png" alt="Facebook" className="w-5.5 h-5.5 object-contain" />
-                </a>
-                <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="p-1 rounded-full hover:scale-110 transition-transform">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/youtube.png" alt="YouTube" className="w-5.5 h-5.5 object-contain" />
-                </a>
-              </div>
+              <SocialIcons
+                className="flex items-center gap-2"
+                linkClassName="inline-flex items-center justify-center rounded-full hover:scale-110 transition-transform"
+                iconClassName="w-6 h-6 object-contain"
+              />
             </div>
           </div>
         </div>
